@@ -1,29 +1,30 @@
 {
    "gate":
    {
-      "type": "resolution", # or "film"
+      "type": String(choices=["resolution", "film"], default="resolution")
       "primary":
       {
-         "display": True,
-         "width": 1,
-         "color": (0, 0, 0),
+         "display": Boolean(default=True),
+         "width": Integer(default=1),
+         "color": Sequence(type=Real(), size=3, default=(0, 0, 0)),
          "mask":
          {
-            "display": True,
-            "opacity": 0.650,
-            "color": (0, 0, 0)
+            "display": Boolean(default=True),
+            "opacity": Real(default=0.650),
+            "color": Sequence(type=Real(), size=3, default=(0, 0, 0))
          }
       },
       "secondary":
       {
-         "display": False,
-         "scale": (1, 1),
-         "width": 1,
-         "color": (0, 0, 0),
-         "mask": {
-            "display": False,
-            "opacity": 1,
-            "color": (0, 0, 0)
+         "display": Boolean(default=False),
+         "scale": Sequence(type=Real(), size=2, default=(1, 1)),
+         "width": Integer(default=1),
+         "color": Sequence(type=Real(), size=3, default=(0, 0, 0)),
+         "mask":
+         {
+            "display": Boolean(default=False),
+            "opacity": Real(default=1),
+            "color": Sequence(type=Real(), size=3, default=(0, 0, 0))
          }
       }
    },
@@ -31,26 +32,26 @@
    {
       "primary":
       {
-         "display": True,
-         "gate": "primary", # or "secondary"
-         "width": 1,
-         "color": (0, 0, 0),
-         "divisions": (3, 3)
+         "display": Boolean(default=True),
+         "gate": String(choices=["primary", "secondary"], default="primary"),
+         "width": Integer(default=1),
+         "color": Sequence(type=Real(), size=3, default=(0, 0, 0)),
+         "divisions": Sequence(type=Integer(), size=2, default=(3, 3))
       },
       "secondary":
       {
-         "display": False,
-         "gate": "primary",
-         "width": 1,
-         "color": (0, 0, 0),
-         "divisions": (24, 24)
+         "display": Boolean(default=False),
+         "gate": String(choices=["primary", "secondary"], default="primary"),
+         "width": Integer(default=1),
+         "color": Sequence(type=Real(), size=3, default=(0, 0, 0)),
+         "divisions": Sequence(type=Integer(), size=2, default=(24, 24))
       },
       "cross":
       {
-         "display": True,
-         "gate": "primary",
-         "width": 1,
-         "color": (0, 0, 0)
+         "display": Boolean(default=True),
+         "gate": String(choices=["primary", "secondary"], default="primary"),
+         "width": Integer(default=1),
+         "color": Sequence(type=Real(), size=3, default=(0, 0, 0))
       }
    },
    "safe":
@@ -72,132 +73,25 @@
    },
    "text":
    {
-      "display": True,
-      "font": "$CAMRIG_FONTS_PATH/arial.ttf",
-      "face": 0,
-      "elements":
-      [
-         {
-            "display": True,
-            "size": 1.650,
-            "scale": (1, 1),
-            "opacity": 1,
-            "color": (1, 1, 1),
-            "position": (0, -1.1),
-            "align": ("center", "center"), # or "left", or "right", or "top", or "bottom"
-            "attach": ("center", "center"),
-            "format": "%.1f(1)mm",
-            "values": (attribute("camera.focalLength"),)
-         },
-         {
-            "display": True,
-            "size": 1,
-            "scale": (1, 1),
-            "opacity": 1,
-            "color": (1, 1, 1),
-            "position": (-0.99, -1.070),
-            "align": ("left", "center"),
-            "attach": ("center", "center"),
-            "format": "<CAM>"
-         },
-         {
-            "display": True,
-            "size": 1.65,
-            "scale": (1, 1),
-            "opacity": 1,
-            "color": (1, 1, 1),
-            "position": (0.99, -1.1),
-            "align": ("right", "center"),
-            "attach": ("center", "center"),
-            "format": "[%04.0f(1) - %04.0f(2)]",
-            "values": (attribute("camera.startFrame"), attribute("camera.endFrame"))
-         },
-         {
-            "display": attribute("rangeinfo.inRange"),
-            "size": 1.65,
-            "scale": (1, 1),
-            "opacity": 1,
-            "color": (1, 1, 1),
-            "position": (0.72, -1.1),
-            "align": ("right", "center"),
-            "attach": ("center", "center"),
-            "format": "%04.0f(1)",
-            "values": (attribute("time1.outTime"),)
-         },
-         {
-            "display": attribute("rangeinfo.inExtendedRange"),
-            "size": 1.65,
-            "scale": (1, 1),
-            "opacity": 1,
-            "color": (1, 0.75, 0),
-            "position": (0.72, -1.1),
-            "align": ("right", "center"),
-            "attach": ("center", "center"),
-            "format": "%04.0f(1)",
-            "values": (attribute("time1.outTime"),)
-         },
-         {
-            "display": attribute("rangeinfo.outOfRange"),
-            "size": 1.65,
-            "scale": (1, 1),
-            "opacity": 1,
-            "color": (1, 0, 0),
-            "position": (0.72, -1.1),
-            "align": ("right", "center"),
-            "attach": ("center", "center"),
-            "format": "%04.0f(1)",
-            "values": (attribute("time1.outTime"),)
-         },
-         {
-            "display": True,
-            "size": 1.65,
-            "scale": (1, 1),
-            "opacity": 1,
-            "color": (1, 1, 1),
-            "position": (-0.99, 1.04),
-            "align": ("left", "center"),
-            "attach": ("center", "center"),
-            "format": "<DATE2>"
-         },
-         {
-            "display": True,
-            "size": 1.65,
-            "scale": (1, 1),
-            "opacity": 1,
-            "color": (1, 1, 1),
-            "position": (0, 1.04),
-            "align": ("center", "center"),
-            "attach": ("center", "center"),
-            "format": "PROJ_ALL"
-         },
-         {
-            "display": True,
-            "size": 1.65,
-            "scale": (1, 1),
-            "opacity": 1,
-            "color": (1, 1, 1),
-            "position": (0.99, 1.04),
-            "align": ("right", "center"),
-            "attach": ("center", "center"),
-            "format": "<USER>"
-         },
-         {
-            "display": True,
-            "size": 1,
-            "scale": (1, 1),
-            "opacity": 1,
-            "color": (1, 1, 1),
-            "position": (-0.99, -1.15),
-            "align": ("left", "center"),
-            "attach": ("center", "center"),
-            "format": "<FILEEXT>"
-         }
-      ]
+      "display": Boolean(default=True),
+      "font": String(default="$CAMRIG_FONTS_PATH/arial.ttf"),
+      "face": Integer(min=0, default=0),
+      "elements": Sequence(type={"display": True,
+                                 "size": 1.650,
+                                 "scale": (1, 1),
+                                 "opacity": 1,
+                                 "color": (1, 1, 1),
+                                 "position": (0, -1.1),
+                                 "align": ("center", "center"), # or "left", or "right", or "top", or "bottom"
+                                 "attach": ("center", "center"),
+                                 "format": "%.1f(1)mm",
+                                 "values": (attribute("camera.focalLength"),)},
+                           default=[])
    },
    "image":
    {
-      "display": False,
-      "path": "",
-      "position": (0.5, 0.5)
+      "display": Boolean(default=False),
+      "path": String(default=""),
+      "position": Sequence(type=Real(), size=2, default=(0.5, 0.5))
    }
 }
