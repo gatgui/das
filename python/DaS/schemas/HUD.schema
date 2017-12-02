@@ -56,19 +56,19 @@
    },
    "safe":
    {
-      "type": "perspective", # or "horizontal", or "vertical",
-      "gate": "primary",
+      "type": String(choices=["perspective", "horizontal", "vertical"], default="perspective"),
+      "gate": String(choices=["primary", "secondary"], default="primary"),
       "action":
       {
-         "ratio": 0.9,
-         "width": 1,
-         "color": (0, 0, 0)
+         "ratio": Real(default=0.9),
+         "width": Integer(default=1),
+         "color": Sequence(type=Real(), size=3, default=(0, 0, 0))
       },
       "title":
       {
-         "ratio": 0.8,
-         "width": 1,
-         "color": (0, 0, 0)
+         "ratio": Real(default=0.8),
+         "width": Integer(default=1),
+         "color": Sequence(type=Real(), size=3, default=(0, 0, 0))
       }
    },
    "text":
@@ -76,16 +76,19 @@
       "display": Boolean(default=True),
       "font": String(default="$CAMRIG_FONTS_PATH/arial.ttf"),
       "face": Integer(min=0, default=0),
-      "elements": Sequence(type={"display": True,
-                                 "size": 1.650,
-                                 "scale": (1, 1),
-                                 "opacity": 1,
-                                 "color": (1, 1, 1),
-                                 "position": (0, -1.1),
-                                 "align": ("center", "center"), # or "left", or "right", or "top", or "bottom"
-                                 "attach": ("center", "center"),
-                                 "format": "%.1f(1)mm",
-                                 "values": (attribute("camera.focalLength"),)},
+      "elements": Sequence(type={"display": Booelan(default=True),
+                                 "size": Real(default=1),
+                                 "scale": Sequence(type=Real(), size=2, default=(1, 1)),
+                                 "opacity": Real(default=1),
+                                 "color": Sequence(type=Real(), size=3, default=(1, 1, 1)),
+                                 "position": Sequence(type=Real(), size=3, default=(0.5, 0.5)),
+                                 "align": (String(choices=["center", "right", "left"], default="center"),
+                                           String(choices=["center", "top", "bottom"], default="center")),
+                                 "attach": (String(choices=["center", "right", "left"], default="center"),
+                                            String(choices=["center", "top", "bottom"], default="center")),
+                                 "format": String(default=""),
+                                 "values": Sequence(type=???),
+#                                 "values": (attribute("camera.focalLength"),)},
                            default=[])
    },
    "image":
