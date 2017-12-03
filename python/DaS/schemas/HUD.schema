@@ -1,7 +1,7 @@
 {
    "gate":
    {
-      "type": String(choices=["resolution", "film"], default="resolution")
+      "type": String(choices=["resolution", "film"], default="resolution"),
       "primary":
       {
          "display": Boolean(default=True),
@@ -76,8 +76,8 @@
       "display": Boolean(default=True),
       "font": String(default="$CAMRIG_FONTS_PATH/arial.ttf"),
       "face": Integer(min=0, default=0),
-      "elements": Sequence(type={"display": Booelan(default=True),
-                                 "size": Real(default=1),
+      "elements": Sequence(type={"display": Or(Boolean(default=True), Class(Attribute)),
+                                 "size": Or(Real(default=1), Class(Attribute)),
                                  "scale": Sequence(type=Real(), size=2, default=(1, 1)),
                                  "opacity": Real(default=1),
                                  "color": Sequence(type=Real(), size=3, default=(1, 1, 1)),
@@ -87,8 +87,7 @@
                                  "attach": (String(choices=["center", "right", "left"], default="center"),
                                             String(choices=["center", "top", "bottom"], default="center")),
                                  "format": String(default=""),
-                                 "values": Sequence(type=???),
-#                                 "values": (attribute("camera.focalLength"),)},
+                                 "values": Sequence(type=Or(Real(), Class(Attribute)), max_size=4)},
                            default=[])
    },
    "image":
