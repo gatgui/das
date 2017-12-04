@@ -1,11 +1,32 @@
 import os
 import imp
 import glob
-import DaS
-import DaS.schema
+import das
 
+__all__ = ["UnknownSchemaError",
+           "ValidationError",
+           "TypeValidator",
+           "Boolean",
+           "Integer",
+           "Real",
+           "String",
+           "Sequence",
+           "Tuple",
+           "Dict",
+           "Class",
+           "Or",
+           "Optional",
+           "Schema",
+           "LoadSchemas",
+           "ListSchemas",
+           "GetSchema",
+           "GetSchemaModule",
+           "Validate"]
+
+# ---
 
 Schemas = {}
+
 SchemasInitialized = False
 
 # ---
@@ -13,6 +34,7 @@ SchemasInitialized = False
 class UnknownSchemaError(Exception):
    def __init__(self, name):
       super(UnknownSchemaError, self).__init__("'%s' is not a known schema" % name)
+
 
 class ValidationError(Exception):
    def __init__(self, msg):
@@ -29,6 +51,7 @@ class TypeValidator(object):
    def __str__(self):
       return self.__repr__()
 
+
 class Boolean(TypeValidator):
    def __init__(self, default=False):
       super(Boolean, self).__init__()
@@ -43,6 +66,7 @@ class Boolean(TypeValidator):
       if self.default is True:
          s += "default=%s" % self.default
       return s + ")"
+
 
 class Integer(TypeValidator):
    def __init__(self, default=0, min=None, max=None):
@@ -72,6 +96,7 @@ class Integer(TypeValidator):
          s += "%smax=%d" % (sep, self.max)
       return s + ")"
 
+
 class Real(TypeValidator):
    def __init__(self, default=0.0, min=None, max=None):
       super(Real, self).__init__()
@@ -100,6 +125,7 @@ class Real(TypeValidator):
          s += "%smax=%d" % (sep, self.max)
       return s + ")"
 
+
 class String(TypeValidator):
    def __init__(self, default="", choices=None):
       super(String, self).__init__()
@@ -126,6 +152,7 @@ class String(TypeValidator):
             sep = ", "
          s += "]"
       return s + ")"
+
 
 class Sequence(TypeValidator):
    def __init__(self, type, default=[], size=None, min_size=None, max_size=None):
@@ -168,6 +195,7 @@ class Sequence(TypeValidator):
             s += "%smax_size=%d" % (sep, self.max_size)
       return s + ")"
 
+
 class Tuple(TypeValidator):
    def __init__(self, *args, **kwargs):
       super(Tuple, self).__init__()
@@ -196,12 +224,13 @@ class Tuple(TypeValidator):
          s += "%sdefault=%s" % (sep, self.default)
       return s + ")"
 
-class Dict(DaS.DaS, TypeValidator):
+
+class Dict(das.struct.Das, TypeValidator):
    def __init__(self, **kwargs):
       super(Dict, self).__init__(**kwargs)
 
    def _validate(self, data):
-      if not type(data) in (dict, DaS.DaS):
+      if not type(data) in (dict, das.struct.Das):
          raise ValidationError("Expected a dict value, got %s" % type(data))
       for k, v in self._iteritems():
          if not k in data:
@@ -213,7 +242,7 @@ class Dict(DaS.DaS, TypeValidator):
             except ValidationError, e:
                raise ValidationError("Invalid value for key '%s': %s" % (k, e))
 
-   # redefine __str__ as the one from DaS will be used
+   # redefine __str__ as the one from Das will be used
    def __str__(self):
       return self.__repr__()
 
@@ -228,6 +257,7 @@ class Dict(DaS.DaS, TypeValidator):
          sep = ", "
       return s + ")"
 
+
 class Class(TypeValidator):
    def __init__(self, klass):
       super(Class, self).__init__()
@@ -239,6 +269,7 @@ class Class(TypeValidator):
 
    def __repr__(self):
       return "Class(%s)" % self.klass.__name__
+
 
 class Or(TypeValidator):
    def __init__(self, type1, type2):
@@ -255,6 +286,7 @@ class Or(TypeValidator):
    def __repr__(self):
       return "Or(%s, %s)" % (self.type1, self.type2)
 
+
 class Optional(TypeValidator):
    def __init__(self, type):
       super(Optional, self).__init__()
@@ -265,6 +297,7 @@ class Optional(TypeValidator):
 
    def __repr__(self):
       return "Optional(type=%s)" % self.type
+
 
 class Schema(TypeValidator):
    def __init__(self, name):
@@ -277,22 +310,23 @@ class Schema(TypeValidator):
    def __repr__(self):
       return "Schema('%s')" % self.schema
 
+
 # ---
 
 def LoadSchemas():
    global SchemasInitialized
 
    if not SchemasInitialized:
-      # Cleanup DaS.schema submodule
-      for item in dir(DaS.schema):
+      # Cleanup das.schema submodule
+      for item in dir(das.schema):
          if item.startswith("__") and item.endswith("__"):
             continue
          else:
-            exec "del(DaS.schema.%s)" % item in {}
+            exec "del(das.schema.%s)" % item in {}
       p = os.environ.get("DAS_SCHEMA_PATH", None)
       if p is None:
          cwd = os.getcwd()
-         print("[DaS] 'DAS_SCHEMA_PATH' environment variable is not set. Use '%s'." % cwd)
+         print("[das] 'DAS_SCHEMA_PATH' environment variable is not set. Use '%s'." % cwd)
          pl = [cwd]
       else:
          pl = filter(lambda x: os.path.isdir, p.split(os.pathsep))
@@ -303,10 +337,10 @@ def LoadSchemas():
             mod = None
             if os.path.isfile(pp):
                try:
-                  mod = imp.load_source("DaS.schema.%s" % sn, pp)
-                  setattr(DaS.schema, sn, mod)
+                  mod = imp.load_source("das.schema.%s" % sn, pp)
+                  setattr(das.schema, sn, mod)
                except Exception, e:
-                  print("[DaS] Failed to load schema module '%s' (%s)" % (pp, e))
+                  print("[das] Failed to load schema module '%s' (%s)" % (pp, e))
             
             try:
                eval_locals = {"Boolean": Boolean,
@@ -332,14 +366,16 @@ def LoadSchemas():
                      else:
                         Schemas[k] = (v, mod)
             except Exception, e:
-               print("[DaS] Failed to read schemas from '%s' (%s)" % (sp, e))
+               print("[das] Failed to read schemas from '%s' (%s)" % (sp, e))
                raise e
 
       SchemasInitialized = True
 
+
 def ListSchemas():
    LoadSchemas()
    return Schemas.keys()
+
 
 def GetSchema(schema):
    LoadSchemas()
@@ -348,10 +384,12 @@ def GetSchema(schema):
       raise UnknownSchemaError(schema)
    return sch
 
+
 def GetSchemaModule(schema):
    LoadSchemas()
    _, mod = Schemas.get(schema, (None, None))
    return mod
+
 
 def Validate(d, schema):
    s = GetSchema(schema)

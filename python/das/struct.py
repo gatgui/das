@@ -1,10 +1,16 @@
-import os
 import sys
-import imp
-import glob
+import das
 
+__all__ = ["Das",
+           "ReservedNameError",
+           "Read",
+           "Copy",
+           "PrettyPrint",
+           "Write"]
 
-ReservedNames = set(['_is_reserved',
+# ---
+
+ReservedNames = set(['_check_reserved',
                      '_adapt_value',
                      '_update',
                      '_has_key',
@@ -22,16 +28,16 @@ ReservedNames = set(['_is_reserved',
                      '_setdefault',
                      '_validate'])
 
-ExceptOnReservedNameUsage = True
-
+# ---
 
 class ReservedNameError(Exception):
    def __init__(self, name):
       super(ReservedNameError, self).__init__("'%s' is a reserved name" % name)
 
-class DaS(object):
+
+class Das(object):
    def __init__(self, *args, **kwargs):
-      super(DaS, self).__init__()
+      super(Das, self).__init__()
       self.__dict__["_dict"] = {}
       self.__dict__["_schema"] = None
       self._update(*args, **kwargs)
@@ -40,11 +46,11 @@ class DaS(object):
       try:
          return self._dict[k]
       except KeyError:
-         raise AttributeError("'DaS' has not attribute '%s'" % k)
+         raise AttributeError("'Das' has not attribute '%s'" % k)
 
    def __setattr__(self, k, v):
-      if not self._is_reserved(k):
-         self._dict[k] = v
+      self._check_reserved(k)
+      self._dict[k] = v
 
    def __delattr__(self, k):
       del(self._dict[k])
@@ -53,8 +59,8 @@ class DaS(object):
       return self._dict.__getitem__(k)
 
    def __setitem__(self, k, v):
-      if not self._is_reserved(k):
-         self._dict.__setitem__(k, v)
+      self._check_reserved(k)
+      self._dict.__setitem__(k, v)
 
    def __delitem__(self, k):
       return self._dict.__delitem__(k)
@@ -63,22 +69,22 @@ class DaS(object):
       return self._dict.__contains__(k)
 
    def __cmp__(self, oth):
-      return self._dict.__cmp__(oth._dict if isinstance(oth, DaS) else oth)
+      return self._dict.__cmp__(oth._dict if isinstance(oth, Das) else oth)
 
    def __eq__(self, oth):
-      return self._dict.__eq__(oth._dict if isinstance(oth, DaS) else oth)
+      return self._dict.__eq__(oth._dict if isinstance(oth, Das) else oth)
 
    def __ge__(self, oth):
-      return self._dict.__ge__(oth._dict if isinstance(oth, DaS) else oth)
+      return self._dict.__ge__(oth._dict if isinstance(oth, Das) else oth)
 
    def __le__(self, oth):
-      return self._dict.__le__(oth._dict if isinstance(oth, DaS) else oth)
+      return self._dict.__le__(oth._dict if isinstance(oth, Das) else oth)
 
    def __gt__(self, oth):
-      return self._dict.__gt__(oth._dict if isinstance(oth, DaS) else oth)
+      return self._dict.__gt__(oth._dict if isinstance(oth, Das) else oth)
 
    def __lt__(self, oth):
-      return self._dict.__lt__(oth._dict if isinstance(oth, DaS) else oth)
+      return self._dict.__lt__(oth._dict if isinstance(oth, Das) else oth)
 
    def __iter__(self):
       return self._dict.__iter__()
@@ -126,12 +132,11 @@ class DaS(object):
       self._dict.clear()
 
    def _copy(self):
-      return DaS(self._dict.copy())
+      return Das(self._dict.copy())
 
    def _setdefault(self, *args):
       if len(args) >= 1:
-         if self._is_reserved(args[0]):
-            return
+         self._check_reserved(args[0])
       if len(args) >= 2:
          args[1] = self._adapt_value(args[1])
       self._dict.setdefault(*args)
@@ -139,24 +144,17 @@ class DaS(object):
    def _update(self, *args, **kwargs):
       self._dict.update(*args, **kwargs)
       for k, v in self._dict.items():
-         if not self._is_reserved(k):
-            self._dict[k] = self._adapt_value(v)
+         self._check_reserved(k)
+         self._dict[k] = self._adapt_value(v)
 
-   def _is_reserved(self, k):
+   def _check_reserved(self, k):
       if k in ReservedNames:
-         e = ReservedNameError(k)
-         if ExceptOnReservedNameUsage:
-            raise e
-         else:
-            print("[DaS] %s" % e)
-            return True
-      else:
-         return False
+         raise ReservedNameError(k)
 
    def _adapt_value(self, value):
       t = type(value)
       if t == dict:
-         return DaS(**value)
+         return Das(**value)
       elif t in (list, set, tuple):
          n = len(value)
          l = [None] * n
@@ -175,17 +173,38 @@ class DaS(object):
          schema._validate(self)
       self.__dict__["_schema"] = schema
 
+
 # ---
+
+def Read(path, schema=None, **funcs):
+   if schema is not None:
+      sch = das.validation.GetSchema(schema)
+      mod = das.validation.GetSchemaModule(schema)
+      if mod is not None and hasattr(mod, "__all__"):
+         for item in mod.__all__:
+            funcs[item] = getattr(mod, item)
+   else:
+      sch, mod = None, None
+
+   rv = Das()
+   with open(path, "r") as f:
+      rv._update(**eval(f.read(), globals(), funcs))
+
+   rv._validate(sch)
+
+   return rv
+
 
 def Copy(d, deep=True):
    if not deep:
       return d._copy()
    else:
-      rv = DaS(d._dict)
+      rv = Das(d._dict)
       for k, v in rv._dict.items():
-         if isinstance(v, DaS):
+         if isinstance(v, Das):
             rv._dict[k] = Copy(v, deep=True)
       return rv
+
 
 def PrettyPrint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
    if stream is None:
@@ -198,7 +217,7 @@ def PrettyPrint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
 
    t = type(d)
 
-   if t in (DaS, dict):
+   if t in (Das, dict):
       stream.write("{\n")
       n = len(d)
       i = 0
@@ -250,23 +269,6 @@ def PrettyPrint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
    if eof:
       stream.write("\n")
 
-def Read(path, schema=None, **funcs):
-   if schema is not None:
-      sch = GetSchema(schema)
-      mod = GetSchemaModule(schema)
-      if mod is not None and hasattr(mod, "__all__"):
-         for item in mod.__all__:
-            funcs[item] = getattr(mod, item)
-   else:
-      sch, mod = None, None
-
-   rv = DaS()
-   with open(path, "r") as f:
-      rv._update(**eval(f.read(), globals(), funcs))
-
-   rv._validate(sch)
-
-   return rv
 
 def Write(d, path, indent="  "):
    # Validate before writing
@@ -274,6 +276,3 @@ def Write(d, path, indent="  "):
    with open(path, "w") as f:
       PrettyPrint(d, stream=f, indent=indent)
 
-
-from . import schema
-from .validation import LoadSchemas, ListSchemas, GetSchema, GetSchemaModule, Validate
