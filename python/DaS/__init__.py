@@ -1,7 +1,7 @@
 import os
 import sys
+import imp
 import glob
-
 
 
 ReservedNames = set(['_is_reserved',
@@ -19,30 +19,24 @@ ReservedNames = set(['_is_reserved',
                      '_popitem',
                      '_clear',
                      '_copy',
-                     '_setdefault'])
+                     '_setdefault',
+                     '_validate'])
 
 ExceptOnReservedNameUsage = True
-
-Schemas = {}
 
 
 class ReservedNameError(Exception):
    def __init__(self, name):
       super(ReservedNameError, self).__init__("'%s' is a reserved name" % name)
 
-class UnknownSchemaError(Exception):
-   def __init__(self, name):
-      super(UnknownSchemaError, self).__init__("'%s' is not a known schema" % name)
-
-
 class DaS(object):
    def __init__(self, *args, **kwargs):
       super(DaS, self).__init__()
       self.__dict__["_dict"] = {}
+      self.__dict__["_schema"] = None
       self._update(*args, **kwargs)
 
    def __getattr__(self, k):
-      #return self._dict.get(k, None)
       try:
          return self._dict[k]
       except KeyError:
@@ -174,6 +168,13 @@ class DaS(object):
       else:
          return value
 
+   def _validate(self, schema=None):
+      if schema is None:
+         schema = self.__dict__["_schema"]
+      if schema is not None:
+         schema._validate(self)
+      self.__dict__["_schema"] = schema
+
 # ---
 
 def Copy(d, deep=True):
@@ -201,7 +202,9 @@ def PrettyPrint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
       stream.write("{\n")
       n = len(d)
       i = 0
-      for k in d:
+      keys = [k for k in d]
+      keys.sort()
+      for k in keys:
          stream.write("%s%s'%s': " % (tindent, indent, k))
          v = d[k]
          PrettyPrint(v, stream, indent=indent, depth=depth+1, inline=True, eof=False)
@@ -247,219 +250,30 @@ def PrettyPrint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
    if eof:
       stream.write("\n")
 
-def Read(path, **funcs):
+def Read(path, schema=None, **funcs):
+   if schema is not None:
+      sch = GetSchema(schema)
+      mod = GetSchemaModule(schema)
+      if mod is not None and hasattr(mod, "__all__"):
+         for item in mod.__all__:
+            funcs[item] = getattr(mod, item)
+   else:
+      sch, mod = None, None
+
    rv = DaS()
    with open(path, "r") as f:
       rv._update(**eval(f.read(), globals(), funcs))
+
+   rv._validate(sch)
+
    return rv
 
 def Write(d, path, indent="  "):
+   # Validate before writing
+   d._validate()
    with open(path, "w") as f:
       PrettyPrint(d, stream=f, indent=indent)
 
-# === Validation 
 
-class TypeValidator(object):
-   def __init__(self):
-      super(TypeValidator, self).__init__()
-
-   def validate(self, data):
-      return False
-
-   def __str__(self):
-      return self.__repr__()
-
-class Boolean(TypeValidator):
-   def __init__(self, default=False):
-      super(Boolean, self).__init__()
-      self.default = bool(default)
-
-   def validate(self, data):
-      return isinstance(data, bool)
-
-   def __repr__(self):
-      s = "Boolean(";
-      if self.default is True:
-         s += "default=%s" % self.default
-      return s + ")"
-
-class Integer(TypeValidator):
-   def __init__(self, default=0, min=None, max=None):
-      super(Integer, self).__init__()
-      self.default = long(default)
-      self.min = min
-      self.max = max
-
-   def validate(self, data):
-      if not type(data) in (int, long):
-         return False
-      if self.min is not None and data < self.min:
-         return False
-      if self.max is not None and data > self.max:
-         return False
-      return True
-
-   def __repr__(self):
-      s = "Integer(";
-      sep = ""
-      if self.default is not None and self.default != 0:
-         s += "default=%s" % self.default
-         sep = ", "
-      if self.min is not None:
-         s += "%smin=%d" % (sep, self.min)
-         sep = ", "
-      if self.max is not None:
-         s += "%smax=%d" % (sep, self.max)
-      return s + ")"
-
-class Real(TypeValidator):
-   def __init__(self, default=0.0, min=None, max=None):
-      super(Real, self).__init__()
-      self.default = float(default)
-      self.min = min
-      self.max = max
-
-   def validate(self, data):
-      if not type(data) in (int, long, float):
-         return False
-      if self.min is not None and data < self.min:
-         return False
-      if self.max is not None and data > self.max:
-         return False
-      return True
-
-   def __repr__(self):
-      s = "Real(";
-      sep = ""
-      if self.default is not None and self.default != 0.0:
-         s += "default=%s" % self.default
-         sep = ", "
-      if self.min is not None:
-         s += "%smin=%d" % (sep, self.min)
-         sep = ", "
-      if self.max is not None:
-         s += "%smax=%d" % (sep, self.max)
-      return s + ")"
-
-class String(TypeValidator):
-   def __init__(self, default="", choices=None):
-      super(String, self).__init__()
-      self.default = str(default)
-      self.choices = choices
-
-   def validate(self, data):
-      if not type(data) in (str, unicode):
-         return False
-      if self.choices is not None and not data in self.choices:
-         return False
-      return True
-
-   def __repr__(self):
-      s = "String(";
-      sep = ""
-      if self.default is not None and self.default != "":
-         s += "default='%s'" % self.default
-         sep = ", "
-      if self.choices is not None:
-         s += "%schoices=[" % sep
-         sep = ""
-         for c in self.choices:
-            s += "%s'%s'" % (sep, c)
-            sep = ", "
-      return s + ")"
-
-class Sequence(TypeValidator):
-   def __init__(self, type, default=[], size=None, min_size=None, max_size=None):
-      super(Sequence, self).__init__()
-      self.default = list(default)
-      self.size = size
-      self.min_size = min_size
-      self.max_size = max_size
-      self.elementType = type
-
-   def validate(self, data):
-      if not type(data) in (tuple, list, set):
-         return False
-      n = len(data)
-      if self.size is not None:
-         if n != self.size:
-            return False
-      else:
-         if self.min_size is not None and n < self.min_size:
-            return False
-         if self.max_size is not None and n > self.max_size:
-            return False
-      return True
-
-   def __repr__(self):
-      s = "Sequence(type=%s" % self.elementType
-      sep = ", "
-      if self.default is not None and len(self.default) > 0:
-         s += "%sdefault=%s" % (sep, self.default)
-      if self.size is not None:
-         s += "%ssize=%d" % (sep, self.size)
-      else:
-         if self.min_size is not None:
-            s += "%smin_size=%d" % (sep, self.min_size)
-         if self.max_size is not None:
-            s += "%smax_size=%d" % (sep, self.max_size)
-      return s + ")"
-
-class Class(TypeValidator):
-   def __init__(self, klass):
-      super(Class, self).__init__()
-      self.klass = klass
-
-   def validate(self, data):
-      return isinstance(data, self.klass)
-
-   def __repr__(self):
-      return "Class(%s)" % self.klass.__name__
-
-class Or(TypeValidator):
-   def __init__(self, type1, type2):
-      super(Or, self).__init__()
-      self.type1 = type1
-      self.type2 = type2
-
-   def validate(self, data):
-      return (self.type1.validate(data) or self.type2.validate(data))
-
-   def __repr__(self):
-      return "Or(%s, %s)" % (self.type1, self.type2)
-
-
-def Validate(d, schema):
-   found = Schemas.get(schema)
-   if found is None:
-      p = os.environ.get("DAS_SCHEMA_PATH", None)
-      if p is None:
-         raise UnknownSchemaError(schema)
-      else:
-         pl = filter(lambda x: os.path.isdir, p.split(os.pathsep))
-         for d in pl:
-            for s in glob.glob(d+"/*.schema"):
-               sn = os.path.splitext(os.path.basename(s))[0]
-               if sn in Schemas:
-                  print("[DaS] Skip schema in '%s'" % s)
-                  continue
-               try:
-                  with open(s, "r") as f:
-                     d = eval(f.read(), globals(), {"Boolean": Boolean,
-                                                    "Integer": Integer,
-                                                    "Real": Real,
-                                                    "String": String,
-                                                    "Sequence": Sequence,
-                                                    "Class": Class,
-                                                    "Or": Or})
-                     Schemas[sn] = DaS(d)
-                     if sn == schema:
-                        found = Schemas[sn]
-               except Exception, e:
-                  print("[DaS] Failed to read schema '%s' (%s)" % (s, e))
-      if found is None:
-         raise UnknownSchemaError(schema)
-   # Now validates!
-   for k, v in d._iteritems():
-      if not k in found:
-         return False
+from . import schema
+from .validation import LoadSchemas, ListSchemas, GetSchema, GetSchemaModule, Validate
