@@ -13,7 +13,8 @@ __all__ = ["UnknownSchemaError",
            "String",
            "Sequence",
            "Tuple",
-           "Dict",
+           "StaticDict",
+           "DynamicDict",
            "Class",
            "Or",
            "Optional",
@@ -234,9 +235,9 @@ class Tuple(TypeValidator):
       return s + ")"
 
 
-class Dict(das.struct.Das, TypeValidator):
+class StaticDict(das.struct.Das, TypeValidator):
    def __init__(self, **kwargs):
-      super(Dict, self).__init__(**kwargs)
+      super(StaticDict, self).__init__(**kwargs)
 
    def _validate(self, data):
       if not type(data) in (dict, das.struct.Das):
@@ -256,7 +257,7 @@ class Dict(das.struct.Das, TypeValidator):
       return self.__repr__()
 
    def __repr__(self):
-      s = "Dict("
+      s = "StaticDict("
       sep = ""
       keys = [k for k in self]
       keys.sort()
@@ -267,9 +268,9 @@ class Dict(das.struct.Das, TypeValidator):
       return s + ")"
 
 
-class DDict(TypeValidator):
+class DynamicDict(TypeValidator):
    def __init__(self, ktype, vtype, default=None, **kwargs):
-      super(DDict, self).__init__()
+      super(DynamicDict, self).__init__()
       self.ktype = ktype
       self.vtype = vtype
       self.default = default
@@ -292,7 +293,7 @@ class DDict(TypeValidator):
             raise ValidationError("Invalid value for key '%s': %s" % (k, e))
 
    def __repr__(self):
-      s = "DDict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
+      s = "DynamicDict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
       if self.default is not None:
          s += ", default=%s" % self.default
       for k, v in self.vtypeOverrides:
@@ -365,14 +366,15 @@ def load_schemas():
             continue
          else:
             exec "del(das.schema.%s)" % item in {}
+
       p = os.environ.get("DAS_SCHEMA_PATH", None)
-      print("DAS_SCHEMA_PATH=%s" % p)
       if p is None:
          cwd = os.getcwd()
          print("[das] 'DAS_SCHEMA_PATH' environment variable is not set. Use '%s'." % cwd)
          pl = [cwd]
       else:
          pl = filter(lambda x: os.path.isdir, p.split(os.pathsep))
+
       for d in pl:
          for sp in glob.glob(d+"/*.schema"):
             sn = os.path.splitext(os.path.basename(sp))[0]
@@ -384,7 +386,7 @@ def load_schemas():
                   setattr(das.schema, sn, mod)
                except Exception, e:
                   print("[das] Failed to load schema module '%s' (%s)" % (pp, e))
-            
+
             try:
                eval_locals = {"Boolean": Boolean,
                               "Integer": Integer,
@@ -392,14 +394,17 @@ def load_schemas():
                               "String": String,
                               "Sequence": Sequence,
                               "Tuple": Tuple,
-                              "Dict": Dict,
+                              "StaticDict": StaticDict,
+                              "DynamicDict": DynamicDict,
                               "Class": Class,
                               "Or": Or,
                               "Optional": Optional,
                               "Schema": Schema}
+
                if mod is not None and hasattr(mod, "__all__"):
                   for an in mod.__all__:
                      eval_locals[an] = getattr(mod, an)
+
                with open(sp, "r") as f:
                   d = eval(f.read(), globals(), eval_locals)
                   for k, v in d.iteritems():
@@ -408,6 +413,7 @@ def load_schemas():
                         print("[Das] Schema '%s' is already defined. Ignore definition from '%s'." % (k, sp))
                      else:
                         gSchemas[k] = (v, mod)
+
             except Exception, e:
                print("[das] Failed to read schemas from '%s' (%s)" % (sp, e))
                raise e
