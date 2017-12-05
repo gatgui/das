@@ -1,4 +1,5 @@
 import os
+import re
 import imp
 import glob
 import das
@@ -127,16 +128,24 @@ class Real(TypeValidator):
 
 
 class String(TypeValidator):
-   def __init__(self, default="", choices=None):
+   def __init__(self, default="", choices=None, matches=None):
       super(String, self).__init__()
       self.default = str(default)
       self.choices = choices
+      self.matches = None
+      if choices is None and matches is not None:
+         if type(matches) in (str, unicode):
+            self.matches = re.compile(matches)
+         else:
+            self.matches = matches
 
    def _validate(self, data):
       if not type(data) in (str, unicode):
          raise ValidationError("Expected a string value, got %s" % type(data))
       if self.choices is not None and not data in self.choices:
          raise ValidationError("String value must be on of %s, got '%s'" % (self.choices, data))
+      if self.matches is not None and not self.matches.match(data):
+         raise ValidationError("String value '%s' doesn't match pattern '%s'" % (data, self.matches.pattern))
 
    def __repr__(self):
       s = "String(";
@@ -259,11 +268,14 @@ class Dict(das.struct.Das, TypeValidator):
 
 
 class DDict(TypeValidator):
-   def __init__(self, ktype, vtype, default=None):
+   def __init__(self, ktype, vtype, default=None, **kwargs):
       super(DDict, self).__init__()
       self.ktype = ktype
       self.vtype = vtype
       self.default = default
+      self.vtypeOverrides = {}
+      for k, v in kwargs.iteritems():
+         self.vtypeOverrides[k] = v
 
    def _validate(self, data):
       if not type(data) in (dict, das.struct.Das):
@@ -272,16 +284,19 @@ class DDict(TypeValidator):
          try:
             self.ktype._validate(k)
          except ValidationError, e:
-            raise ValidationError("Invalid value for key '%s': %s" % (k, e))
+            raise ValidationError("Invalid key value '%s': %s" % (k, e))
          try:
-            self.vtype._validate(data[k])
+            vtype = self.vtypeOverrides.get(k, self.vtype)
+            vtype._validate(data[k])
          except ValidationError, e:
-            raise ValidationError("Invalid value for key '%s' value: %s" % (k, e))
+            raise ValidationError("Invalid value for key '%s': %s" % (k, e))
 
    def __repr__(self):
       s = "DDict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
       if self.default is not None:
          s += ", default=%s" % self.default
+      for k, v in self.vtypeOverrides:
+         s += ", %s=%s" % (k, v)
       return s + ")"
 
 

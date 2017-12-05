@@ -1,0 +1,12 @@
+{
+   "project": "testproj",
+   "sequence": "common",
+   "shot": "global",
+   "asset_group": "cast",
+   "name": "hero",
+   "part": "body",
+   "datatype": "shader",
+   "context": "render",
+   "variant": "hurt",
+   "version": 10
+}
