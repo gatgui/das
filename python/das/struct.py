@@ -3,14 +3,14 @@ import das
 
 __all__ = ["Das",
            "ReservedNameError",
-           "Read",
-           "Copy",
-           "PrettyPrint",
-           "Write"]
+           "read",
+           "copy",
+           "pprint",
+           "write"]
 
 # ---
 
-ReservedNames = set(['_check_reserved',
+gReservedNames = set(['_check_reserved',
                      '_adapt_value',
                      '_update',
                      '_has_key',
@@ -148,7 +148,7 @@ class Das(object):
          self._dict[k] = self._adapt_value(v)
 
    def _check_reserved(self, k):
-      if k in ReservedNames:
+      if k in gReservedNames:
          raise ReservedNameError(k)
 
    def _adapt_value(self, value):
@@ -176,10 +176,10 @@ class Das(object):
 
 # ---
 
-def Read(path, schema=None, **funcs):
+def read(path, schema=None, **funcs):
    if schema is not None:
-      sch = das.validation.GetSchema(schema)
-      mod = das.validation.GetSchemaModule(schema)
+      sch = das.validation.get_schema(schema)
+      mod = das.validation.get_schema_module(schema)
       if mod is not None and hasattr(mod, "__all__"):
          for item in mod.__all__:
             funcs[item] = getattr(mod, item)
@@ -195,18 +195,18 @@ def Read(path, schema=None, **funcs):
    return rv
 
 
-def Copy(d, deep=True):
+def copy(d, deep=True):
    if not deep:
       return d._copy()
    else:
       rv = Das(d._dict)
       for k, v in rv._dict.items():
          if isinstance(v, Das):
-            rv._dict[k] = Copy(v, deep=True)
+            rv._dict[k] = copy(v, deep=True)
       return rv
 
 
-def PrettyPrint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
+def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
    if stream is None:
       stream = sys.stdout
 
@@ -226,7 +226,7 @@ def PrettyPrint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
       for k in keys:
          stream.write("%s%s'%s': " % (tindent, indent, k))
          v = d[k]
-         PrettyPrint(v, stream, indent=indent, depth=depth+1, inline=True, eof=False)
+         pprint(v, stream, indent=indent, depth=depth+1, inline=True, eof=False)
          i += 1
          if i >= n:
             stream.write("\n")
@@ -239,7 +239,7 @@ def PrettyPrint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
       n = len(d)
       i = 0
       for v in d:
-         PrettyPrint(v, stream, indent=indent, depth=depth+1, inline=False, eof=False)
+         pprint(v, stream, indent=indent, depth=depth+1, inline=False, eof=False)
          i += 1
          if i >= n:
             stream.write("\n")
@@ -252,7 +252,7 @@ def PrettyPrint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
       n = len(d)
       i = 0
       for v in d:
-         PrettyPrint(v, stream, indent=indent, depth=depth+1, inline=False, eof=False)
+         pprint(v, stream, indent=indent, depth=depth+1, inline=False, eof=False)
          i += 1
          if i >= n:
             stream.write("\n")
@@ -270,9 +270,9 @@ def PrettyPrint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
       stream.write("\n")
 
 
-def Write(d, path, indent="  "):
+def write(d, path, indent="  "):
    # Validate before writing
    d._validate()
    with open(path, "w") as f:
-      PrettyPrint(d, stream=f, indent=indent)
+      pprint(d, stream=f, indent=indent)
 

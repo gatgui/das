@@ -88,7 +88,7 @@
             "align": ("center", "center"), # or "left", or "right", or "top", or "bottom"
             "attach": ("center", "center"),
             "format": "%.1f(1)mm",
-            "values": (attribute("camera.focalLength"),)
+            "values": (Attribute("camera.focalLength"),)
          },
          {
             "display": True,
@@ -111,10 +111,10 @@
             "align": ("right", "center"),
             "attach": ("center", "center"),
             "format": "[%04.0f(1) - %04.0f(2)]",
-            "values": (attribute("camera.startFrame"), attribute("camera.endFrame"))
+            "values": (Attribute("camera.startFrame"), Attribute("camera.endFrame"))
          },
          {
-            "display": attribute("rangeinfo.inRange"),
+            "display": Attribute("rangeinfo.inRange"),
             "size": 1.65,
             "scale": (1, 1),
             "opacity": 1,
@@ -123,10 +123,10 @@
             "align": ("right", "center"),
             "attach": ("center", "center"),
             "format": "%04.0f(1)",
-            "values": (attribute("time1.outTime"),)
+            "values": (Attribute("time1.outTime"),)
          },
          {
-            "display": attribute("rangeinfo.inExtendedRange"),
+            "display": Attribute("rangeinfo.inExtendedRange"),
             "size": 1.65,
             "scale": (1, 1),
             "opacity": 1,
@@ -135,10 +135,10 @@
             "align": ("right", "center"),
             "attach": ("center", "center"),
             "format": "%04.0f(1)",
-            "values": (attribute("time1.outTime"),)
+            "values": (Attribute("time1.outTime"),)
          },
          {
-            "display": attribute("rangeinfo.outOfRange"),
+            "display": Attribute("rangeinfo.outOfRange"),
             "size": 1.65,
             "scale": (1, 1),
             "opacity": 1,
@@ -147,7 +147,7 @@
             "align": ("right", "center"),
             "attach": ("center", "center"),
             "format": "%04.0f(1)",
-            "values": (attribute("time1.outTime"),)
+            "values": (Attribute("time1.outTime"),)
          },
          {
             "display": True,

@@ -1,4 +1,4 @@
 
-from .struct import Das, Read, Write, Copy, PrettyPrint
-from .validation import LoadSchemas, ListSchemas, GetSchema, GetSchemaModule, Validate
+from .struct import Das, read, write, copy, pprint
+from .validation import load_schemas, list_schemas, get_schema, get_schema_module, validate
 from . import schema

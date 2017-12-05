@@ -17,17 +17,17 @@ __all__ = ["UnknownSchemaError",
            "Or",
            "Optional",
            "Schema",
-           "LoadSchemas",
-           "ListSchemas",
-           "GetSchema",
-           "GetSchemaModule",
-           "Validate"]
+           "load_schemas",
+           "list_schemas",
+           "get_schema",
+           "get_schema_module",
+           "validate"]
 
 # ---
 
-Schemas = {}
+gSchemas = {}
 
-SchemasInitialized = False
+gSchemasInitialized = False
 
 # ---
 
@@ -258,6 +258,33 @@ class Dict(das.struct.Das, TypeValidator):
       return s + ")"
 
 
+class DDict(TypeValidator):
+   def __init__(self, ktype, vtype, default=None):
+      super(DDict, self).__init__()
+      self.ktype = ktype
+      self.vtype = vtype
+      self.default = default
+
+   def _validate(self, data):
+      if not type(data) in (dict, das.struct.Das):
+         raise ValidationError("Expected a dict value, got %s" % type(data))
+      for k in data:
+         try:
+            self.ktype._validate(k)
+         except ValidationError, e:
+            raise ValidationError("Invalid value for key '%s': %s" % (k, e))
+         try:
+            self.vtype._validate(data[k])
+         except ValidationError, e:
+            raise ValidationError("Invalid value for key '%s' value: %s" % (k, e))
+
+   def __repr__(self):
+      s = "DDict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
+      if self.default is not None:
+         s += ", default=%s" % self.default
+      return s + ")"
+
+
 class Class(TypeValidator):
    def __init__(self, klass):
       super(Class, self).__init__()
@@ -305,7 +332,7 @@ class Schema(TypeValidator):
       self.schema = name
 
    def _validate(self, data):
-      Validate(data, self.schema)
+      validate(data, self.schema)
 
    def __repr__(self):
       return "Schema('%s')" % self.schema
@@ -313,10 +340,10 @@ class Schema(TypeValidator):
 
 # ---
 
-def LoadSchemas():
-   global SchemasInitialized
+def load_schemas():
+   global gSchemasInitialized
 
-   if not SchemasInitialized:
+   if not gSchemasInitialized:
       # Cleanup das.schema submodule
       for item in dir(das.schema):
          if item.startswith("__") and item.endswith("__"):
@@ -324,6 +351,7 @@ def LoadSchemas():
          else:
             exec "del(das.schema.%s)" % item in {}
       p = os.environ.get("DAS_SCHEMA_PATH", None)
+      print("DAS_SCHEMA_PATH=%s" % p)
       if p is None:
          cwd = os.getcwd()
          print("[das] 'DAS_SCHEMA_PATH' environment variable is not set. Use '%s'." % cwd)
@@ -361,36 +389,36 @@ def LoadSchemas():
                   d = eval(f.read(), globals(), eval_locals)
                   for k, v in d.iteritems():
                      k = "%s.%s" % (sn, k)
-                     if k in Schemas:
+                     if k in gSchemas:
                         print("[Das] Schema '%s' is already defined. Ignore definition from '%s'." % (k, sp))
                      else:
-                        Schemas[k] = (v, mod)
+                        gSchemas[k] = (v, mod)
             except Exception, e:
                print("[das] Failed to read schemas from '%s' (%s)" % (sp, e))
                raise e
 
-      SchemasInitialized = True
+      gSchemasInitialized = True
 
 
-def ListSchemas():
-   LoadSchemas()
-   return Schemas.keys()
+def list_schemas():
+   load_schemas()
+   return gSchemas.keys()
 
 
-def GetSchema(schema):
-   LoadSchemas()
-   sch, _ = Schemas.get(schema, (None, None))
+def get_schema(schema):
+   load_schemas()
+   sch, _ = gSchemas.get(schema, (None, None))
    if sch is None:
       raise UnknownSchemaError(schema)
    return sch
 
 
-def GetSchemaModule(schema):
-   LoadSchemas()
-   _, mod = Schemas.get(schema, (None, None))
+def get_schema_module(schema):
+   load_schemas()
+   _, mod = gSchemas.get(schema, (None, None))
    return mod
 
 
-def Validate(d, schema):
-   s = GetSchema(schema)
+def validate(d, schema):
+   s = get_schema(schema)
    s._validate(d)
