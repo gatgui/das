@@ -38,6 +38,8 @@ gSchemaNames = {}
 gSchemaModules = {}
 # Map schema name to its validator instance and schema file path
 gSchemas = {}
+# Current schema scope
+gCurrentSchema = ""
 
 # ---
 
@@ -353,7 +355,10 @@ class Optional(TypeValidator):
 class Schema(TypeValidator):
    def __init__(self, name):
       super(Schema, self).__init__()
-      self.schema = name
+      if not "." in name:
+         self.schema = gCurrentSchema + "." + name
+      else:
+         self.schema = name
 
    def _validate(self, data):
       validate(data, self.schema)
@@ -365,7 +370,7 @@ class Schema(TypeValidator):
 # ---
 
 def load_schemas(paths=None):
-   global gSchemaPath, gDirSchemas, gSchemaNames, gSchemaModules, gSchemas
+   global gSchemaPath, gDirSchemas, gSchemaNames, gSchemaModules, gSchemas, gCurrentSchema
 
    schemaPath = (os.pathsep.join(paths) if paths is not None else os.environ.get("DAS_SCHEMA_PATH", ""))
    if schemaPath == gSchemaPath:
@@ -436,7 +441,9 @@ def load_schemas(paths=None):
 
             names = []
             with open(sf, "r") as f:
+               gCurrentSchema = sn
                rv = eval(f.read(), globals(), el)
+               gCurrentSchema = ""
                for k, v in rv.iteritems():
                   k = "%s.%s" % (sn, k)
                   names.append(k)
