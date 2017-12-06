@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import imp
 import glob
 import das
@@ -21,31 +22,17 @@ __all__ = ["UnknownSchemaError",
            "SchemaType",
            "load_schemas",
            "list_schemas",
-           "get_schema",
+           "list_schema_types",
+           "get_schema_type",
            "get_schema_path",
            "get_schema_module",
            "validate"]
 
 # ---
 
-# Value of DAS_SCHEMA_PATH when load_schemas was last called
-gSchemaPath = ""
-# Map schema file directory to list of loaded schema files
-gDirSchemas = {}
-# Map schema file path to list of defined schemas
-gSchemaNames = {}
-# Map schema file path to its associated python module (if any)
-gSchemaModules = {}
-# Map schema name to its validator instance and schema file path
-gSchemas = {}
-# Current schema scope
-gCurrentSchema = ""
-
-# ---
-
 class UnknownSchemaError(Exception):
    def __init__(self, name):
-      super(UnknownSchemaError, self).__init__("'%s' is not a known schema" % name)
+      super(UnknownSchemaError, self).__init__("'%s' is not a known schema%s" % (name, " type" if "." in name else ""))
 
 
 class ValidationError(Exception):
@@ -306,7 +293,7 @@ class DynamicDict(TypeValidator):
       s = "DynamicDict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
       if self.default is not None:
          s += ", default=%s" % self.default
-      for k, v in self.vtypeOverrides:
+      for k, v in self.vtypeOverrides.iteritems():
          s += ", %s=%s" % (k, v)
       return s + ")"
 
@@ -353,10 +340,12 @@ class Optional(TypeValidator):
 
 
 class SchemaType(TypeValidator):
+   CurrentSchema = ""
+
    def __init__(self, name):
       super(SchemaType, self).__init__()
       if not "." in name:
-         self.name = gCurrentSchema + "." + name
+         self.name = self.CurrentSchema + "." + name
       else:
          self.name = name
 
@@ -367,130 +356,289 @@ class SchemaType(TypeValidator):
       return "SchemaType('%s')" % self.name
 
 
-# ---
+class Schema(object):
+   def __init__(self, location, path, dont_load=False):
+      super(Schema, self).__init__()
+      name = os.path.splitext(os.path.basename(path))[0]
+      if "." in name:
+         raise Exception("Schema file base name must not contain '.'")
+      self.name = name
+      self.path = path
+      self.location = location
+      self.module = None
+      self.types = {}
+      if not dont_load:
+         self.load()
 
-def load_schemas(paths=None):
-   global gSchemaPath, gDirSchemas, gSchemaNames, gSchemaModules, gSchemas, gCurrentSchema
+   def load(self):
+      if not self.path:
+         return
 
-   schemaPath = (os.pathsep.join(paths) if paths is not None else os.environ.get("DAS_SCHEMA_PATH", ""))
-   if schemaPath == gSchemaPath:
-      return
+      self.unload()
 
-   oldDirs = set(filter(lambda x: os.path.isdir, gSchemaPath.split(os.pathsep)))
-   newDirs = set(filter(lambda x: os.path.isdir, schemaPath.split(os.pathsep)))
-
-   eval_locals = {"Boolean": Boolean,
-                  "Integer": Integer,
-                  "Real": Real,
-                  "String": String,
-                  "Sequence": Sequence,
-                  "Tuple": Tuple,
-                  "StaticDict": StaticDict,
-                  "DynamicDict": DynamicDict,
-                  "Class": Class,
-                  "Or": Or,
-                  "Optional": Optional,
-                  "SchemaType": SchemaType}
-
-   # Remove schemas not in DAS_SCHEMA_PATH anymore
-   for d in oldDirs:
-      if d in newDirs or not d in gDirSchemas:
-         continue
-
-      for sf in gDirSchemas[d]:
-         if sf in gSchemaNames:
-            for sn in gSchemaNames[sf]:
-               sch, _ = gSchemas.get(sn, (None, None))
-               if sch is not None:
-                  del(gSchemas[sn])
-            del(gSchemaNames[sf])
-
-         if sf in gSchemaModules:
-            mod = gSchemaModules[sf]
-            if mod is not None:
-               delattr(das.schema, mod.__name__.split(".")[-1])
-            del(gSchemaModules[sf])
-
-      del(gDirSchemas[d])
-
-   # Add schemas for new items in DAS_SCHEMA_PATH
-   for d in newDirs:
-      if d in oldDirs:
-         continue
-
-      dirSchemas = glob.glob(d+"/*.schema")
-
-      for sf in dirSchemas:
-         sn = os.path.splitext(os.path.basename(sf))[0]
-         pp = os.path.splitext(sf)[0] + ".py"
-
-         mod = None
-         if os.path.isfile(pp):
-            try:
-               mod = imp.load_source("das.schema.%s" % sn, pp)
-               setattr(das.schema, sn, mod)
-            except Exception, e:
-               print("[das] Failed to load schema module '%s' (%s)" % (pp, e))
-         gSchemaModules[sf] = mod
-
+      pmp = os.path.splitext(self.path)[0] + ".py"
+      if os.path.isfile(pmp):
          try:
-            el = eval_locals.copy()
-            if mod is not None and hasattr(mod, "__all__"):
-               for an in mod.__all__:
-                  el[an] = getattr(mod, an)
-
-            names = []
-            with open(sf, "r") as f:
-               gCurrentSchema = sn
-               rv = eval(f.read(), globals(), el)
-               gCurrentSchema = ""
-               for k, v in rv.iteritems():
-                  k = "%s.%s" % (sn, k)
-                  names.append(k)
-                  if k in gSchemas:
-                     print("[Das] Schema '%s' is already defined. Ignore definition from '%s'." % (k, sf))
-                  else:
-                     gSchemas[k] = (v, sf)
-            gSchemaNames[sf] = names
-
+            self.module = imp.load_source("das.schema.%s" % self.name, pmp)
+            setattr(das.schema, self.name, self.module)
          except Exception, e:
-            print("[das] Failed to read schemas from '%s' (%s)" % (sf, e))
+            print("[das] Failed to load schema module '%s' (%s)" % (pmp, e))
+
+      eval_locals = {"Boolean": Boolean,
+                     "Integer": Integer,
+                     "Real": Real,
+                     "String": String,
+                     "Sequence": Sequence,
+                     "Tuple": Tuple,
+                     "StaticDict": StaticDict,
+                     "DynamicDict": DynamicDict,
+                     "Class": Class,
+                     "Or": Or,
+                     "Optional": Optional,
+                     "SchemaType": SchemaType}
+      if self.module is not None and hasattr(self.module, "__all__"):
+         for an in self.module.__all__:
+            eval_locals[an] = getattr(self.module, an)
+
+      names = []
+      with open(self.path, "r") as f:
+         SchemaType.CurrentSchema = self.name
+         rv = eval(f.read(), globals(), eval_locals)
+         SchemaType.CurrentSchema = ""
+         for typename, validator in rv.iteritems():
+            k = "%s.%s" % (self.name, typename)
+            if SchemaTypesRegistry.instance.has_schema_type(k):
+               raise Exception("[das] Schema type '%s' already registered in another schema")
+            else:
+               self.types[k] = validator
+
+   def unload(self):
+      if self.module is not None:
+         delattr(das.schema, self.module.__name__.split(".")[-1])
+         self.module = None
+      self.types = {}
+
+   def list_types(self, sort=True):
+      rv = self.types.keys()
+      if sort:
+         rv.sort()
+      return rv
+
+   def has_type(self, name):
+      return (name in self.types)
+
+   def get_type(self, name):
+      return self.types.get(name, None)
+
+
+class SchemaLocation(object):
+   def __init__(self, path=None, dont_load=False):
+      super(SchemaLocation, self).__init__()
+      if path:
+         self.path = os.path.abspath(path).replace("\\", "/")
+         if sys.path == "win32":
+            self.path = self.path.lower()
+      else:
+         self.path = None
+      self.schemas = {}
+      if not dont_load:
+         self.load_schemas()
+
+   def load_schemas(self):
+      if not self.path:
+         return
+
+      self.unload_schemas()
+
+      schema_files = glob.glob(self.path + "/*.schema")
+      for schema_file in schema_files:
+         try:
+            schema = Schema(self, schema_file, dont_load=True)
+            if SchemaTypesRegistry.instance.has_schema(schema.name):
+               raise Exception("[das] Schema '%s' already registered in another schema")
+            else:
+               schema.load()
+               self.schemas[schema.name] = schema
+         except Exception, e:
+            print("[das] Failed to read schemas from '%s' (%s)" % (schema_file, e))
             raise e
 
-      gDirSchemas[d] = dirSchemas
+   def unload_schemas(self):
+      for _, schema in self.schemas.iteritems():
+         schema.unload()
+      self.schemas = {}
 
-   gSchemaPath = schemaPath
+   def list_schemas(self, sort=True):
+      rv = self.schemas.keys()
+      if sort:
+         rv.sort()
+      return rv
+
+   def has_schema(self, name):
+      return (name in self.schemas)
+
+   def get_schema(self, name):
+      return self.schemas.get(name, None)
+
+   def list_schema_types(self, sort=True):
+      rv = set()
+      for _, schema in self.schemas.iteritems():
+         rv = rv.union(schema.list_types(sort=False))
+      rv = list(rv)
+      if sort:
+         rv.sort()
+      return rv
+
+   def has_schema_type(self, name):
+      for sname, schema in self.schemas.iteritems():
+         if schema.has_type(name):
+            return True
+      return False
+
+   def get_schema_type(self, name):
+      for sname, schema in self.schemas.iteritems():
+         if name.startswith(sname+"."):
+            rv = schema.get_type(name)
+            if rv is not None:
+               return rv
+      return None
+
+   def __hash__(self):
+      return hash(self.path)
+
+
+class SchemaTypesRegistry(object):
+   instance = None
+
+   def __init__(self):
+      super(SchemaTypesRegistry, self).__init__()
+      if SchemaTypesRegistry.instance is not None:
+         raise Exception("SchemaTypesRegistry must be globally unique")
+      self.path = ""
+      self.locations = set()
+      SchemaTypesRegistry.instance = self
+
+   def load_schemas(self, paths=None):
+      path = (os.pathsep.join(paths) if paths is not None else os.environ.get("DAS_SCHEMA_PATH", ""))
+      if path == self.path:
+         return
+
+      locations = set()
+      for d in path.split(os.pathsep):
+         if not os.path.isdir(d):
+            continue
+         location = SchemaLocation(d, dont_load=True)
+         if not location in self.locations:
+            locations.add(location)
+
+      for location in self.locations:
+         if not location in locations:
+            location.unload_schemas()
+
+      # Load schemas after removing the unncessary ones
+      for location in locations:
+         location.load_schemas()
+
+      self.locations = locations
+      self.path = path
+
+   def list_schemas(self, sort=True):
+      self.load_schemas()
+      rv = set()
+      for location in self.locations:
+         rv = rv.union(location.list_schemas(sort=False))
+      rv = list(rv)
+      if sort:
+         rv.sort()
+      return rv
+
+   def list_schema_types(self, sort=True):
+      self.load_schemas()
+      rv = set()
+      for location in self.locations:
+         rv = rv.union(location.list_schema_types(sort=False))
+      rv = list(rv)
+      if sort:
+         rv.sort()
+      return rv
+
+   def has_schema(self, name):
+      for location in self.locations:
+         if location.has_schema(name):
+            return True
+      return False
+
+   def get_schema(self, name):
+      self.load_schemas()
+      rv = None
+      for location in self.locations:
+         rv = location.get_schema(name)
+         if rv is not None:
+            return rv
+      if rv is None:
+         raise UnknownSchemaError(name)
+      else:
+         return rv
+
+   def has_schema_type(self, name):
+      for location in self.locations:
+         if location.has_schema_type(name):
+            return True
+      return False
+
+   def get_schema_type(self, name):
+      self.load_schemas()
+      rv = None
+      for location in self.locations:
+         rv = location.get_schema_type(name)
+      if rv is None:
+         raise UnknownSchemaError(name)
+      else:
+         return rv
+
+   def get_schema_path(self, name):
+      self.load_schemas()
+      if "." in name:
+         name = name.split(".")[0]
+      return self.get_schema(name).path
+
+
+   def get_schema_module(self, name):
+      self.load_schemas()
+      if "." in name:
+         name = name.split(".")[0]
+      return self.get_schema(name).module
+
+
+# Initialize registry
+SchemaTypesRegistry()
+
+# ---
+
+
+def load_schemas(paths=None):
+   SchemaTypesRegistry.instance.load_schemas(paths=paths)
 
 
 def list_schemas():
-   load_schemas()
-   return gSchemas.keys()
+   return SchemaTypesRegistry.instance.list_schemas()
 
 
-def get_schema(schema):
-   load_schemas()
-   sch, _ = gSchemas.get(schema, (None, None))
-   if sch is None:
-      raise UnknownSchemaError(schema)
-   return sch
+def list_schema_types():
+   return SchemaTypesRegistry.instance.list_schema_types()
 
 
-def get_schema_path(schema):
-   load_schemas()
-   sch, sf = gSchemas.get(schema, (None, None))
-   if sch is None:
-      raise UnknownSchemaError(schema)
-   return sf
+def get_schema_type(name):
+   return SchemaTypesRegistry.instance.get_schema_type(name)
 
 
-def get_schema_module(schema):
-   load_schemas()
-   sch, sf = gSchemas.get(schema, (None, None))
-   if sch is None:
-      raise UnknownSchemaError(schema)
-   return gSchemaModules.get(sf, None)
+def get_schema_path(name):
+   return SchemaTypesRegistry.instance.get_schema_path(name)
+
+
+def get_schema_module(name):
+   return SchemaTypesRegistry.instance.get_schema_module(name)
 
 
 def validate(d, schema):
-   s = get_schema(schema)
-   s._validate(d)
+   get_schema_type(schema)._validate(d)

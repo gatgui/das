@@ -39,7 +39,7 @@ class Das(object):
    def __init__(self, *args, **kwargs):
       super(Das, self).__init__()
       self.__dict__["_dict"] = {}
-      self.__dict__["_schema"] = None
+      self.__dict__["_schema_type"] = None
       self._update(*args, **kwargs)
 
    def __getattr__(self, k):
@@ -166,20 +166,20 @@ class Das(object):
       else:
          return value
 
-   def _validate(self, schema=None):
-      if schema is None:
-         schema = self.__dict__["_schema"]
-      if schema is not None:
-         schema._validate(self)
-      self.__dict__["_schema"] = schema
+   def _validate(self, schema_type=None):
+      if schema_type is None:
+         schema_type = self.__dict__["_schema_type"]
+      if schema_type is not None:
+         schema_type._validate(self)
+      self.__dict__["_schema_type"] = schema_type
 
 
 # ---
 
-def read(path, schema=None, **funcs):
-   if schema is not None:
-      sch = das.validation.get_schema(schema)
-      mod = das.validation.get_schema_module(schema)
+def read(path, schema_type=None, **funcs):
+   if schema_type is not None:
+      sch = das.validation.get_schema_type(schema_type)
+      mod = das.validation.get_schema_module(schema_type)
       if mod is not None and hasattr(mod, "__all__"):
          for item in mod.__all__:
             funcs[item] = getattr(mod, item)
