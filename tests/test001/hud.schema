@@ -7,7 +7,7 @@
 
    "GateMask": StaticDict(display = Or(Boolean(default=True), Class(Attribute)),
                           opacity = Or(Real(default=0.650), Class(Attribute)),
-                          color   = Sequence(type=Real(), size=3, default=(0, 0, 0))),
+                          color   = SchemaType("Color")),
 
    "TextItem": StaticDict(display  = Or(Boolean(default=True), Class(Attribute)),
                           size     = Or(Real(default=1), Class(Attribute)),
