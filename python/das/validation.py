@@ -18,7 +18,7 @@ __all__ = ["UnknownSchemaError",
            "Class",
            "Or",
            "Optional",
-           "Schema",
+           "SchemaType",
            "load_schemas",
            "list_schemas",
            "get_schema",
@@ -352,19 +352,19 @@ class Optional(TypeValidator):
       return "Optional(type=%s)" % self.type
 
 
-class Schema(TypeValidator):
+class SchemaType(TypeValidator):
    def __init__(self, name):
-      super(Schema, self).__init__()
+      super(SchemaType, self).__init__()
       if not "." in name:
-         self.schema = gCurrentSchema + "." + name
+         self.name = gCurrentSchema + "." + name
       else:
-         self.schema = name
+         self.name = name
 
    def _validate(self, data):
-      validate(data, self.schema)
+      validate(data, self.name)
 
    def __repr__(self):
-      return "Schema('%s')" % self.schema
+      return "SchemaType('%s')" % self.name
 
 
 # ---
@@ -390,7 +390,7 @@ def load_schemas(paths=None):
                   "Class": Class,
                   "Or": Or,
                   "Optional": Optional,
-                  "Schema": Schema}
+                  "SchemaType": SchemaType}
 
    # Remove schemas not in DAS_SCHEMA_PATH anymore
    for d in oldDirs:
