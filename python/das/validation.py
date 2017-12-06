@@ -22,7 +22,10 @@ __all__ = ["UnknownSchemaError",
            "SchemaType",
            "load_schemas",
            "list_schemas",
+           "get_schema",
+           "has_schema",
            "list_schema_types",
+           "has_schema_type",
            "get_schema_type",
            "get_schema_path",
            "get_schema_module",
@@ -356,6 +359,9 @@ class SchemaType(TypeValidator):
       return "SchemaType('%s')" % self.name
 
 
+# ---
+
+
 class Schema(object):
    def __init__(self, location, path, dont_load=False):
       super(Schema, self).__init__()
@@ -570,15 +576,11 @@ class SchemaTypesRegistry(object):
 
    def get_schema(self, name):
       self.load_schemas()
-      rv = None
       for location in self.locations:
          rv = location.get_schema(name)
          if rv is not None:
             return rv
-      if rv is None:
-         raise UnknownSchemaError(name)
-      else:
-         return rv
+      raise UnknownSchemaError(name)
 
    def has_schema_type(self, name):
       for location in self.locations:
@@ -588,13 +590,11 @@ class SchemaTypesRegistry(object):
 
    def get_schema_type(self, name):
       self.load_schemas()
-      rv = None
       for location in self.locations:
          rv = location.get_schema_type(name)
-      if rv is None:
-         raise UnknownSchemaError(name)
-      else:
-         return rv
+         if rv is not None:
+            return rv
+      raise UnknownSchemaError(name)
 
    def get_schema_path(self, name):
       self.load_schemas()
@@ -624,8 +624,20 @@ def list_schemas():
    return SchemaTypesRegistry.instance.list_schemas()
 
 
+def has_schema():
+   return SchemaTypesRegistry.instance.has_schema()
+
+
+def get_schema(name):
+   return SchemaTypesRegistry.instance.get_schema(name)
+
+
 def list_schema_types():
    return SchemaTypesRegistry.instance.list_schema_types()
+
+
+def has_schema_type(name):
+   return SchemaTypesRegistry.instance.has_schema_type(name)
 
 
 def get_schema_type(name):
