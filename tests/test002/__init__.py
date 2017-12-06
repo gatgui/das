@@ -26,12 +26,12 @@ class TestCase(unittest.TestCase):
    # Test functions
 
    def testRead1(self):
-      rv = das.read(self.TestDir + "/ok.asset", schema="asset.TokenDict")
+      rv = das.read(self.TestDir + "/ok.asset", schema_type="asset.TokenDict")
 
    def testRead2(self):
       with self.assertRaises(das.ValidationError):
-         das.read(self.TestDir + "/error1.asset", schema="asset.TokenDict")
+         das.read(self.TestDir + "/error1.asset", schema_type="asset.TokenDict")
 
    def testRead3(self):
       with self.assertRaises(das.ValidationError):
-         das.read(self.TestDir + "/error2.asset", schema="asset.TokenDict")
+         das.read(self.TestDir + "/error2.asset", schema_type="asset.TokenDict")

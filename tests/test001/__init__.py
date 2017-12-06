@@ -34,27 +34,27 @@ class TestCase(unittest.TestCase):
       self.assertRaises(Exception, das.read, self.InputFile)
 
    def testRead2(self):
-      rv = das.read(self.InputFile, schema="hud.HUD")
+      rv = das.read(self.InputFile, schema_type="hud.HUD")
       self.assertIsInstance(rv, das.struct.Das)
 
    def testWrite1(self):
-      das.write(das.read(self.InputFile, schema="hud.HUD"), self.OutputFile)
+      das.write(das.read(self.InputFile, schema_type="hud.HUD"), self.OutputFile)
       self.assertTrue(os.path.isfile(self.OutputFile))
 
    def testWrite2(self):
-      hud = das.read(self.InputFile, schema="hud.HUD")
+      hud = das.read(self.InputFile, schema_type="hud.HUD")
       hud.text.elements[2].align = ("top", "left")
       self.assertRaises(Exception, das.write, self.OutputFile)
 
    def testCompare1(self):
-      hud1 = das.read(self.InputFile, schema="hud.HUD")
+      hud1 = das.read(self.InputFile, schema_type="hud.HUD")
       das.write(hud1, self.OutputFile)
-      hud2 = das.read(self.OutputFile, schema="hud.HUD")
+      hud2 = das.read(self.OutputFile, schema_type="hud.HUD")
       self.assertEqual(hud1, hud2)
 
    def testCompare1(self):
-      hud1 = das.read(self.InputFile, schema="hud.HUD")
+      hud1 = das.read(self.InputFile, schema_type="hud.HUD")
       das.write(hud1, self.OutputFile)
-      hud2 = das.read(self.OutputFile, schema="hud.HUD")
+      hud2 = das.read(self.OutputFile, schema_type="hud.HUD")
       hud2.text.elements[2].opacity = 0.5
       self.assertNotEqual(hud1, hud2)
