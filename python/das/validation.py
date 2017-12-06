@@ -22,14 +22,22 @@ __all__ = ["UnknownSchemaError",
            "load_schemas",
            "list_schemas",
            "get_schema",
+           "get_schema_path",
            "get_schema_module",
            "validate"]
 
 # ---
 
+# Value of DAS_SCHEMA_PATH when load_schemas was last called
+gSchemaPath = ""
+# Map schema file directory to list of loaded schema files
+gDirSchemas = {}
+# Map schema file path to list of defined schemas
+gSchemaNames = {}
+# Map schema file path to its associated python module (if any)
+gSchemaModules = {}
+# Map schema name to its validator instance and schema file path
 gSchemas = {}
-
-gSchemasInitialized = False
 
 # ---
 
@@ -356,69 +364,95 @@ class Schema(TypeValidator):
 
 # ---
 
-def load_schemas():
-   global gSchemasInitialized
+def load_schemas(paths=None):
+   global gSchemaPath, gDirSchemas, gSchemaNames, gSchemaModules, gSchemas
 
-   if not gSchemasInitialized:
-      # Cleanup das.schema submodule
-      for item in dir(das.schema):
-         if item.startswith("__") and item.endswith("__"):
-            continue
-         else:
-            exec "del(das.schema.%s)" % item in {}
+   schemaPath = (os.pathsep.join(paths) if paths is not None else os.environ.get("DAS_SCHEMA_PATH", ""))
+   if schemaPath == gSchemaPath:
+      return
 
-      p = os.environ.get("DAS_SCHEMA_PATH", None)
-      if p is None:
-         cwd = os.getcwd()
-         print("[das] 'DAS_SCHEMA_PATH' environment variable is not set. Use '%s'." % cwd)
-         pl = [cwd]
-      else:
-         pl = filter(lambda x: os.path.isdir, p.split(os.pathsep))
+   oldDirs = set(filter(lambda x: os.path.isdir, gSchemaPath.split(os.pathsep)))
+   newDirs = set(filter(lambda x: os.path.isdir, schemaPath.split(os.pathsep)))
 
-      for d in pl:
-         for sp in glob.glob(d+"/*.schema"):
-            sn = os.path.splitext(os.path.basename(sp))[0]
-            pp = os.path.splitext(sp)[0] + ".py"
-            mod = None
-            if os.path.isfile(pp):
-               try:
-                  mod = imp.load_source("das.schema.%s" % sn, pp)
-                  setattr(das.schema, sn, mod)
-               except Exception, e:
-                  print("[das] Failed to load schema module '%s' (%s)" % (pp, e))
+   eval_locals = {"Boolean": Boolean,
+                  "Integer": Integer,
+                  "Real": Real,
+                  "String": String,
+                  "Sequence": Sequence,
+                  "Tuple": Tuple,
+                  "StaticDict": StaticDict,
+                  "DynamicDict": DynamicDict,
+                  "Class": Class,
+                  "Or": Or,
+                  "Optional": Optional,
+                  "Schema": Schema}
 
+   # Remove schemas not in DAS_SCHEMA_PATH anymore
+   for d in oldDirs:
+      if d in newDirs or not d in gDirSchemas:
+         continue
+
+      for sf in gDirSchemas[d]:
+         if sf in gSchemaNames:
+            for sn in gSchemaNames[sf]:
+               sch, _ = gSchemas.get(sn, (None, None))
+               if sch is not None:
+                  del(gSchemas[sn])
+            del(gSchemaNames[sf])
+
+         if sf in gSchemaModules:
+            mod = gSchemaModules[sf]
+            if mod is not None:
+               delattr(das.schema, mod.__name__.split(".")[-1])
+            del(gSchemaModules[sf])
+
+      del(gDirSchemas[d])
+
+   # Add schemas for new items in DAS_SCHEMA_PATH
+   for d in newDirs:
+      if d in oldDirs:
+         continue
+
+      dirSchemas = glob.glob(d+"/*.schema")
+
+      for sf in dirSchemas:
+         sn = os.path.splitext(os.path.basename(sf))[0]
+         pp = os.path.splitext(sf)[0] + ".py"
+
+         mod = None
+         if os.path.isfile(pp):
             try:
-               eval_locals = {"Boolean": Boolean,
-                              "Integer": Integer,
-                              "Real": Real,
-                              "String": String,
-                              "Sequence": Sequence,
-                              "Tuple": Tuple,
-                              "StaticDict": StaticDict,
-                              "DynamicDict": DynamicDict,
-                              "Class": Class,
-                              "Or": Or,
-                              "Optional": Optional,
-                              "Schema": Schema}
-
-               if mod is not None and hasattr(mod, "__all__"):
-                  for an in mod.__all__:
-                     eval_locals[an] = getattr(mod, an)
-
-               with open(sp, "r") as f:
-                  d = eval(f.read(), globals(), eval_locals)
-                  for k, v in d.iteritems():
-                     k = "%s.%s" % (sn, k)
-                     if k in gSchemas:
-                        print("[Das] Schema '%s' is already defined. Ignore definition from '%s'." % (k, sp))
-                     else:
-                        gSchemas[k] = (v, mod)
-
+               mod = imp.load_source("das.schema.%s" % sn, pp)
+               setattr(das.schema, sn, mod)
             except Exception, e:
-               print("[das] Failed to read schemas from '%s' (%s)" % (sp, e))
-               raise e
+               print("[das] Failed to load schema module '%s' (%s)" % (pp, e))
+         gSchemaModules[sf] = mod
 
-      gSchemasInitialized = True
+         try:
+            el = eval_locals.copy()
+            if mod is not None and hasattr(mod, "__all__"):
+               for an in mod.__all__:
+                  el[an] = getattr(mod, an)
+
+            names = []
+            with open(sf, "r") as f:
+               rv = eval(f.read(), globals(), el)
+               for k, v in rv.iteritems():
+                  k = "%s.%s" % (sn, k)
+                  names.append(k)
+                  if k in gSchemas:
+                     print("[Das] Schema '%s' is already defined. Ignore definition from '%s'." % (k, sf))
+                  else:
+                     gSchemas[k] = (v, sf)
+            gSchemaNames[sf] = names
+
+         except Exception, e:
+            print("[das] Failed to read schemas from '%s' (%s)" % (sf, e))
+            raise e
+
+      gDirSchemas[d] = dirSchemas
+
+   gSchemaPath = schemaPath
 
 
 def list_schemas():
@@ -434,10 +468,20 @@ def get_schema(schema):
    return sch
 
 
+def get_schema_path(schema):
+   load_schemas()
+   sch, sf = gSchemas.get(schema, (None, None))
+   if sch is None:
+      raise UnknownSchemaError(schema)
+   return sf
+
+
 def get_schema_module(schema):
    load_schemas()
-   _, mod = gSchemas.get(schema, (None, None))
-   return mod
+   sch, sf = gSchemas.get(schema, (None, None))
+   if sch is None:
+      raise UnknownSchemaError(schema)
+   return gSchemaModules.get(sf, None)
 
 
 def validate(d, schema):
