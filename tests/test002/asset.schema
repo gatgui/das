@@ -1,0 +1,18 @@
+{
+   "Token": String(choices=["asset_group",
+                            "name",
+                            "part",
+                            "datatype",
+                            "context",
+                            "variant",
+                            "sequence",
+                            "shot",
+                            "project",
+                            "version"]),
+
+   "TokenStringValue": String(matches="^[a-zA-Z][a-zA-Z0-9]*$"),
+
+   "TokenDict": DynamicDict(ktype=SchemaType("Token"),
+                            vtype=SchemaType("TokenStringValue"),
+                            version=Integer(min=1))
+}

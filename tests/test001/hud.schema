@@ -1,0 +1,74 @@
+{
+   "Color": Sequence(type=Real(), size=3, default=(0, 0, 0)),
+
+   "VerticalAlign": String(choices=["center", "top", "bottom"], default="center"),
+
+   "HorizontalAlign": String(choices=["center", "left", "right"], default="center"),
+
+   "GateMask": StaticDict(display = Or(Boolean(default=True), Class(Attribute)),
+                          opacity = Or(Real(default=0.650), Class(Attribute)),
+                          color   = SchemaType("Color")),
+
+   "TextItem": StaticDict(display  = Or(Boolean(default=True), Class(Attribute)),
+                          size     = Or(Real(default=1), Class(Attribute)),
+                          scale    = Sequence(type=Real(), size=2, default=(1, 1)),
+                          opacity  = Real(default=1),
+                          color    = Sequence(type=Real(), size=3, default=(1, 1, 1)),
+                          position = Sequence(type=Real(), size=2, default=(0.5, 0.5)),
+                          align    = Tuple(SchemaType("HorizontalAlign"), SchemaType("VerticalAlign")),
+                          attach   = Tuple(SchemaType("HorizontalAlign"), SchemaType("VerticalAlign")),
+                          format   = String(default=""),
+                          values   = Optional(Sequence(type=Or(Real(), Class(Attribute)), max_size=4))),
+
+   "SourceGate": String(choices=["primary", "secondary"], default="primary"),
+
+   "Image": StaticDict(display  = Boolean(default=False),
+                       path     = String(default=""),
+                       position = Sequence(type=Real(), size=2, default=(0.5, 0.5))),
+
+   "Text": StaticDict(display  = Boolean(default=True),
+                      font     = String(default="$CAMRIG_FONTS_PATH/arial.ttf"),
+                      face     = Integer(min=0, default=0),
+                      elements = Sequence(type=SchemaType("TextItem"), default=[])),
+
+   "Gate": StaticDict(type      = String(choices=["resolution", "film"], default="resolution"),
+                      primary   = StaticDict(display = Boolean(default=True),
+                                             width   = Integer(default=1),
+                                             color   = SchemaType("Color"),
+                                             mask    = SchemaType("GateMask")),
+                      secondary = StaticDict(display = Boolean(default=False),
+                                             scale   = Sequence(type=Real(), size=2, default=(1, 1)),
+                                             width   = Integer(default=1),
+                                             color   = SchemaType("Color"),
+                                             mask    = SchemaType("GateMask"))),
+
+   "Chart": StaticDict(primary   = StaticDict(display   = Boolean(default=True),
+                                              gate      = SchemaType("SourceGate"),
+                                              width     = Integer(default=1),
+                                              color     = SchemaType("Color"),
+                                              divisions = Sequence(type=Integer(), size=2, default=(3, 3))),
+                       secondary = StaticDict(display   = Boolean(default=False),
+                                              gate      = SchemaType("SourceGate"),
+                                              width     = Integer(default=1),
+                                              color     = SchemaType("Color"),
+                                              divisions = Sequence(type=Integer(), size=2, default=(24, 24))),
+                       cross     = StaticDict(display   = Boolean(default=False),
+                                              gate      = SchemaType("SourceGate"),
+                                              width     = Integer(default=1),
+                                              color     = SchemaType("Color"))),
+
+   "Safe": StaticDict(type   = String(choices=["perspective", "horizontal", "vertical"], default="perspective"),
+                      gate   = SchemaType("SourceGate"),
+                      action = StaticDict(ratio = Real(default=0.9),
+                                          width = Integer(default=1),
+                                          color = SchemaType("Color")),
+                      title  = StaticDict(ratio = Real(default=0.8),
+                                          width = Integer(default=1),
+                                          color = SchemaType("Color"))),
+
+   "HUD": StaticDict(image = SchemaType("Image"),
+                     text  = SchemaType("Text"),
+                     gate  = SchemaType("Gate"),
+                     chart = SchemaType("Chart"),
+                     safe  = SchemaType("Safe"))
+}
