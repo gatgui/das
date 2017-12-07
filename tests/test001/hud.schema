@@ -1,6 +1,8 @@
 {
    "Color": Sequence(type=Real(), size=3, default=(0, 0, 0)),
 
+   "Point2": Sequence(type=Real(), size=2, default=(0, 0)),
+
    "VerticalAlign": String(choices=["center", "top", "bottom"], default="center"),
 
    "HorizontalAlign": String(choices=["center", "left", "right"], default="center"),
@@ -11,10 +13,10 @@
 
    "TextItem": StaticDict(display  = Or(Boolean(default=True), Class(Attribute)),
                           size     = Or(Real(default=1), Class(Attribute)),
-                          scale    = Sequence(type=Real(), size=2, default=(1, 1)),
+                          scale    = SchemaType("Point2", default=(1, 1)),
                           opacity  = Real(default=1),
-                          color    = Sequence(type=Real(), size=3, default=(1, 1, 1)),
-                          position = Sequence(type=Real(), size=2, default=(0.5, 0.5)),
+                          color    = SchemaType("Color", default=(1, 1, 1)),
+                          position = SchemaType("Point2", default=(0.5, 0.5)),
                           align    = Tuple(SchemaType("HorizontalAlign"), SchemaType("VerticalAlign")),
                           attach   = Tuple(SchemaType("HorizontalAlign"), SchemaType("VerticalAlign")),
                           format   = String(default=""),
@@ -24,7 +26,7 @@
 
    "Image": StaticDict(display  = Boolean(default=False),
                        path     = String(default=""),
-                       position = Sequence(type=Real(), size=2, default=(0.5, 0.5))),
+                       position = SchemaType("Point2", default=(0.5, 0.5))),
 
    "Text": StaticDict(display  = Boolean(default=True),
                       font     = String(default="$CAMRIG_FONTS_PATH/arial.ttf"),
@@ -37,7 +39,7 @@
                                              color   = SchemaType("Color"),
                                              mask    = SchemaType("GateMask")),
                       secondary = StaticDict(display = Boolean(default=False),
-                                             scale   = Sequence(type=Real(), size=2, default=(1, 1)),
+                                             scale   = SchemaType("Point2", default=(1, 1)),
                                              width   = Integer(default=1),
                                              color   = SchemaType("Color"),
                                              mask    = SchemaType("GateMask"))),
