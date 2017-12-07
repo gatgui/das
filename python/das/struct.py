@@ -26,7 +26,8 @@ gReservedNames = set(['_check_reserved',
                      '_clear',
                      '_copy',
                      '_setdefault',
-                     '_validate'])
+                     '_validate',
+                     '_make_default'])
 
 # ---
 

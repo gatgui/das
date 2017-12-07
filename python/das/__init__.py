@@ -16,5 +16,6 @@ from .validation import (ValidationError,
                          get_schema_type,
                          get_schema_path,
                          get_schema_module,
-                         validate)
+                         validate,
+                         make_default)
 from . import schema

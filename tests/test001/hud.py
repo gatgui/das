@@ -2,9 +2,12 @@
 __all__ = ["Attribute"]
 
 class Attribute(object):
-   def __init__(self, attr):
+   def __init__(self, attr=""):
       super(Attribute, self).__init__()
       self.attr = attr
+
+   def copy(self):
+      return Attribute(self.attr)
 
    def __str__(self):
       return "Attribute('%s')" % self.attr
