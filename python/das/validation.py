@@ -443,6 +443,25 @@ class Optional(TypeValidator):
       return "Optional(type=%s)" % self.type
 
 
+class Empty(TypeValidator):
+   def __init__(self):
+      super(Empty, self).__init__()
+
+   def _validate_default(self, value):
+      if value is not None:
+         raise Exception("Empty only accepts None as default value, got %s" % type(value).__name__)
+
+   def _validate(self, data):
+      if data is not None:
+         raise ValidationError("Expected None, got %s" % type(data).__name__)
+
+   def _make_default(self):
+      return None
+
+   def __repr__(self):
+      return "Empty()"
+
+
 class SchemaType(TypeValidator):
    CurrentSchema = ""
 
