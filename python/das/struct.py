@@ -1,3 +1,4 @@
+import re
 import sys
 import das
 
@@ -182,6 +183,22 @@ class Das(object):
 # ---
 
 def read(path, schema_type=None, **funcs):
+   # Read header data
+   md = {}
+   mde = re.compile("^\s*([^:]+):\s*(.*)\s*$")
+   with open(path, "r") as f:
+      for l in f.readlines():
+         l = l.strip()
+         if l.startswith("#"):
+            m = mde.match(l[1:])
+            if m is not None:
+               md[m.group(1)] = m.group(2)
+         else:
+            break
+
+   if schema_type is None:
+      schema_type = md.get("schema_type", None)
+
    if schema_type is not None:
       sch = das.validation.get_schema_type(schema_type)
       mod = das.validation.get_schema_module(schema_type)
@@ -279,5 +296,8 @@ def write(d, path, indent="  "):
    # Validate before writing
    d._validate()
    with open(path, "w") as f:
+      if d._schema_type:
+         st = das.validation.get_schema_type_name(d._schema_type)
+         f.write("# schema_type: %s\n" % st)
       pprint(d, stream=f, indent=indent)
 

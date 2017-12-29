@@ -19,3 +19,9 @@ for st in stl:
    das.pprint(v)
    if hasattr(v, "_schema_type"):
       print(v._schema_type)
+
+print("=== timeline.ClipSource")
+das.write(das.make_default("timeline.ClipSource"), "./out.tl")
+tl = das.read("./out.tl")
+das.pprint(tl)
+print(tl._schema_type)
