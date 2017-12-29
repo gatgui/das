@@ -1,9 +1,12 @@
 import os
+import re
 import sys
+import glob
 
 thisdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(thisdir, "..", "python"))
-os.environ["DAS_SCHEMA_PATH"] = "%s/test001%s%s/test002" % (thisdir, os.pathsep, thisdir)
+dirs = map(lambda y: thisdir + "/" + y, filter(lambda x: re.match("test\d+", x), os.listdir(thisdir)))
+os.environ["DAS_SCHEMA_PATH"] = os.pathsep.join(dirs)
 
 import das
 
