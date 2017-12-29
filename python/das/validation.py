@@ -20,6 +20,7 @@ __all__ = ["UnknownSchemaError",
            "Class",
            "Or",
            "Optional",
+           "Empty",
            "SchemaType",
            "load_schemas",
            "list_schemas",
@@ -550,6 +551,7 @@ class Schema(object):
                      "Class": Class,
                      "Or": Or,
                      "Optional": Optional,
+                     "Empty": Empty,
                      "SchemaType": SchemaType}
       if self.module is not None and hasattr(self.module, "__all__"):
          for an in self.module.__all__:
