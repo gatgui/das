@@ -301,13 +301,15 @@ class StaticDict(das.struct.Das, TypeValidator):
                raise ValidationError("Invalid value for key '%s': %s" % (k, e))
 
    def _make_default(self):
-      rv = {}
+      dct = {}
       for k, v in self._iteritems():
          dv = v._make_default()
          if isinstance(v, Optional) and not dv:
             continue
-         rv[k] = dv
-      return das.struct.Das(rv)
+         dct[k] = dv
+      rv = das.struct.Das(dct)
+      rv._set_schema_type(self)
+      return rv
 
    # redefine __str__ as the one from Das will be used
    def __str__(self):
@@ -356,9 +358,11 @@ class DynamicDict(TypeValidator):
 
    def _make_default(self):
       if self.default is None:
-         return das.struct.Das({})
+         rv = das.struct.Das({})
       else:
-         return das.struct.Das(self.default)
+         rv = das.struct.Das(self.default)
+      rv._set_schema_type(self)
+      return rv
 
    def __repr__(self):
       s = "DynamicDict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
@@ -481,7 +485,7 @@ class SchemaType(TypeValidator):
    def __repr__(self):
       s = "SchemaType('%s'" % self.name
       if self.default is not None:
-         s += ", default=%s" % self.default
+         s += ", default=%s" % str(self.default)
       return s + ")"
 
 

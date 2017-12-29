@@ -14,3 +14,5 @@ for st in stl:
    v = das.make_default(st)
    print(type(v).__name__)
    das.pprint(v)
+   if hasattr(v, "_schema_type"):
+      print(v._schema_type)

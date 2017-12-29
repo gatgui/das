@@ -11,23 +11,24 @@ __all__ = ["Das",
 # ---
 
 gReservedNames = set(['_check_reserved',
-                     '_adapt_value',
-                     '_update',
-                     '_has_key',
-                     '_get',
-                     '_keys',
-                     '_iterkeys',
-                     '_values',
-                     '_itervalues',
-                     '_items',
-                     '_iteritems',
-                     '_pop',
-                     '_popitem',
-                     '_clear',
-                     '_copy',
-                     '_setdefault',
-                     '_validate',
-                     '_make_default'])
+                      '_adapt_value',
+                      '_update',
+                      '_has_key',
+                      '_get',
+                      '_keys',
+                      '_iterkeys',
+                      '_values',
+                      '_itervalues',
+                      '_items',
+                      '_iteritems',
+                      '_pop',
+                      '_popitem',
+                      '_clear',
+                      '_copy',
+                      '_setdefault',
+                      '_validate',
+                      '_make_default',
+                      '_set_schema_type'])
 
 # ---
 
@@ -174,6 +175,9 @@ class Das(object):
          schema_type._validate(self)
       self.__dict__["_schema_type"] = schema_type
 
+   def _set_schema_type(self, schema_type):
+      self.__dict__["_schema_type"] = schema_type
+      
 
 # ---
 
