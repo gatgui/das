@@ -155,17 +155,16 @@ class Das(object):
          raise ReservedNameError(k)
 
    def _adapt_value(self, value):
-      t = type(value)
-      if t == dict:
+      if isinstance(value, dict):
          return Das(**value)
-      elif t in (list, set, tuple):
+      elif isinstance(value, (tuple, list, set)):
          n = len(value)
          l = [None] * n
          i = 0
          for item in value:
             l[i] = self._adapt_value(item)
             i += 1
-         return t(l)
+         return type(value)(l)
       else:
          return value
 
