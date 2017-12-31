@@ -98,7 +98,7 @@ class Integer(TypeValidator):
       return long(value)
 
    def _validate(self, data):
-      if not type(data) in (int, long):
+      if not isinstance(data, (int, long)):
          raise ValidationError("Expected an integer value, got %s" % type(data).__name__)
       if self.min is not None and data < self.min:
          raise ValidationError("Integer value out of range, %d < %d" % (data, self.min))
@@ -132,7 +132,7 @@ class Real(TypeValidator):
       return float(value)
 
    def _validate(self, data):
-      if not type(data) in (int, long, float):
+      if not isinstance(data, (int, long, float)):
          raise ValidationError("Expected a real value, got %s" % type(data).__name__)
       if self.min is not None and data < self.min:
          raise ValidationError("Real value out of range, %d < %d" % (data, self.min))
@@ -171,7 +171,7 @@ class String(TypeValidator):
       return str(value)
 
    def _validate(self, data):
-      if not type(data) in (str, unicode):
+      if not isinstance(data, (str, unicode)):
          raise ValidationError("Expected a string value, got %s" % type(data).__name__)
       if self.choices is not None and not data in self.choices:
          raise ValidationError("String value must be on of %s, got '%s'" % (self.choices, data))
@@ -209,7 +209,7 @@ class Sequence(TypeValidator):
       return list(value)
 
    def _validate(self, data):
-      if not type(data) in (tuple, list, set):
+      if not isinstance(data, (tuple, list, set)):
          raise ValidationError("Expected a sequence value, got %s" % type(data).__name__)
       n = len(data)
       if self.size is not None:
@@ -255,7 +255,7 @@ class Tuple(TypeValidator):
       return value
 
    def _validate(self, data):
-      if type(data) not in (list, tuple):
+      if not isinstance(data, (list, tuple)):
          raise ValidationError("Expected a tuple value, got %s" % type(data).__name__)
       n = len(data)
       if n != len(self.types):
@@ -290,7 +290,7 @@ class StaticDict(das.struct.Das, TypeValidator):
       super(StaticDict, self).__init__(**kwargs)
 
    def _validate(self, data):
-      if not type(data) in (dict, das.struct.Das):
+      if not isinstance(data, (dict, das.struct.Das)):
          raise ValidationError("Expected a dict value, got %s" % type(data).__name__)
       for k, v in self._iteritems():
          if not k in data:
@@ -345,7 +345,7 @@ class DynamicDict(TypeValidator):
       return value
 
    def _validate(self, data):
-      if not type(data) in (dict, das.struct.Das):
+      if not isinstance(data, (dict, das.struct.Das)):
          raise ValidationError("Expected a dict value, got %s" % type(data).__name__)
       for k in data:
          try:
