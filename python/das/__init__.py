@@ -21,4 +21,7 @@ from .validation import (ValidationError,
                          get_schema_module,
                          validate,
                          make_default)
+from .fsets import (BindError,
+                    SchemaTypeError,
+                    FunctionSet)
 from . import schema

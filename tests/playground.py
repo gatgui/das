@@ -20,8 +20,40 @@ for st in stl:
    if hasattr(v, "_schema_type"):
       print(v._schema_type)
 
-print("=== timeline.ClipSource")
+print("=== FunctionSet tests using timeline.ClipSource schema type ===")
+
 das.write(das.make_default("timeline.ClipSource"), "./out.tl")
-tl = das.read("./out.tl")
-das.pprint(tl)
-print(tl._schema_type)
+
+class ClipSource(das.FunctionSet):
+   def __init__(self):
+      super(ClipSource, self).__init__("timeline.ClipSource")
+
+   def setMedia(self, path):
+      _, ext = map(lambda x: x.lower(), os.path.splitext(path))
+      if ext == ".fbx":
+         print("Get range from FBX file")
+      elif ext == ".abc":
+         print("Get range from Alembic file")
+      elif ext == ".mov":
+         print("Get range from Movie file")
+      self.media = os.path.abspath(path).replace("\\", "/")
+
+   def setClipOffsets(self, start, end):
+      dataStart, dataEnd = self.dataRange
+      clipStart = min(dataEnd, dataStart + max(0, start))
+      clipEnd = max(dataStart, dataEnd + min(end, 0))
+      if clipStart == dataStart and clipEnd == dataEnd:
+         self.clipRange = None
+      else:
+         self.clipRange = (clipStart, clipEnd)
+
+cs = ClipSource()
+cs.read("./out.tl")
+cs.pprint()
+cs.dataRange = (100, 146)
+cs.setMedia("./source.mov")
+cs.setClipOffsets(1, -1)
+cs.pprint()
+cs.write("./out.tl")
+print(type(cs.copy()))
+cs.copy().pprint()
