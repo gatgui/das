@@ -237,9 +237,7 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
    if not inline:
       stream.write(tindent)
 
-   t = type(d)
-
-   if t in (Das, dict):
+   if isinstance(d, (dict, Das)):
       stream.write("{\n")
       n = len(d)
       i = 0
@@ -256,7 +254,7 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
             stream.write(",\n")
       stream.write("%s}" % tindent)
 
-   elif t == list:
+   elif isinstance(d, list):
       stream.write("[\n")
       n = len(d)
       i = 0
@@ -269,7 +267,7 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
             stream.write(",\n")
       stream.write("%s]" % tindent)
 
-   elif t == set:
+   elif isinstance(d, set):
       stream.write("set([\n")
       n = len(d)
       i = 0
@@ -282,7 +280,7 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
             stream.write(",\n")
       stream.write("%s])" % tindent)
 
-   elif t in (str, unicode):
+   elif isinstance(d, (str, unicode)):
       stream.write("'%s'" % d)
 
    else:
