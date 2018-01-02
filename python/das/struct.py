@@ -114,6 +114,8 @@ class Das(object):
       if hasattr(self.__class__, k):
          raise ReservedNameError(k)
       elif hasattr(self._dict, k):
+         if "_" + k in self.__dict__:
+            raise ReservedNameError(k)
          print("'%s' key conflicts with existing method of dict class, use '_%s()' to call it instead" % (k, k))
          self.__dict__["_" + k] = getattr(self._dict, k)
 
