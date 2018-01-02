@@ -13,28 +13,6 @@ __all__ = ["Das",
 
 # ---
 
-gReservedNames = set(['_check_reserved',
-                      '_adapt_value',
-                      '_update',
-                      '_has_key',
-                      '_get',
-                      '_keys',
-                      '_iterkeys',
-                      '_values',
-                      '_itervalues',
-                      '_items',
-                      '_iteritems',
-                      '_pop',
-                      '_popitem',
-                      '_clear',
-                      '_copy',
-                      '_setdefault',
-                      '_validate',
-                      '_make_default',
-                      '_set_schema_type'])
-
-# ---
-
 class ReservedNameError(Exception):
    def __init__(self, name):
       super(ReservedNameError, self).__init__("'%s' is a reserved name" % name)
@@ -51,7 +29,17 @@ class Das(object):
       try:
          return self._dict[k]
       except KeyError:
-         raise AttributeError("'Das' has not attribute '%s'" % k)
+         if hasattr(self._dict, k):
+            # Look for an override method of the same name prefixed by '_' in current class
+            k2 = '_' + k
+            if hasattr(self, k2):
+               #print("Forward '%s' to %s class '%s'" % (k, self.__class__.__name__, k2))
+               return getattr(self, k2)
+            else:
+               #print("Forward '%s' to dict class '%s'" % (k, k))
+               return getattr(self._dict, k)
+         else:
+            raise AttributeError("'Das' has not attribute '%s' (dict %s)" % (k, "has" if hasattr(self._dict, k) else "hasn't"))
 
    def __setattr__(self, k, v):
       self._check_reserved(k)
@@ -103,42 +91,11 @@ class Das(object):
    def __repr__(self):
       return self._dict.__repr__()
 
-   def _has_key(self, k):
-      return self._dict.has_key(k)
-
-   def _get(self, k, default=None):
-      return self._dict.get(k, default)
-
-   def _keys(self):
-      return self._dict.keys()
-
-   def _iterkeys(self):
-      return self._dict.iterkeys()
-
-   def _values(self):
-      return self._dict.values()
-
-   def _itervalues(self):
-      return self._dict.itervalues()
-
-   def _items(self):
-      return self._dict.items()
-
-   def _iteritems(self):
-      return self._dict.iteritems()
-
-   def _pop(self, *args):
-      return self._dict.pop(*args)
-
-   def _popitem(self):
-      return self._dict.popitem()
-
-   def _clear(self):
-      self._dict.clear()
-
+   # Override of dict.copy
    def _copy(self):
       return Das(self._dict.copy())
 
+   # Override of dict.setdefault
    def _setdefault(self, *args):
       if len(args) >= 1:
          self._check_reserved(args[0])
@@ -146,6 +103,7 @@ class Das(object):
          args[1] = self._adapt_value(args[1])
       self._dict.setdefault(*args)
 
+   # Override of dict.update
    def _update(self, *args, **kwargs):
       self._dict.update(*args, **kwargs)
       for k, v in self._dict.items():
@@ -153,8 +111,11 @@ class Das(object):
          self._dict[k] = self._adapt_value(v)
 
    def _check_reserved(self, k):
-      if k in gReservedNames:
+      if hasattr(self.__class__, k):
          raise ReservedNameError(k)
+      elif hasattr(self._dict, k):
+         print("'%s' key conflicts with existing method of dict class, use '_%s()' to call it instead" % (k, k))
+         self.__dict__["_" + k] = getattr(self._dict, k)
 
    def _adapt_value(self, value):
       if isinstance(value, dict):
@@ -175,7 +136,7 @@ class Das(object):
          schema_type = self.__dict__["_schema_type"]
       if schema_type is not None:
          schema_type._validate(self)
-      self.__dict__["_schema_type"] = schema_type
+      self._set_schema_type(schema_type)
 
    def _set_schema_type(self, schema_type):
       self.__dict__["_schema_type"] = schema_type
@@ -196,6 +157,7 @@ def read_meta(path):
          else:
             break
    return md
+
 
 def read(path, schema_type=None, ignore_meta=False, **funcs):
    # Read header data

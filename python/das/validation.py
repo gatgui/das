@@ -292,7 +292,7 @@ class StaticDict(das.struct.Das, TypeValidator):
    def _validate(self, data):
       if not isinstance(data, (dict, das.struct.Das)):
          raise ValidationError("Expected a dict value, got %s" % type(data).__name__)
-      for k, v in self._iteritems():
+      for k, v in self._dict.iteritems():
          if not k in data:
             if not isinstance(v, Optional):
                raise ValidationError("Missing key '%s'" % k)
@@ -304,7 +304,7 @@ class StaticDict(das.struct.Das, TypeValidator):
 
    def _make_default(self):
       dct = {}
-      for k, v in self._iteritems():
+      for k, v in self._dict.iteritems():
          dv = v._make_default()
          if isinstance(v, Optional) and not dv:
             continue
