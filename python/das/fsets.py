@@ -23,7 +23,7 @@ class FunctionSet(das.struct.Das):
          raise SchemaTypeError("Invalid schema type '%s'" % schema_type)
       self._set_schema_type(st)
       if data is None:
-         data = st._make_default()
+         data = st.make_default()
       self.bind(data)
 
    def bind(self, data):

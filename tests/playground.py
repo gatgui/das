@@ -22,8 +22,6 @@ for st in stl:
 
 print("=== FunctionSet tests using timeline.ClipSource schema type ===")
 
-das.write(das.make_default("timeline.ClipSource"), "./out.tl")
-
 class ClipSource(das.FunctionSet):
    def __init__(self):
       super(ClipSource, self).__init__("timeline.ClipSource")
@@ -47,6 +45,7 @@ class ClipSource(das.FunctionSet):
       else:
          self.clipRange = (clipStart, clipEnd)
 
+das.write(das.make_default("timeline.ClipSource"), "./out.tl")
 cs = ClipSource()
 cs.read("./out.tl")
 cs.pprint()
@@ -61,6 +60,7 @@ c = das.copy(cs)
 print(type(c.copy()))
 for k, v in c.iteritems():
    print("%s = %s" % (k, v))
+os.remove("./out.tl")
 
 print("=== Name conflict resolution ===")
 d = das.make_default("conflicts.DictMethod")

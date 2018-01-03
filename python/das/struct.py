@@ -137,7 +137,7 @@ class Das(object):
       if schema_type is None:
          schema_type = self.__dict__["_schema_type"]
       if schema_type is not None:
-         schema_type._validate(self)
+         schema_type.validate(self)
       self._set_schema_type(schema_type)
 
    def _set_schema_type(self, schema_type):
