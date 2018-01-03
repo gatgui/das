@@ -94,7 +94,7 @@ class Das(object):
 
    # Override of dict.copy
    def _copy(self):
-      return Das(self._dict.copy())
+      return self.__class__(self._dict.copy())
 
    # Override of dict.setdefault
    def _setdefault(self, *args):
