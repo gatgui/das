@@ -10,8 +10,8 @@ __all__ = ["ValidationError",
            "String",
            "Sequence",
            "Tuple",
-           "StaticDict",
-           "DynamicDict",
+           "Struct",
+           "Dict",
            "Class",
            "Or",
            "Optional",
@@ -260,11 +260,11 @@ class Tuple(TypeValidator):
       return s + ")"
 
 
-class StaticDict(dict, TypeValidator):
+class Struct(dict, TypeValidator):
    def __init__(self, **kwargs):
       if "default" in kwargs:
          del(kwargs["default"])
-      super(StaticDict, self).__init__(**kwargs)
+      super(Struct, self).__init__(**kwargs)
 
    def validate(self, data):
       if not isinstance(data, (dict, das.types.Struct)):
@@ -291,7 +291,7 @@ class StaticDict(dict, TypeValidator):
       return rv
 
    def __repr__(self):
-      s = "StaticDict("
+      s = "Struct("
       sep = ""
       keys = [k for k in self]
       keys.sort()
@@ -302,9 +302,9 @@ class StaticDict(dict, TypeValidator):
       return s + ")"
 
 
-class DynamicDict(TypeValidator):
+class Dict(TypeValidator):
    def __init__(self, ktype, vtype, default=None, **kwargs):
-      super(DynamicDict, self).__init__(default=default)
+      super(Dict, self).__init__(default=default)
       self.ktype = ktype
       self.vtype = vtype
       self.default = default
@@ -312,9 +312,12 @@ class DynamicDict(TypeValidator):
       for k, v in kwargs.iteritems():
          self.vtypeOverrides[k] = v
 
+   def value_type(self, k):
+      return self.vtypeOverrides.get(k, self.vtype)
+
    def validate_default(self, value):
       if not isinstance(value, dict):
-         raise Exception("DynamicDict default value must be a dict, got %s" % type(value).__name__)
+         raise Exception("Dict default value must be a dict, got %s" % type(value).__name__)
       return value
 
    def validate(self, data):
@@ -326,8 +329,7 @@ class DynamicDict(TypeValidator):
          except ValidationError, e:
             raise ValidationError("Invalid key value '%s': %s" % (k, e))
          try:
-            vtype = self.vtypeOverrides.get(k, self.vtype)
-            vtype.validate(data[k])
+            self.value_type(k).validate(data[k])
          except ValidationError, e:
             raise ValidationError("Invalid value for key '%s': %s" % (k, e))
 
@@ -340,7 +342,7 @@ class DynamicDict(TypeValidator):
       return rv
 
    def __repr__(self):
-      s = "DynamicDict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
+      s = "Dict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
       if self.default is not None:
          s += ", default=%s" % self.default
       for k, v in self.vtypeOverrides.iteritems():

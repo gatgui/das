@@ -5,24 +5,8 @@ import datetime
 
 __version__ = "1.1.0"
 
-from .types import (ReservedNameError,
-                    Struct,
-                    Sequence)
-from .schematypes import (ValidationError,
-                          TypeValidator,
-                          Boolean,
-                          Integer,
-                          Real,
-                          String,
-                          Sequence,
-                          Tuple,
-                          StaticDict,
-                          DynamicDict,
-                          Class,
-                          Or,
-                          Optional,
-                          Empty,
-                          SchemaType)
+from .types import ReservedNameError, Struct, Sequence
+from .schematypes import ValidationError
 from .validation import (UnknownSchemaError,
                          Schema,
                          SchemaLocation,
@@ -39,13 +23,12 @@ from .validation import (UnknownSchemaError,
                          get_schema_module,
                          validate,
                          make_default)
-from .fsets import (BindError,
-                    SchemaTypeError,
-                    FunctionSet)
+from .fsets import BindError, SchemaTypeError, FunctionSet
 from . import schema
 
 # For backward compatibiilty
 Das = Struct
+
 
 def read_meta(path):
    md = {}

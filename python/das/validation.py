@@ -64,8 +64,10 @@ class Schema(object):
                      "String": das.schematypes.String,
                      "Sequence": das.schematypes.Sequence,
                      "Tuple": das.schematypes.Tuple,
-                     "StaticDict": das.schematypes.StaticDict,
-                     "DynamicDict": das.schematypes.DynamicDict,
+                     "StaticDict": das.schematypes.Struct, # Deprecated: -> use Struct instead
+                     "DynamicDict": das.schematypes.Dict,  # Deprecated: -> use Dict instead
+                     "Struct": das.schematypes.Struct,
+                     "Dict": das.schematypes.Dict,
                      "Class": das.schematypes.Class,
                      "Or": das.schematypes.Or,
                      "Optional": das.schematypes.Optional,
