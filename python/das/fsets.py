@@ -15,7 +15,7 @@ class SchemaTypeError(Exception):
       super(SchemaTypeError, self).__init__(msg)
 
 
-class FunctionSet(das.struct.Das):
+class FunctionSet(das.types.Struct):
    def __init__(self, schema_type=None, data=None):
       super(FunctionSet, self).__init__()
       st = (das.get_schema_type(schema_type) if schema_type else None)
@@ -27,8 +27,8 @@ class FunctionSet(das.struct.Das):
       self.bind(data)
 
    def bind(self, data):
-      if not isinstance(data, das.struct.Das):
-         raise BindError("data must be an instance of das.struct.Das class")
+      if not isinstance(data, das.types.Struct):
+         raise BindError("data must be an instance of das.types.Struct class")
       self._update(data._dict)
       self._validate()
 

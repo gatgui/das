@@ -290,7 +290,7 @@ class StaticDict(dict, TypeValidator):
       super(StaticDict, self).__init__(**kwargs)
 
    def validate(self, data):
-      if not isinstance(data, (dict, das.struct.Das)):
+      if not isinstance(data, (dict, das.types.Struct)):
          raise ValidationError("Expected a dict value, got %s" % type(data).__name__)
       for k, v in self.iteritems():
          if not k in data:
@@ -309,7 +309,7 @@ class StaticDict(dict, TypeValidator):
          if isinstance(v, Optional) and not dv:
             continue
          dct[k] = dv
-      rv = das.struct.Das(dct)
+      rv = das.types.Struct(dct)
       rv._set_schema_type(self)
       return rv
 
@@ -341,7 +341,7 @@ class DynamicDict(TypeValidator):
       return value
 
    def validate(self, data):
-      if not isinstance(data, (dict, das.struct.Das)):
+      if not isinstance(data, (dict, das.types.Struct)):
          raise ValidationError("Expected a dict value, got %s" % type(data).__name__)
       for k in data:
          try:
@@ -356,9 +356,9 @@ class DynamicDict(TypeValidator):
 
    def make_default(self):
       if self.default is None:
-         rv = das.struct.Das({})
+         rv = das.types.Struct({})
       else:
-         rv = das.struct.Das(self.default)
+         rv = das.types.Struct(self.default)
       rv._set_schema_type(self)
       return rv
 

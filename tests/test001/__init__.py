@@ -35,7 +35,7 @@ class TestCase(unittest.TestCase):
 
    def testRead2(self):
       rv = das.read(self.InputFile, schema_type="hud.HUD")
-      self.assertIsInstance(rv, das.struct.Das)
+      self.assertIsInstance(rv, das.types.Struct)
 
    def testWrite1(self):
       das.write(das.read(self.InputFile, schema_type="hud.HUD"), self.OutputFile)
