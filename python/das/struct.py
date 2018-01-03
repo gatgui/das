@@ -44,6 +44,7 @@ class Das(object):
 
    def __setattr__(self, k, v):
       self._check_reserved(k)
+      # adapt value and validate it
       self._dict[k] = v
 
    def __delattr__(self, k):
@@ -54,6 +55,7 @@ class Das(object):
 
    def __setitem__(self, k, v):
       self._check_reserved(k)
+      # adapt value and validate it
       self._dict.__setitem__(k, v)
 
    def __delitem__(self, k):
@@ -121,8 +123,13 @@ class Das(object):
          self.__dict__["_" + k] = getattr(self._dict, k)
 
    def _adapt_value(self, value):
+      st = self._get_schema_type()
       if isinstance(value, dict):
-         return Das(**value)
+         if st is not None:
+            # TODO
+            return self.__class__(**value)
+         else:
+            return self.__class__(**value)
       elif isinstance(value, (tuple, list, set)):
          n = len(value)
          l = [None] * n
@@ -130,16 +137,23 @@ class Das(object):
          for item in value:
             l[i] = self._adapt_value(item)
             i += 1
-         return type(value)(l)
+         if st is not None:
+            # TODO
+            return type(value)(l)
+         else:
+            return type(value)(l)
       else:
          return value
 
    def _validate(self, schema_type=None):
       if schema_type is None:
-         schema_type = self.__dict__["_schema_type"]
+         schema_type = self._get_schema_type()
       if schema_type is not None:
          schema_type.validate(self)
       self._set_schema_type(schema_type)
+
+   def _get_schema_type(self):
+      return self.__dict__["_schema_type"]
 
    def _set_schema_type(self, schema_type):
       self.__dict__["_schema_type"] = schema_type
@@ -180,6 +194,7 @@ def read(path, schema_type=None, ignore_meta=False, **funcs):
    else:
       sch, mod = None, None
 
+   # if sch is defined, lookup for class override
    rv = Das()
    with open(path, "r") as f:
       rv._update(**eval(f.read(), globals(), funcs))
