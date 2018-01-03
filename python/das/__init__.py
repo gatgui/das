@@ -7,27 +7,60 @@ __version__ = "1.1.0"
 
 from .types import ReservedNameError, Struct, Sequence
 from .schematypes import ValidationError
-from .validation import (UnknownSchemaError,
-                         Schema,
-                         SchemaLocation,
-                         SchemaTypesRegistry,
-                         load_schemas,
-                         list_schemas,
-                         has_schema,
-                         get_schema,
-                         list_schema_types,
-                         has_schema_type,
-                         get_schema_type,
-                         get_schema_type_name,
-                         get_schema_path,
-                         get_schema_module,
-                         validate,
-                         make_default)
+from .validation import UnknownSchemaError, Schema, SchemaLocation, SchemaTypesRegistry
 from .fsets import BindError, SchemaTypeError, FunctionSet
 from . import schema
 
 # For backward compatibiilty
 Das = Struct
+
+
+def load_schemas(paths=None):
+   SchemaTypesRegistry.instance.load_schemas(paths=paths)
+
+
+def list_schemas():
+   return SchemaTypesRegistry.instance.list_schemas()
+
+
+def has_schema():
+   return SchemaTypesRegistry.instance.has_schema()
+
+
+def get_schema(name):
+   return SchemaTypesRegistry.instance.get_schema(name)
+
+
+def list_schema_types(schema=None):
+   return SchemaTypesRegistry.instance.list_schema_types(schema)
+
+
+def has_schema_type(name):
+   return SchemaTypesRegistry.instance.has_schema_type(name)
+
+
+def get_schema_type(name):
+   return SchemaTypesRegistry.instance.get_schema_type(name)
+
+
+def get_schema_type_name(typ):
+   return SchemaTypesRegistry.instance.get_schema_type_name(typ)
+
+
+def get_schema_path(name):
+   return SchemaTypesRegistry.instance.get_schema_path(name)
+
+
+def get_schema_module(name):
+   return SchemaTypesRegistry.instance.get_schema_module(name)
+
+
+def make_default(name):
+   return SchemaTypesRegistry.instance.make_default(name)
+
+
+def validate(d, schema):
+   get_schema_type(schema).validate(d)
 
 
 def read_meta(path):
