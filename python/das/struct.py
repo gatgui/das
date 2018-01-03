@@ -6,6 +6,7 @@ import das
 
 __all__ = ["Das",
            "ReservedNameError",
+           "read_meta",
            "read",
            "copy",
            "pprint",
