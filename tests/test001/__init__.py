@@ -52,7 +52,7 @@ class TestCase(unittest.TestCase):
       hud2 = das.read(self.OutputFile, schema_type="hud.HUD")
       self.assertEqual(hud1, hud2)
 
-   def testCompare1(self):
+   def testCompare2(self):
       hud1 = das.read(self.InputFile, schema_type="hud.HUD")
       das.write(hud1, self.OutputFile)
       hud2 = das.read(self.OutputFile, schema_type="hud.HUD")
