@@ -6,24 +6,6 @@ import glob
 import copy
 import das
 
-__all__ = ["UnknownSchemaError",
-           "Schema",
-           "SchemaLocation",
-           "SchemaTypesRegistry",
-           "load_schemas",
-           "list_schemas",
-           "get_schema",
-           "has_schema",
-           "list_schema_types",
-           "has_schema_type",
-           "get_schema_type",
-           "get_schema_type_name",
-           "get_schema_path",
-           "get_schema_module",
-           "validate",
-           "make_default"]
-
-# ---
 
 class UnknownSchemaError(Exception):
    def __init__(self, name):

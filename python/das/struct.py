@@ -3,7 +3,6 @@ import das
 print("[WARNING] das.struct module is deprecated")
 
 # For backward compatibility
-__all__ = ["Das"]
 
 ReservedNameError = das.types.ReservedNameError
 Das = das.types.Struct
