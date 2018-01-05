@@ -145,14 +145,30 @@ class Struct(object):
 
 
 class Sequence(list):
-   def __init__(self, iterable=None, schema_type=None):
-      self._schema_type = schema_type
-      if iterable is None:
-         super(Sequence, self).__init__()
-      else:
-         super(Sequence, self).__init__(iterable)
+   def __init__(self, *args):
+      super(Sequence, self).__init__(*args)
+      self._schema_type = None
 
-   # review append, pop, etc to possibly adapt value
+   def __iadd__(self, y):
+      return super(Sequence, self).__iadd__(y)
+
+   def __add__(self, y):
+      super(Sequence, self).__add__(y)
+
+   def __setitem__(self, i, y):
+      super(Sequence, self).__setitem__(i, y)
+
+   def __setslice__(self, i, j, y):
+      super(Sequence, self).__setslice__(i, j, y)
+
+   def insert(self, i, y):
+      super(Sequence, self).insert(i, y)
+
+   def append(self, y):
+      super(Sequence, self).append(y)
+
+   def extend(self, y):
+      super(Sequence, self).extend(y)
 
    def _validate(self, schema_type=None):
       if schema_type is None:
@@ -168,5 +184,101 @@ class Sequence(list):
       self._schema_type = schema_type
 
 
-#class Tuple
-#class Dict
+class Tuple(tuple):
+   def __init__(self, *args):
+      super(Tuple, self).__init__(*args)
+      self._schema_type = None
+
+   def __add__(self, y):
+      return super(Tuple, self).__add__(y)
+
+   def _validate(self, schema_type=None):
+      if schema_type is None:
+         schema_type = self._schema_type
+      if schema_type is not None:
+         schema_type.validate(self)
+      self._set_schema_type(schema_type)
+
+   def _get_schema_type(self, schema_type):
+      return self._schema_type
+
+   def _set_schema_type(self, schema_type):
+      self._schema_type = schema_type
+
+
+class Set(set):
+   def __init__(self, *args):
+      super(Set, self).__init__(*args)
+      self._schema_type = None
+
+   def __iand__(self, y):
+      return super(Set, self).__iand__(y)
+
+   def __isub__(self, y):
+      return super(Set, self).__isub__(y)
+
+   def __ior__(self, y):
+      return super(Set, self).__ior__(y)
+
+   def __ixor__(self, y):
+      return super(Set, self).__ixor__(y)
+
+   def add(self, e):
+      super(Set, self).add(e)
+
+   def update(self, *args):
+      super(Set, self).update(args)
+
+   def _validate(self, schema_type=None):
+      if schema_type is None:
+         schema_type = self._schema_type
+      if schema_type is not None:
+         schema_type.validate(self)
+      self._set_schema_type(schema_type)
+
+   def _get_schema_type(self, schema_type):
+      return self._schema_type
+
+   def _set_schema_type(self, schema_type):
+      self._schema_type = schema_type
+
+
+class Dict(dict):
+   def __init__(self, *args, **kwargs):
+      super(Dict, self).__init__(*args, **kwargs)
+      self._schema_type = None
+
+   def __setitem__(self, k, v):
+      super(Dict, self).__setitem__(k, v)
+
+   def setdefault(self, *args):
+      super(Dict, self).setdefault(*args)
+
+   def update(self, *args, **kwargs):
+      super(Dict, self).update(*args, **kwargs)
+      # if len(args) == 1:
+      #    a0 = args[0]
+      #    if hasattr(a0, "keys"):
+      #       for k in a0.keys():
+      #          # adapt values
+      #          self[k] = a0[k]
+      #    else:
+      #       for k, v in a0:
+      #          # adapt values
+      #          self[k] = v
+      # for k, v in kwargs.iteritems():
+      #    # adapt values
+      #    self[k] = v
+
+   def _validate(self, schema_type=None):
+      if schema_type is None:
+         schema_type = self._schema_type
+      if schema_type is not None:
+         schema_type.validate(self)
+      self._set_schema_type(schema_type)
+
+   def _get_schema_type(self, schema_type):
+      return self._schema_type
+
+   def _set_schema_type(self, schema_type):
+      self._schema_type = schema_type
