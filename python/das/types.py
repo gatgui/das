@@ -4,11 +4,115 @@ class ReservedNameError(Exception):
       super(ReservedNameError, self).__init__("'%s' is a reserved name" % name)
 
 
-class Struct(object):
-   def __init__(self, *args, **kwargs):
-      super(Struct, self).__init__()
-      self.__dict__["_dict"] = {}
+class TypeBase(object):
+   def __init__(self):
+      super(TypeBase, self).__init__()
       self.__dict__["_schema_type"] = None
+
+   def _validate(self, schema_type=None):
+      if schema_type is None:
+         schema_type = self._get_schema_type()
+      if schema_type is not None:
+         schema_type.validate(self)
+      self._set_schema_type(schema_type)
+
+   def _get_schema_type(self):
+      return self.__dict__["_schema_type"]
+
+   def _set_schema_type(self, schema_type):
+      self.__dict__["_schema_type"] = schema_type
+
+
+class Tuple(TypeBase, tuple):
+   def __init__(self, *args):
+      TypeBase.__init__(self)
+      tuple.__init__(self, *args)
+
+   def __add__(self, y):
+      return super(Tuple, self).__add__(tuple(map(lambda x: adapt_value(x), y)))
+
+
+class Sequence(TypeBase, list):
+   def __init__(self, *args):
+      TypeBase.__init__(self)
+      list.__init__(self, *args)
+
+   def __iadd__(self, y):
+      return super(Sequence, self).__iadd__(map(lambda x: adapt_value(x), y))
+
+   def __add__(self, y):
+      super(Sequence, self).__add__(map(lambda x: adapt_value(x), y))
+
+   def __setitem__(self, i, y):
+      super(Sequence, self).__setitem__(i, adapt_value(y))
+
+   def __setslice__(self, i, j, y):
+      super(Sequence, self).__setslice__(i, j, map(lambda x: adapt_value(x), y))
+
+   def insert(self, i, y):
+      super(Sequence, self).insert(i, adapt_value(y))
+
+   def append(self, y):
+      super(Sequence, self).append(adapt_value(y))
+
+   def extend(self, y):
+      super(Sequence, self).extend(map(lambda x: adapt_value(x), y))
+
+
+class Set(TypeBase, set):
+   def __init__(self, *args):
+      TypeBase.__init__(self)
+      set.__init__(self, *args)
+
+   def __iand__(self, y):
+      return super(Set, self).__iand__(map(lambda x: adapt_value(x), y))
+
+   def __isub__(self, y):
+      return super(Set, self).__isub__(map(lambda x: adapt_value(x), y))
+
+   def __ior__(self, y):
+      return super(Set, self).__ior__(map(lambda x: adapt_value(x), y))
+
+   def __ixor__(self, y):
+      return super(Set, self).__ixor__(map(lambda x: adapt_value(x), y))
+
+   def add(self, e):
+      super(Set, self).add(adapt_value(e))
+
+   def update(self, *args):
+      super(Set, self).update(args)
+
+
+class Dict(TypeBase, dict):
+   def __init__(self, *args, **kwargs):
+      TypeBase.__init__(self)
+      dict.__init__(self, *args, **kwargs)
+
+   def __setitem__(self, k, v):
+      super(Dict, self).__setitem__(k, adapt_value(v))
+
+   def setdefault(self, *args):
+      if len(args) >= 2:
+         args[1] = adapt_value(args[1])
+      super(Dict, self).setdefault(*args)
+
+   def update(self, *args, **kwargs):
+      if len(args) == 1:
+         a0 = args[0]
+         if hasattr(a0, "keys"):
+            for k in a0.keys():
+               self[k] = adapt_value(a0[k])
+         else:
+            for k, v in a0:
+               self[k] = adapt_value(v)
+      for k, v in kwargs.iteritems():
+         self[k] = adapt_value(v)
+
+
+class Struct(TypeBase):
+   def __init__(self, *args, **kwargs):
+      TypeBase.__init__(self)
+      self.__dict__["_dict"] = {}
       self._update(*args, **kwargs)
 
    def __getattr__(self, k):
@@ -29,8 +133,7 @@ class Struct(object):
 
    def __setattr__(self, k, v):
       self._check_reserved(k)
-      # adapt value and validate it
-      self._dict[k] = v
+      self._dict[k] = adapt_value(v)
 
    def __delattr__(self, k):
       del(self._dict[k])
@@ -40,8 +143,7 @@ class Struct(object):
 
    def __setitem__(self, k, v):
       self._check_reserved(k)
-      # adapt value and validate it
-      self._dict.__setitem__(k, v)
+      self._dict.__setitem__(k, adapt_value(v))
 
    def __delitem__(self, k):
       return self._dict.__delitem__(k)
@@ -88,7 +190,7 @@ class Struct(object):
       if len(args) >= 1:
          self._check_reserved(args[0])
       if len(args) >= 2:
-         args[1] = self._adapt_value(args[1])
+         args[1] = adapt_value(args[1])
       self._dict.setdefault(*args)
 
    # Override of dict.update
@@ -96,7 +198,7 @@ class Struct(object):
       self._dict.update(*args, **kwargs)
       for k, v in self._dict.items():
          self._check_reserved(k)
-         self._dict[k] = self._adapt_value(v)
+         self._dict[k] = adapt_value(v)
 
    def _check_reserved(self, k):
       if hasattr(self.__class__, k):
@@ -107,178 +209,27 @@ class Struct(object):
          print("'%s' key conflicts with existing method of dict class, use '_%s()' to call it instead" % (k, k))
          self.__dict__["_" + k] = getattr(self._dict, k)
 
-   def _adapt_value(self, value):
-      st = self._get_schema_type()
-      if isinstance(value, dict):
-         if st is not None:
-            # TODO
-            return self.__class__(**value)
-         else:
-            return self.__class__(**value)
-      elif isinstance(value, (tuple, list, set)):
+
+def adapt_value(value, validator=None):
+   if isinstance(value, (Tuple, Sequence, Set, Dict, Struct)):
+      return value
+   elif isinstance(value, dict):
+      return Struct(**value)
+   else:
+      klass = None
+      if isinstance(value, tuple):
+         klass = Tuple
+      elif isinstance(value, list):
+         klass = Sequence
+      elif isinstance(value, set):
+         klass = Set
+      if klass is not None:
          n = len(value)
          l = [None] * n
          i = 0
          for item in value:
-            l[i] = self._adapt_value(item)
+            l[i] = adapt_value(item, validator=validator)
             i += 1
-         if st is not None:
-            # TODO
-            return type(value)(l)
-         else:
-            return type(value)(l)
+         return klass(l)
       else:
          return value
-
-   def _validate(self, schema_type=None):
-      if schema_type is None:
-         schema_type = self._get_schema_type()
-      if schema_type is not None:
-         schema_type.validate(self)
-      self._set_schema_type(schema_type)
-
-   def _get_schema_type(self):
-      return self.__dict__["_schema_type"]
-
-   def _set_schema_type(self, schema_type):
-      self.__dict__["_schema_type"] = schema_type
-
-
-class Sequence(list):
-   def __init__(self, *args):
-      super(Sequence, self).__init__(*args)
-      self._schema_type = None
-
-   def __iadd__(self, y):
-      return super(Sequence, self).__iadd__(y)
-
-   def __add__(self, y):
-      super(Sequence, self).__add__(y)
-
-   def __setitem__(self, i, y):
-      super(Sequence, self).__setitem__(i, y)
-
-   def __setslice__(self, i, j, y):
-      super(Sequence, self).__setslice__(i, j, y)
-
-   def insert(self, i, y):
-      super(Sequence, self).insert(i, y)
-
-   def append(self, y):
-      super(Sequence, self).append(y)
-
-   def extend(self, y):
-      super(Sequence, self).extend(y)
-
-   def _validate(self, schema_type=None):
-      if schema_type is None:
-         schema_type = self._schema_type
-      if schema_type is not None:
-         schema_type.validate(self)
-      self._set_schema_type(schema_type)
-
-   def _get_schema_type(self, schema_type):
-      return self._schema_type
-
-   def _set_schema_type(self, schema_type):
-      self._schema_type = schema_type
-
-
-class Tuple(tuple):
-   def __init__(self, *args):
-      super(Tuple, self).__init__(*args)
-      self._schema_type = None
-
-   def __add__(self, y):
-      return super(Tuple, self).__add__(y)
-
-   def _validate(self, schema_type=None):
-      if schema_type is None:
-         schema_type = self._schema_type
-      if schema_type is not None:
-         schema_type.validate(self)
-      self._set_schema_type(schema_type)
-
-   def _get_schema_type(self, schema_type):
-      return self._schema_type
-
-   def _set_schema_type(self, schema_type):
-      self._schema_type = schema_type
-
-
-class Set(set):
-   def __init__(self, *args):
-      super(Set, self).__init__(*args)
-      self._schema_type = None
-
-   def __iand__(self, y):
-      return super(Set, self).__iand__(y)
-
-   def __isub__(self, y):
-      return super(Set, self).__isub__(y)
-
-   def __ior__(self, y):
-      return super(Set, self).__ior__(y)
-
-   def __ixor__(self, y):
-      return super(Set, self).__ixor__(y)
-
-   def add(self, e):
-      super(Set, self).add(e)
-
-   def update(self, *args):
-      super(Set, self).update(args)
-
-   def _validate(self, schema_type=None):
-      if schema_type is None:
-         schema_type = self._schema_type
-      if schema_type is not None:
-         schema_type.validate(self)
-      self._set_schema_type(schema_type)
-
-   def _get_schema_type(self, schema_type):
-      return self._schema_type
-
-   def _set_schema_type(self, schema_type):
-      self._schema_type = schema_type
-
-
-class Dict(dict):
-   def __init__(self, *args, **kwargs):
-      super(Dict, self).__init__(*args, **kwargs)
-      self._schema_type = None
-
-   def __setitem__(self, k, v):
-      super(Dict, self).__setitem__(k, v)
-
-   def setdefault(self, *args):
-      super(Dict, self).setdefault(*args)
-
-   def update(self, *args, **kwargs):
-      super(Dict, self).update(*args, **kwargs)
-      # if len(args) == 1:
-      #    a0 = args[0]
-      #    if hasattr(a0, "keys"):
-      #       for k in a0.keys():
-      #          # adapt values
-      #          self[k] = a0[k]
-      #    else:
-      #       for k, v in a0:
-      #          # adapt values
-      #          self[k] = v
-      # for k, v in kwargs.iteritems():
-      #    # adapt values
-      #    self[k] = v
-
-   def _validate(self, schema_type=None):
-      if schema_type is None:
-         schema_type = self._schema_type
-      if schema_type is not None:
-         schema_type.validate(self)
-      self._set_schema_type(schema_type)
-
-   def _get_schema_type(self, schema_type):
-      return self._schema_type
-
-   def _set_schema_type(self, schema_type):
-      self._schema_type = schema_type
