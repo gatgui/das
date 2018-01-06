@@ -46,7 +46,7 @@ class Sequence(TypeBase, list):
 
    def __add__(self, y):
       n = len(self)
-      super(Sequence, self).__add__([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
+      return super(Sequence, self).__add__([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
 
    def __setitem__(self, i, y):
       super(Sequence, self).__setitem__(i, self._adapt_value(y, index=i))
