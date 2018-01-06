@@ -9,6 +9,11 @@ class TypeBase(object):
       super(TypeBase, self).__init__()
       self.__dict__["_schema_type"] = None
 
+   def _wrap(self, rhs):
+      rv = self.__class__(rhs)
+      rv._set_schema_type(self._get_schema_type())
+      return rv
+
    def _adapt_value(self, value, key=None, index=None):
       return adapt_value(value, schema_type=self._get_schema_type(), key=key, index=index)
 
@@ -32,7 +37,8 @@ class Tuple(TypeBase, tuple):
       tuple.__init__(self, *args)
 
    def __add__(self, y):
-      return super(Tuple, self).__add__(tuple([self._adapt_value(x, index=i) for i, x in enumerate(y)]))
+      rv = super(Tuple, self).__add__(tuple([self._adapt_value(x, index=i) for i, x in enumerate(y)]))
+      return self._wrap(rv)
 
 
 class Sequence(TypeBase, list):
@@ -42,11 +48,13 @@ class Sequence(TypeBase, list):
 
    def __iadd__(self, y):
       n = len(self)
-      return super(Sequence, self).__iadd__([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
+      rv = super(Sequence, self).__iadd__([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
+      return self._wrap(rv)
 
    def __add__(self, y):
       n = len(self)
-      return super(Sequence, self).__add__([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
+      rv = super(Sequence, self).__add__([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
+      return self._wrap(rv)
 
    def __setitem__(self, i, y):
       super(Sequence, self).__setitem__(i, self._adapt_value(y, index=i))
@@ -71,16 +79,20 @@ class Set(TypeBase, set):
       set.__init__(self, *args)
 
    def __iand__(self, y):
-      return super(Set, self).__iand__(map(lambda x: self._adapt_value(x), y))
+      rv = super(Set, self).__iand__(map(lambda x: self._adapt_value(x), y))
+      return self._wrap(rv)
 
    def __isub__(self, y):
-      return super(Set, self).__isub__(map(lambda x: self._adapt_value(x), y))
+      rv = super(Set, self).__isub__(map(lambda x: self._adapt_value(x), y))
+      return self._wrap(rv)
 
    def __ior__(self, y):
-      return super(Set, self).__ior__(map(lambda x: self._adapt_value(x), y))
+      rv = super(Set, self).__ior__(map(lambda x: self._adapt_value(x), y))
+      return self._wrap(rv)
 
    def __ixor__(self, y):
-      return super(Set, self).__ixor__(map(lambda x: self._adapt_value(x), y))
+      rv = super(Set, self).__ixor__(map(lambda x: self._adapt_value(x), y))
+      return self._wrap(rv)
 
    def add(self, e):
       super(Set, self).add(self._adapt_value(e))
