@@ -9,6 +9,9 @@ class TypeBase(object):
       super(TypeBase, self).__init__()
       self.__dict__["_schema_type"] = None
 
+   def _adapt_value(self, value, key=None, index=None):
+      return adapt_value(value, schema_type=self._get_schema_type(), key=key, index=index)
+
    def _validate(self, schema_type=None):
       if schema_type is None:
          schema_type = self._get_schema_type()
@@ -29,7 +32,7 @@ class Tuple(TypeBase, tuple):
       tuple.__init__(self, *args)
 
    def __add__(self, y):
-      return super(Tuple, self).__add__(tuple(map(lambda x: adapt_value(x), y)))
+      return super(Tuple, self).__add__(tuple(map(lambda x: self._adapt_value(x), y)))
 
 
 class Sequence(TypeBase, list):
@@ -38,25 +41,25 @@ class Sequence(TypeBase, list):
       list.__init__(self, *args)
 
    def __iadd__(self, y):
-      return super(Sequence, self).__iadd__(map(lambda x: adapt_value(x), y))
+      return super(Sequence, self).__iadd__(map(lambda x: self._adapt_value(x), y))
 
    def __add__(self, y):
-      super(Sequence, self).__add__(map(lambda x: adapt_value(x), y))
+      super(Sequence, self).__add__(map(lambda x: self._adapt_value(x), y))
 
    def __setitem__(self, i, y):
-      super(Sequence, self).__setitem__(i, adapt_value(y))
+      super(Sequence, self).__setitem__(i, self._adapt_value(y))
 
    def __setslice__(self, i, j, y):
-      super(Sequence, self).__setslice__(i, j, map(lambda x: adapt_value(x), y))
+      super(Sequence, self).__setslice__(i, j, map(lambda x: self._adapt_value(x), y))
 
    def insert(self, i, y):
-      super(Sequence, self).insert(i, adapt_value(y))
+      super(Sequence, self).insert(i, self._adapt_value(y))
 
    def append(self, y):
-      super(Sequence, self).append(adapt_value(y))
+      super(Sequence, self).append(self._adapt_value(y))
 
    def extend(self, y):
-      super(Sequence, self).extend(map(lambda x: adapt_value(x), y))
+      super(Sequence, self).extend(map(lambda x: self._adapt_value(x), y))
 
 
 class Set(TypeBase, set):
@@ -65,19 +68,19 @@ class Set(TypeBase, set):
       set.__init__(self, *args)
 
    def __iand__(self, y):
-      return super(Set, self).__iand__(map(lambda x: adapt_value(x), y))
+      return super(Set, self).__iand__(map(lambda x: self._adapt_value(x), y))
 
    def __isub__(self, y):
-      return super(Set, self).__isub__(map(lambda x: adapt_value(x), y))
+      return super(Set, self).__isub__(map(lambda x: self._adapt_value(x), y))
 
    def __ior__(self, y):
-      return super(Set, self).__ior__(map(lambda x: adapt_value(x), y))
+      return super(Set, self).__ior__(map(lambda x: self._adapt_value(x), y))
 
    def __ixor__(self, y):
-      return super(Set, self).__ixor__(map(lambda x: adapt_value(x), y))
+      return super(Set, self).__ixor__(map(lambda x: self._adapt_value(x), y))
 
    def add(self, e):
-      super(Set, self).add(adapt_value(e))
+      super(Set, self).add(self._adapt_value(e))
 
    def update(self, *args):
       super(Set, self).update(args)
@@ -89,11 +92,11 @@ class Dict(TypeBase, dict):
       dict.__init__(self, *args, **kwargs)
 
    def __setitem__(self, k, v):
-      super(Dict, self).__setitem__(k, adapt_value(v))
+      super(Dict, self).__setitem__(k, self._adapt_value(v))
 
    def setdefault(self, *args):
       if len(args) >= 2:
-         args[1] = adapt_value(args[1])
+         args[1] = self._adapt_value(args[1])
       super(Dict, self).setdefault(*args)
 
    def update(self, *args, **kwargs):
@@ -101,12 +104,12 @@ class Dict(TypeBase, dict):
          a0 = args[0]
          if hasattr(a0, "keys"):
             for k in a0.keys():
-               self[k] = adapt_value(a0[k])
+               self[k] = self._adapt_value(a0[k])
          else:
             for k, v in a0:
-               self[k] = adapt_value(v)
+               self[k] = self._adapt_value(v)
       for k, v in kwargs.iteritems():
-         self[k] = adapt_value(v)
+         self[k] = self._adapt_value(v)
 
 
 class Struct(TypeBase):
@@ -133,7 +136,7 @@ class Struct(TypeBase):
 
    def __setattr__(self, k, v):
       self._check_reserved(k)
-      self._dict[k] = adapt_value(v)
+      self._dict[k] = self._adapt_value(v)
 
    def __delattr__(self, k):
       del(self._dict[k])
@@ -143,7 +146,7 @@ class Struct(TypeBase):
 
    def __setitem__(self, k, v):
       self._check_reserved(k)
-      self._dict.__setitem__(k, adapt_value(v))
+      self._dict.__setitem__(k, self._adapt_value(v))
 
    def __delitem__(self, k):
       return self._dict.__delitem__(k)
@@ -190,7 +193,7 @@ class Struct(TypeBase):
       if len(args) >= 1:
          self._check_reserved(args[0])
       if len(args) >= 2:
-         args[1] = adapt_value(args[1])
+         args[1] = self._adapt_value(args[1])
       self._dict.setdefault(*args)
 
    # Override of dict.update
@@ -198,7 +201,7 @@ class Struct(TypeBase):
       self._dict.update(*args, **kwargs)
       for k, v in self._dict.items():
          self._check_reserved(k)
-         self._dict[k] = adapt_value(v)
+         self._dict[k] = self._adapt_value(v)
 
    def _check_reserved(self, k):
       if hasattr(self.__class__, k):
@@ -210,7 +213,7 @@ class Struct(TypeBase):
          self.__dict__["_" + k] = getattr(self._dict, k)
 
 
-def adapt_value(value, validator=None):
+def adapt_value(value, schema_type=None, key=None, index=None):
    if isinstance(value, (Tuple, Sequence, Set, Dict, Struct)):
       return value
    elif isinstance(value, dict):
@@ -228,7 +231,7 @@ def adapt_value(value, validator=None):
          l = [None] * n
          i = 0
          for item in value:
-            l[i] = adapt_value(item, validator=validator)
+            l[i] = adapt_value(item, schema_type=schema_type, key=key, index=index)
             i += 1
          return klass(l)
       else:
