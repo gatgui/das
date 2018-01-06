@@ -66,7 +66,8 @@ class Sequence(TypeBase, list):
       super(Sequence, self).insert(i, self._adapt_value(y, index=i))
 
    def append(self, y):
-      super(Sequence, self).append(self._adapt_value(y, index=len(self)))
+      n = len(self)
+      super(Sequence, self).append(self._adapt_value(y, index=n))
 
    def extend(self, y):
       n = len(self)
@@ -98,7 +99,8 @@ class Set(TypeBase, set):
       super(Set, self).add(self._adapt_value(e))
 
    def update(self, *args):
-      super(Set, self).update(args)
+      for y in args:
+         super(Set, self).update(map(lambda x: self._adapt_value(x), y))
 
 
 class Dict(TypeBase, dict):
@@ -107,11 +109,11 @@ class Dict(TypeBase, dict):
       dict.__init__(self, *args, **kwargs)
 
    def __setitem__(self, k, v):
-      super(Dict, self).__setitem__(k, self._adapt_value(v))
+      super(Dict, self).__setitem__(k, self._adapt_value(v, key=k))
 
    def setdefault(self, *args):
       if len(args) >= 2:
-         args[1] = self._adapt_value(args[1])
+         args[1] = self._adapt_value(args[1], key=args[0])
       super(Dict, self).setdefault(*args)
 
    def update(self, *args, **kwargs):
@@ -119,12 +121,12 @@ class Dict(TypeBase, dict):
          a0 = args[0]
          if hasattr(a0, "keys"):
             for k in a0.keys():
-               self[k] = self._adapt_value(a0[k])
+               self[k] = self._adapt_value(a0[k], key=k)
          else:
             for k, v in a0:
-               self[k] = self._adapt_value(v)
+               self[k] = self._adapt_value(v, key=k)
       for k, v in kwargs.iteritems():
-         self[k] = self._adapt_value(v)
+         self[k] = self._adapt_value(v, key=k)
 
 
 class Struct(TypeBase):
@@ -151,7 +153,7 @@ class Struct(TypeBase):
 
    def __setattr__(self, k, v):
       self._check_reserved(k)
-      self._dict[k] = self._adapt_value(v)
+      self._dict[k] = self._adapt_value(v, key=k)
 
    def __delattr__(self, k):
       del(self._dict[k])
@@ -161,7 +163,7 @@ class Struct(TypeBase):
 
    def __setitem__(self, k, v):
       self._check_reserved(k)
-      self._dict.__setitem__(k, self._adapt_value(v))
+      self._dict.__setitem__(k, self._adapt_value(v, key=k))
 
    def __delitem__(self, k):
       return self._dict.__delitem__(k)
@@ -208,7 +210,7 @@ class Struct(TypeBase):
       if len(args) >= 1:
          self._check_reserved(args[0])
       if len(args) >= 2:
-         args[1] = self._adapt_value(args[1])
+         args[1] = self._adapt_value(args[1], key=args[0])
       self._dict.setdefault(*args)
 
    # Override of dict.update
@@ -216,7 +218,7 @@ class Struct(TypeBase):
       self._dict.update(*args, **kwargs)
       for k, v in self._dict.items():
          self._check_reserved(k)
-         self._dict[k] = self._adapt_value(v)
+         self._dict[k] = self._adapt_value(v, key=k)
 
    def _check_reserved(self, k):
       if hasattr(self.__class__, k):
