@@ -32,7 +32,7 @@ class Tuple(TypeBase, tuple):
       tuple.__init__(self, *args)
 
    def __add__(self, y):
-      return super(Tuple, self).__add__(tuple(map(lambda x: self._adapt_value(x), y)))
+      return super(Tuple, self).__add__(tuple([self._adapt_value(x, index=i) for i, x in enumerate(y)]))
 
 
 class Sequence(TypeBase, list):
@@ -41,25 +41,28 @@ class Sequence(TypeBase, list):
       list.__init__(self, *args)
 
    def __iadd__(self, y):
-      return super(Sequence, self).__iadd__(map(lambda x: self._adapt_value(x), y))
+      n = len(self)
+      return super(Sequence, self).__iadd__([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
 
    def __add__(self, y):
-      super(Sequence, self).__add__(map(lambda x: self._adapt_value(x), y))
+      n = len(self)
+      super(Sequence, self).__add__([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
 
    def __setitem__(self, i, y):
-      super(Sequence, self).__setitem__(i, self._adapt_value(y))
+      super(Sequence, self).__setitem__(i, self._adapt_value(y, index=i))
 
    def __setslice__(self, i, j, y):
-      super(Sequence, self).__setslice__(i, j, map(lambda x: self._adapt_value(x), y))
+      super(Sequence, self).__setslice__(i, j, [self._adapt_value(x, index=i+k) for k, x in enumerate(y)])
 
    def insert(self, i, y):
-      super(Sequence, self).insert(i, self._adapt_value(y))
+      super(Sequence, self).insert(i, self._adapt_value(y, index=i))
 
    def append(self, y):
-      super(Sequence, self).append(self._adapt_value(y))
+      super(Sequence, self).append(self._adapt_value(y, index=len(self)))
 
    def extend(self, y):
-      super(Sequence, self).extend(map(lambda x: self._adapt_value(x), y))
+      n = len(self)
+      super(Sequence, self).extend([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
 
 
 class Set(TypeBase, set):
