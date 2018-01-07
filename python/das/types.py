@@ -232,25 +232,26 @@ class Struct(TypeBase):
 
 
 def adapt_value(value, schema_type=None, key=None, index=None):
-   if isinstance(value, (Tuple, Sequence, Set, Dict, Struct)):
+   if isinstance(value, TypeBase):
       return value
-   elif isinstance(value, dict):
-      return Struct(**value)
    else:
-      klass = None
-      if isinstance(value, tuple):
-         klass = Tuple
-      elif isinstance(value, list):
-         klass = Sequence
-      elif isinstance(value, set):
-         klass = Set
-      if klass is not None:
-         n = len(value)
-         l = [None] * n
-         i = 0
-         for item in value:
-            l[i] = adapt_value(item, schema_type=schema_type, key=key, index=index)
-            i += 1
-         return klass(l)
+      if isinstance(value, dict):
+         return Struct(**value)
       else:
-         return value
+         klass = None
+         if isinstance(value, tuple):
+            klass = Tuple
+         elif isinstance(value, list):
+            klass = Sequence
+         elif isinstance(value, set):
+            klass = Set
+         if klass is not None:
+            n = len(value)
+            l = [None] * n
+            i = 0
+            for item in value:
+               l[i] = adapt_value(item, schema_type=schema_type, key=key, index=index)
+               i += 1
+            return klass(l)
+         else:
+            return value
