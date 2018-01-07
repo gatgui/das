@@ -232,10 +232,13 @@ class Struct(TypeBase):
 
 
 def adapt_value(value, schema_type=None, key=None, index=None):
-   if isinstance(value, TypeBase):
-      return value
+   if schema_type:
+      return schema_type.adapt(value, key=key, index=index)
    else:
-      if isinstance(value, dict):
+      if isinstance(value, TypeBase):
+         return value
+      elif isinstance(value, dict):
+         # Or Dict?
          return Struct(**value)
       else:
          klass = None
