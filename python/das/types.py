@@ -37,7 +37,8 @@ class Tuple(TypeBase, tuple):
       tuple.__init__(self, *args)
 
    def __add__(self, y):
-      rv = super(Tuple, self).__add__(tuple([self._adapt_value(x, index=i) for i, x in enumerate(y)]))
+      n = len(self)
+      rv = super(Tuple, self).__add__(tuple([self._adapt_value(x, index=n+i) for i, x in enumerate(y)]))
       return self._wrap(rv)
 
 
