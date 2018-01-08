@@ -23,10 +23,16 @@ for st in stl:
 print("=== FunctionSet tests using timeline.ClipSource schema type ===")
 
 class ClipSource(das.FunctionSet):
-   def __init__(self):
-      super(ClipSource, self).__init__("timeline.ClipSource")
+   def __init__(self, data=None):
+      # Make sure to initialize before calling base class constructor that will
+      # in turn call get_schema_type
+      self.schema_type = das.get_schema_type("timeline.ClipSource")
+      super(ClipSource, self).__init__(data=data)
 
-   def setMedia(self, path):
+   def get_schema_type(self):
+      return self.schema_type
+
+   def set_media(self, path):
       _, ext = map(lambda x: x.lower(), os.path.splitext(path))
       if ext == ".fbx":
          print("Get range from FBX file")
@@ -36,22 +42,22 @@ class ClipSource(das.FunctionSet):
          print("Get range from Movie file")
       self.data.media = os.path.abspath(path).replace("\\", "/")
 
-   def setClipOffsets(self, start, end):
-      dataStart, dataEnd = self.data.dataRange
-      clipStart = min(dataEnd, dataStart + max(0, start))
-      clipEnd = max(dataStart, dataEnd + min(end, 0))
-      if clipStart == dataStart and clipEnd == dataEnd:
+   def set_clip_offsets(self, start, end):
+      data_start, data_end = self.data.dataRange
+      clip_start = min(data_end, data_start + max(0, start))
+      clip_end = max(data_start, data_end + min(end, 0))
+      if clip_start == data_start and clip_end == data_end:
          self.data.clipRange = None
       else:
-         self.data.clipRange = (clipStart, clipEnd)
+         self.data.clipRange = (clip_start, clip_end)
 
 das.write(das.make_default("timeline.ClipSource"), "./out.tl")
 cs = ClipSource()
 cs.read("./out.tl")
 cs.pprint()
 cs.data.dataRange = (100, 146)
-cs.setMedia("./source.mov")
-cs.setClipOffsets(1, -1)
+cs.set_media("./source.mov")
+cs.set_clip_offsets(1, -1)
 cs.pprint()
 cs.write("./out.tl")
 print(type(cs.copy()))

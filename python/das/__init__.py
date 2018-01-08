@@ -8,7 +8,7 @@ __version__ = "1.1.0"
 from .types import ReservedNameError, TypeBase, Tuple, Sequence, Set, Dict, Struct
 from .schematypes import ValidationError
 from .validation import UnknownSchemaError, Schema, SchemaLocation, SchemaTypesRegistry
-from .fsets import BindError, SchemaTypeError, FunctionSet
+from .fsets import SchemaTypeError, FunctionSet
 from . import schema
 
 # For backward compatibiilty
