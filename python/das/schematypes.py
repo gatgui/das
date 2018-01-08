@@ -233,7 +233,7 @@ class Struct(dict, TypeValidator):
          default = kwargs["default"]
          print("[das] 'default' treated as a standard field for Struct type")
          del(kwargs["default"])
-      TypeValidator.__init__(self, default={})
+      TypeValidator.__init__(self)
       if hasdefault:
          kwargs["default"] = default
       dict.__init__(self, **kwargs)
@@ -259,6 +259,13 @@ class Struct(dict, TypeValidator):
                   raise ValidationError("Invalid value for key '%s': %s" % (k, e))
          rv._set_schema_type(self)
          return rv
+
+   def make_default(self):
+      rv = das.types.Struct()
+      for k, t in self.iteritems():
+         rv[k] = t.make_default()
+      rv._set_schema_type(self)
+      return rv
 
    def __repr__(self):
       s = "Struct("
