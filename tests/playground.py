@@ -34,29 +34,29 @@ class ClipSource(das.FunctionSet):
          print("Get range from Alembic file")
       elif ext == ".mov":
          print("Get range from Movie file")
-      self.media = os.path.abspath(path).replace("\\", "/")
+      self.data.media = os.path.abspath(path).replace("\\", "/")
 
    def setClipOffsets(self, start, end):
-      dataStart, dataEnd = self.dataRange
+      dataStart, dataEnd = self.data.dataRange
       clipStart = min(dataEnd, dataStart + max(0, start))
       clipEnd = max(dataStart, dataEnd + min(end, 0))
       if clipStart == dataStart and clipEnd == dataEnd:
-         self.clipRange = None
+         self.data.clipRange = None
       else:
-         self.clipRange = (clipStart, clipEnd)
+         self.data.clipRange = (clipStart, clipEnd)
 
 das.write(das.make_default("timeline.ClipSource"), "./out.tl")
 cs = ClipSource()
 cs.read("./out.tl")
 cs.pprint()
-cs.dataRange = (100, 146)
+cs.data.dataRange = (100, 146)
 cs.setMedia("./source.mov")
 cs.setClipOffsets(1, -1)
 cs.pprint()
 cs.write("./out.tl")
 print(type(cs.copy()))
 cs.copy().pprint()
-c = das.copy(cs)
+c = das.copy(cs.data)
 print(type(c.copy()))
 for k, v in c.iteritems():
    print("%s = %s" % (k, v))
