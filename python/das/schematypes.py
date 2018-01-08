@@ -44,7 +44,7 @@ class Boolean(TypeValidator):
 
 class Integer(TypeValidator):
    def __init__(self, default=None, min=None, max=None):
-      super(Integer, self).__init__(default=(0 if default is None default))
+      super(Integer, self).__init__(default=(0 if default is None else default))
       self.min = min
       self.max = max
 
@@ -333,37 +333,20 @@ class Class(TypeValidator):
 
 class Or(TypeValidator):
    def __init__(self, type1, type2, default=None):
+      super(Or, self).__init__(default=default)
       self.type1 = type1
       self.type2 = type2
-      super(Or, self).__init__(default=default)
 
-   def adapt(self, value, key=None, index=None):
-      if value is not None:
-         try:
-            self.type1.validate(value)
-            return self.type1.adapt(value)
-         except:
-            try:
-               self.type2.validate(value)
-               return self.type2.adapt(value)
-            except:
-               pass
-      return self.type1.make_default()
-
-   def validate_default(self, value):
+   def validate(self, value, key=None, index=None):
       try:
-         self.type1.validate_default(value)
-      except:
-         self.type2.validate_default(value)
-
-   def validate(self, value):
-      try:
-         self.type1.validate(value)
+         return self.type1.validate(value, key=key, index=index)
       except ValidationError, e1:
-         self.type2.validate(value)
+         return self.type2.validate(value, key=key, index=index)
 
    def make_default(self):
-      return self.type1.make_default()
+      if not self.default_validated and self.default is None:
+         self.default = self.type1.make_default()
+      return super(Or, self).make_default()
 
    def __repr__(self):
       s = "Or(%s, %s" % (self.type1, self.type2)
@@ -374,15 +357,11 @@ class Or(TypeValidator):
 
 class Optional(TypeValidator):
    def __init__(self, type):
-      self.type = type
       super(Optional, self).__init__()
+      self.type = type
 
-   def adapt(self, value, key=None, index=None):
-      if value is not None:
-         return self.type.adapt(value)
-
-   def validate(self, value):
-      self.type.validate(value)
+   def validate(self, value, key=None, index=None):
+      return self.type.validate(value, key=key, index=index)
 
    def make_default(self):
       return self.type.make_default()
@@ -395,16 +374,10 @@ class Empty(TypeValidator):
    def __init__(self):
       super(Empty, self).__init__()
 
-   def adapt(self, value, key=None, index=None):
-      return None
-
-   def validate_default(self, value):
-      if value is not None:
-         raise Exception("Empty only accepts None as default value, got %s" % type(value).__name__)
-
-   def validate(self, value):
+   def validate(self, value, key=None, index=None):
       if value is not None:
          raise ValidationError("Expected None, got %s" % type(value).__name__)
+      return value
 
    def make_default(self):
       return None
@@ -417,45 +390,21 @@ class SchemaType(TypeValidator):
    CurrentSchema = ""
 
    def __init__(self, name, default=None):
+      super(SchemaType, self).__init__(default=default)
       if not "." in name:
          self.name = self.CurrentSchema + "." + name
       else:
          self.name = name
-      super(SchemaType, self).__init__(default=default)
 
-   def adapt(self, value, key=None, index=None):
+   def validate(self, value, key=None, index=None):
       st = das.get_schema_type(self.name)
-      return st.adapt(value, key=key, index=index)
-
-   def validate_default(self, value):
-      # Can't really call in the referenced type to validate default can we?
-      # get_schema_type may not return a valid value just yet
-      return value
-
-   def validate(self, value):
-      st = das.get_schema_type(self.name)
-      st.validate(value)
+      return st.validate(value, key=key, index=index)
 
    def make_default(self):
-      st = das.get_schema_type(self.name)
-      if self.default is None:
-         return st.make_default()
-      else:
-         if (hasattr(st, "default")):
-            old_default = st.default
-            st.default = self.default
-            exc = None
-            try:
-               rv = st.make_default()
-            except Exception, e:
-               exc = e
-            st.default = old_default
-            if exc:
-               raise exc
-            return rv
-         else:
-            print("[das] Ignore default value for SchemaType '%s'" % self.name)
-            return st.make_default()
+      if not self.default_validated and self.default is None:
+         st = das.get_schema_type(self.name)
+         self.default = st.make_default()
+      return super(SchemaType, self).make_default()
 
    def __repr__(self):
       s = "SchemaType('%s'" % self.name

@@ -44,8 +44,8 @@ class TestCase(unittest.TestCase):
 
    def testSaveNone2(self):
       rv = das.read(self.TestDir + "/test0.tl", schema_type="timeline.ClipSource")
-      rv.dataRange = None
       with self.assertRaises(das.ValidationError):
+         rv.dataRange = None
          das.write(rv, self.OutputFile)
 
    def testSaveValue(self):
@@ -56,6 +56,6 @@ class TestCase(unittest.TestCase):
 
    def testSaveInvalidValue(self):
       rv = das.read(self.TestDir + "/test1.tl", schema_type="timeline.ClipSource")
-      rv.clipRange = (1, 100, 10)
       with self.assertRaises(das.ValidationError):
+         rv.clipRange = (1, 100, 10)
          das.write(rv, self.OutputFile)
