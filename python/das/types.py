@@ -238,8 +238,12 @@ def adapt_value(value, schema_type=None, key=None, index=None):
       if isinstance(value, TypeBase):
          return value
       elif isinstance(value, dict):
-         # Or Dict?
-         return Struct(**value)
+         try:
+            rv = Struct(**value)
+         except ReservedNameError, e:
+            # If failed to create Struct because of a ReservedNameError exception, wrap using Dict class
+            rv = Dict(**value)
+         return rv
       else:
          klass = None
          if isinstance(value, tuple):
@@ -253,7 +257,7 @@ def adapt_value(value, schema_type=None, key=None, index=None):
             l = [None] * n
             i = 0
             for item in value:
-               l[i] = adapt_value(item, schema_type=schema_type, key=key, index=index)
+               l[i] = adapt_value(item)
                i += 1
             return klass(l)
          else:
