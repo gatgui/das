@@ -409,8 +409,9 @@ class SchemaType(TypeValidator):
 
    def make_default(self):
       if not self.default_validated and self.default is None:
-         st = das.get_schema_type(self.name)
-         self.default = st.make_default()
+         #st = das.get_schema_type(self.name)
+         #self.default = st.make_default()
+         self.default = das.make_default(self.name)
       return super(SchemaType, self).make_default()
 
    def __repr__(self):

@@ -192,6 +192,7 @@ class SchemaTypesRegistry(object):
          raise Exception("SchemaTypesRegistry must be globally unique")
       self.path = ""
       self.locations = set()
+      self.properties = {}
       SchemaTypesRegistry.instance = self
 
    def load_schemas(self, paths=None):
@@ -274,6 +275,27 @@ class SchemaTypesRegistry(object):
             return rv
       raise UnknownSchemaError(name)
 
+   def set_schema_type_property(self, name, pname, pvalue):
+      props = self.properties.get(name, {})
+      props[pname] = pvalue
+      self.properties[name] = props
+
+   def get_schema_type_property(self, name, pname):
+      return self.properties.get(name, {}).get(pname, None)
+
+   def make_default(self, name):
+      st = self.get_schema_type(name)
+      fn = self.get_schema_type_property(name, "function_set")
+      rv = st.make_default()
+      if fn is not None:
+         if isinstance(fn, das.FunctionSet):
+            return fn(data=rv)
+         else:
+            print("[das] Invalid function set for schema type '%s'" % name)
+            return rv
+      else:
+         return rv
+
    def get_schema_path(self, name):
       self.load_schemas()
       if "." in name:
@@ -285,10 +307,6 @@ class SchemaTypesRegistry(object):
       if "." in name:
          name = name.split(".")[0]
       return self.get_schema(name).module
-
-   def make_default(self, name):
-      st = self.get_schema_type(name)
-      return st.make_default()
 
 
 # Initialize registry
