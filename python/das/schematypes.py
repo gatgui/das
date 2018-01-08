@@ -283,20 +283,24 @@ class Dict(TypeValidator):
 
    def validate(self, value, key=None, index=None):
       if key is not None:
-         return self.vtypeOverrides.get(key, self.vtype).validate(value)
+         sk = str(key)
+         return self.vtypeOverrides.get(sk, self.vtype).validate(value)
       else:
          if not isinstance(value, (dict, das.types.Struct)):
             raise ValidationError("Expected a dict value, got %s" % type(value).__name__)
+         rv = das.types.Dict()
          for k in value:
             try:
-               self.ktype.validate(k)
+               ak = self.ktype.validate(k)
             except ValidationError, e:
                raise ValidationError("Invalid key value '%s': %s" % (k, e))
             try:
-               ak = self.ktype.adapt(k)
-               self.vtypeOverrides.get(ak, self.vtype).validate(value[k])
+               sk = str(ak)
+               rv[ak] = self.vtypeOverrides.get(sk, self.vtype).validate(value[k])
             except ValidationError, e:
                raise ValidationError("Invalid value for key '%s': %s" % (k, e))
+         rv._set_schema_type(self)
+         return rv
 
    def __repr__(self):
       s = "Dict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
@@ -315,26 +319,13 @@ class Class(TypeValidator):
          klass()
       except:
          raise Exception("Schema class '%s' constructor cannot be used without arguments")
+      super(Class, self).__init__(default=(klass() if default is None else default))
       self.klass = klass
-      # Only call base class constructor once 'klass' member is set
-      super(Class, self).__init__(default=default)
 
-   def adapt(self, value, key=None, index=None):
-      if value is None or not isinstance(value, self.klass):
-         return self.klass()
-      else:
-         return value
-
-   def validate_default(self, value):
-      if not isinstance(value, self.klass):
-         raise Exception("Class default value must be a %s, got %s" % (self.klass.__name__, type(value).__name__))
-
-   def validate(self, value):
+   def validate(self, value, key=None, index=None):
       if not isinstance(value, self.klass):
          raise ValidationError("Expected a %s value, got %s" % (self.klass.__name__, type(value).__name__))
-
-   def make_default(self):
-      return (self.klass() if self.default is None else self.default.copy())
+      return value
 
    def __repr__(self):
       return "Class(%s)" % self.klass.__name__
