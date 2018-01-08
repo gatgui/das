@@ -309,6 +309,10 @@ class Dict(TypeValidator):
          rv._set_schema_type(self)
          return rv
 
+   def make_default(self):
+      rv = super(Dict, self).make_default()
+      return das.copy(rv)
+
    def __repr__(self):
       s = "Dict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
       if self.default is not None:
@@ -333,6 +337,9 @@ class Class(TypeValidator):
       if not isinstance(value, self.klass):
          raise ValidationError("Expected a %s value, got %s" % (self.klass.__name__, type(value).__name__))
       return value
+
+   def make_default(self):
+      return super(Class, self).make_default().copy()
 
    def __repr__(self):
       return "Class(%s)" % self.klass.__name__
