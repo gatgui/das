@@ -1,3 +1,5 @@
+import das
+
 
 class ReservedNameError(Exception):
    def __init__(self, name):
@@ -15,7 +17,7 @@ class TypeBase(object):
       return rv
 
    def _adapt_value(self, value, key=None, index=None):
-      return adapt_value(value, schema_type=self._get_schema_type(), key=key, index=index)
+      return das.adapt_value(value, schema_type=self._get_schema_type(), key=key, index=index)
 
    def _validate(self, schema_type=None):
       if schema_type is None:
@@ -229,36 +231,3 @@ class Struct(TypeBase):
             raise ReservedNameError(k)
          print("'%s' key conflicts with existing method of dict class, use '_%s()' to call it instead" % (k, k))
          self.__dict__["_" + k] = getattr(self._dict, k)
-
-
-def adapt_value(value, schema_type=None, key=None, index=None):
-   if schema_type:
-      return schema_type.adapt(value, key=key, index=index)
-   else:
-      if isinstance(value, TypeBase):
-         return value
-      elif isinstance(value, dict):
-         try:
-            rv = Struct(**value)
-         except ReservedNameError, e:
-            # If failed to create Struct because of a ReservedNameError exception, wrap using Dict class
-            rv = Dict(**value)
-         return rv
-      else:
-         klass = None
-         if isinstance(value, tuple):
-            klass = Tuple
-         elif isinstance(value, list):
-            klass = Sequence
-         elif isinstance(value, set):
-            klass = Set
-         if klass is not None:
-            n = len(value)
-            l = [None] * n
-            i = 0
-            for item in value:
-               l[i] = adapt_value(item)
-               i += 1
-            return klass(l)
-         else:
-            return value

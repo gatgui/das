@@ -20,7 +20,7 @@ class TypeValidator(object):
    # Once adapted, the value should pass the validate method without raising
    #   any exception
    def adapt(self, value, key=None, index=None):
-      raise ValidationError("'adapt' method is not implemented")
+      raise Exception("'adapt' method is not implemented")
 
    # This method must raise an exception if the default value set in the schema
    #   is not acceptable for the type being defined
@@ -328,7 +328,7 @@ class Struct(dict, TypeValidator):
       if key is not None:
          vtype = self.get(key, None)
          if vtype is None:
-            return das.types.adapt_value(value)
+            return das.adapt_value(value)
          else:
             return vtype.adapt(value)
       else:
@@ -341,7 +341,7 @@ class Struct(dict, TypeValidator):
             for k in value:
                vtype = self.get(k, None)
                if vtype is None:
-                  dct[k] = das.types.adapt_value(value[k])
+                  dct[k] = das.adapt_value(value[k])
                else:
                   dct[k] = vtype.adapt(value[k])
          except Exception, e:
@@ -349,7 +349,7 @@ class Struct(dict, TypeValidator):
                for k, v in value:
                   vtype = self.get(k, None)
                   if vtype is None:
-                     dct[k] = das.types.adapt_value(v)
+                     dct[k] = das.adapt_value(v)
                   else:
                      dct[k] = vtype.adapt(v)
             except:
@@ -411,7 +411,7 @@ class Dict(TypeValidator):
                ak = self.ktype.adapt(k)
                vtype = self.vtypeOverrides.get(ak, self.vtype)
                if vtype is None:
-                  dct[ak] = das.types.adapt_value(value[k])
+                  dct[ak] = das.adapt_value(value[k])
                else:
                   dct[ak] = vtype.adapt(value[k])
          except:
@@ -420,7 +420,7 @@ class Dict(TypeValidator):
                   ak = self.ktype.adapt(k)
                   vtype = self.vtypeOverrides.get(ak, self.vtype)
                   if vtype is None:
-                     dct[ak] = das.types.adapt_value(v)
+                     dct[ak] = das.adapt_value(v)
                   else:
                      dct[ak] = vtype.adapt(v)
             except:

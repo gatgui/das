@@ -5,7 +5,7 @@ import datetime
 
 __version__ = "1.1.0"
 
-from .types import ReservedNameError, Struct, Sequence
+from .types import ReservedNameError, TypeBase, Tuple, Sequence, Set, Dict, Struct
 from .schematypes import ValidationError
 from .validation import UnknownSchemaError, Schema, SchemaLocation, SchemaTypesRegistry
 from .fsets import BindError, SchemaTypeError, FunctionSet
@@ -59,6 +59,39 @@ def make_default(name):
    return SchemaTypesRegistry.instance.make_default(name)
 
 
+def adapt_value(value, schema_type=None, key=None, index=None):
+   if schema_type:
+      return schema_type.adapt(value, key=key, index=index)
+   else:
+      if isinstance(value, TypeBase):
+         return value
+      elif isinstance(value, dict):
+         try:
+            rv = Struct(**value)
+         except ReservedNameError, e:
+            # If failed to create Struct because of a ReservedNameError exception, wrap using Dict class
+            rv = Dict(**value)
+         return rv
+      else:
+         klass = None
+         if isinstance(value, tuple):
+            klass = Tuple
+         elif isinstance(value, list):
+            klass = Sequence
+         elif isinstance(value, set):
+            klass = Set
+         if klass is not None:
+            n = len(value)
+            l = [None] * n
+            i = 0
+            for item in value:
+               l[i] = adapt_value(item)
+               i += 1
+            return klass(l)
+         else:
+            return value
+
+
 def validate(d, schema):
    get_schema_type(schema).validate(d)
 
@@ -97,7 +130,7 @@ def read(path, schema_type=None, ignore_meta=False, **funcs):
       sch, mod = None, None
 
    # if sch is defined, lookup for class override
-   rv = Das()
+   rv = Struct()
    with open(path, "r") as f:
       rv._update(**eval(f.read(), globals(), funcs))
 
@@ -110,7 +143,7 @@ def copy(d, deep=True):
    if not deep:
       return d._copy()
    else:
-      rv = Das(d._dict)
+      rv = Struct(d._dict)
       for k, v in rv._dict.items():
          if isinstance(v, Das):
             rv._dict[k] = copy(v, deep=True)
