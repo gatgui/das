@@ -223,3 +223,14 @@ def write(d, path, indent="  "):
          st = get_schema_type_name(d._schema_type)
          f.write("# schema_type: %s\n" % st)
       pprint(d, stream=f, indent=indent)
+
+
+# Utilities
+
+gPrintedMsgs = set()
+def print_once(msg):
+   global gPrintedMsgs
+   if msg in gPrintedMsgs:
+      return
+   print(msg)
+   gPrintedMsgs.add(msg)

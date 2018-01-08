@@ -235,14 +235,6 @@ class Struct(TypeBase):
             n = das.get_schema_type_name(st)
             if n:
                msg = "[%s] %s" % (n, msg)
-         _print_once(msg)
+         das.print_once(msg)
          self.__dict__["_" + k] = getattr(self._dict, k)
 
-
-gPrintedMsgs = set()
-def _print_once(msg):
-   global gPrintedMsgs
-   if msg in gPrintedMsgs:
-      return
-   print(msg)
-   gPrintedMsgs.add(msg)
