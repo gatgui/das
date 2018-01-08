@@ -61,7 +61,7 @@ def make_default(name):
 
 def adapt_value(value, schema_type=None, key=None, index=None):
    if schema_type:
-      return schema_type.adapt(value, key=key, index=index)
+      return schema_type.validate(value, key=key, index=index)
    else:
       if isinstance(value, TypeBase):
          return value
@@ -129,7 +129,6 @@ def read(path, schema_type=None, ignore_meta=False, **funcs):
    else:
       sch, mod = None, None
 
-   # if sch is defined, lookup for class override
    rv = Struct()
    with open(path, "r") as f:
       rv._update(**eval(f.read(), globals(), funcs))
@@ -215,6 +214,7 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
 def write(d, path, indent="  "):
    # Validate before writing
    d._validate()
+
    with open(path, "w") as f:
       f.write("# version: %s\n" % __version__)
       f.write("# author: %s\n" % os.environ["USER" if sys.platform != "win32" else "USER"])
