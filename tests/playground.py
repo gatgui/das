@@ -60,7 +60,7 @@ class ClipSource(das.FunctionSet):
       self.data.media = os.path.abspath(path).replace("\\", "/")
 
    def set_clip_offsets(self, start, end):
-      data_start, data_end = self.data.dataRange
+      data_start, data_end = self.data.dataRange.data
       clip_start = min(data_end, data_start + max(0, start))
       clip_end = max(data_start, data_end + min(end, 0))
       if clip_start == data_start and clip_end == data_end:
@@ -73,21 +73,14 @@ das.set_schema_type_function_set("timeline.ClipSource", ClipSource)
 
 print("-- make def (1)")
 dv = das.make_default("timeline.ClipSource")
-print(type(dv))
-print(type(dv.data))
-print(type(dv.data.dataRange))
-print(type(dv.data.dataRange.data))
 print("-- write")
 das.write(dv, "./out.tl")
 #cs = ClipSource()
 print("-- make def (2)")
 cs = das.make_default("timeline.ClipSource")
-print(type(cs))
-print(type(cs.data))
-print(type(cs.data.dataRange))
-print(type(cs.data.dataRange.data))
-print("-- read")
+print("-- read (1)")
 cs = das.read("./out.tl")
+print("-- read (2)")
 cs.read("./out.tl")
 cs.pprint()
 cs.data.dataRange = (100, 146)
@@ -99,7 +92,7 @@ print(type(cs.copy()))
 cs.copy().pprint()
 c = das.copy(cs.data)
 print(type(c.copy()))
-for k, v in c.data.iteritems():
+for k, v in c.iteritems():
    print("%s = %s" % (k, v))
 os.remove("./out.tl")
 

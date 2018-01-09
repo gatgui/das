@@ -23,7 +23,11 @@ class FunctionSet(object):
       raise None
 
    def bind(self, data):
-      self.data = self.get_schema_type().validate(data)
+      rv = self.get_schema_type().validate(data)
+      if isinstance(rv, FunctionSet):
+         self.data = rv.data
+      else:
+         self.data = rv
 
    def read(self, path):
       self.bind(das.read(path, ignore_meta=True))
