@@ -426,20 +426,9 @@ class SchemaType(TypeValidator):
 
    def make_default(self):
       if not self.default_validated and self.default is None:
-         #st = das.get_schema_type(self.name)
-         #self.default = st.make_default()
+         # Use das.make_default to enable function set auto-binding
          self.default = das.make_default(self.name)
-
-      rv = super(SchemaType, self).make_default()
-
-      if isinstance(rv, das.fsets.FunctionSet):
-         rv = rv.__class__(data=rv.data._wrap(rv.data), validate=False)
-      elif isinstance(rv, das.types.TypeBase):
-         rv = rv._wrap(rv)
-      else:
-         print("[das] SchemaType '%s' isn't a das.types" % self.name)
-
-      return rv
+      return super(SchemaType, self).make_default()
 
    def __repr__(self):
       s = "SchemaType('%s'" % self.name
