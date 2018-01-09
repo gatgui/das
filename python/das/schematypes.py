@@ -14,6 +14,13 @@ class TypeValidator(object):
       self.default = default
 
    def validate(self, value, key=None, index=None):
+      if isinstance(value, das.FunctionSet):
+         vv = self._validate(value.data, key=key, index=index)
+         return value.__class__(data=vv)
+      else:
+         return self._validate(value, key=key, index=index)
+
+   def _validate(self, value, key=None, index=None):
       raise ValidationError("'validate' method is not implemented")
 
    def make_default(self):
@@ -30,7 +37,7 @@ class Boolean(TypeValidator):
    def __init__(self, default=None):
       super(Boolean, self).__init__(default=(False if default is None else default))
 
-   def validate(self, value, key=None, index=None):
+   def _validate(self, value, key=None, index=None):
       if not isinstance(value, bool):
          raise ValidationError("Expected a boolean value, got %s" % type(value).__name__)
       return value
@@ -48,7 +55,7 @@ class Integer(TypeValidator):
       self.min = min
       self.max = max
 
-   def validate(self, value, key=None, index=None):
+   def _validate(self, value, key=None, index=None):
       if not isinstance(value, (int, long)):
          raise ValidationError("Expected an integer value, got %s" % type(value).__name__)
       if self.min is not None and value < self.min:
@@ -77,7 +84,7 @@ class Real(TypeValidator):
       self.min = min
       self.max = max
 
-   def validate(self, value, key=None, index=None):
+   def _validate(self, value, key=None, index=None):
       if not isinstance(value, (int, long, float)):
          raise ValidationError("Expected a real value, got %s" % type(value).__name__)
       if self.min is not None and value < self.min:
@@ -111,7 +118,7 @@ class String(TypeValidator):
          else:
             self.matches = matches
 
-   def validate(self, value, key=None, index=None):
+   def _validate(self, value, key=None, index=None):
       if not isinstance(value, (str, unicode)):
          raise ValidationError("Expected a string value, got %s" % type(value).__name__)
       if self.choices is not None and not value in self.choices:
@@ -144,7 +151,7 @@ class Sequence(TypeValidator):
       self.max_size = max_size
       self.type = type
 
-   def validate(self, value, key=None, index=None):
+   def _validate(self, value, key=None, index=None):
       if index is not None:
          return self.type.validate(value)
       else:
@@ -170,6 +177,12 @@ class Sequence(TypeValidator):
          rv._set_schema_type(self)
          return rv
 
+   def make_default(self):
+      dv = super(Sequence, self).make_default()
+      rv = das.types.Sequence(dv)
+      rv._set_schema_type(self)
+      return rv
+
    def __repr__(self):
       s = "Sequence(type=%s" % self.type
       sep = ", "
@@ -190,7 +203,7 @@ class Tuple(TypeValidator):
       super(Tuple, self).__init__(default=kwargs.get("default", None))
       self.types = args
 
-   def validate(self, value, key=None, index=None):
+   def _validate(self, value, key=None, index=None):
       if index is not None:
          return self.types[index].validate(value)
       else:
@@ -212,7 +225,10 @@ class Tuple(TypeValidator):
    def make_default(self):
       if not self.default_validated and self.default is None:
          self.default = tuple([t.make_default() for t in self.types])
-      return super(Tuple, self).make_default()
+      dv = super(Tuple, self).make_default()
+      rv = das.types.Tuple(dv)
+      rv._set_schema_type(self)
+      return rv
 
    def __repr__(self):
       s = "Tuple("
@@ -238,7 +254,7 @@ class Struct(dict, TypeValidator):
          kwargs["default"] = default
       dict.__init__(self, **kwargs)
 
-   def validate(self, value, key=None, index=None):
+   def _validate(self, value, key=None, index=None):
       if key is not None:
          if not key in self:
             return das.adapt_value(value)
@@ -288,7 +304,7 @@ class Dict(TypeValidator):
       for k, v in kwargs.iteritems():
          self.vtypeOverrides[k] = v
 
-   def validate(self, value, key=None, index=None):
+   def _validate(self, value, key=None, index=None):
       if key is not None:
          sk = str(key)
          return self.vtypeOverrides.get(sk, self.vtype).validate(value)
@@ -310,8 +326,10 @@ class Dict(TypeValidator):
          return rv
 
    def make_default(self):
-      rv = super(Dict, self).make_default()
-      return das.copy(rv)
+      dv = super(Dict, self).make_default()
+      rv = das.types.Dict(dv)
+      rv._set_schema_type(self)
+      return rv
 
    def __repr__(self):
       s = "Dict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
@@ -333,7 +351,7 @@ class Class(TypeValidator):
       super(Class, self).__init__(default=(klass() if default is None else default))
       self.klass = klass
 
-   def validate(self, value, key=None, index=None):
+   def _validate(self, value, key=None, index=None):
       if not isinstance(value, self.klass):
          raise ValidationError("Expected a %s value, got %s" % (self.klass.__name__, type(value).__name__))
       return value
@@ -351,7 +369,7 @@ class Or(TypeValidator):
       self.type1 = type1
       self.type2 = type2
 
-   def validate(self, value, key=None, index=None):
+   def _validate(self, value, key=None, index=None):
       try:
          return self.type1.validate(value, key=key, index=index)
       except ValidationError, e1:
@@ -374,7 +392,7 @@ class Optional(TypeValidator):
       super(Optional, self).__init__()
       self.type = type
 
-   def validate(self, value, key=None, index=None):
+   def _validate(self, value, key=None, index=None):
       return self.type.validate(value, key=key, index=index)
 
    def make_default(self):
@@ -388,7 +406,7 @@ class Empty(TypeValidator):
    def __init__(self):
       super(Empty, self).__init__()
 
-   def validate(self, value, key=None, index=None):
+   def _validate(self, value, key=None, index=None):
       if value is not None:
          raise ValidationError("Expected None, got %s" % type(value).__name__)
       return value
@@ -410,7 +428,7 @@ class SchemaType(TypeValidator):
       else:
          self.name = name
 
-   def validate(self, value, key=None, index=None):
+   def _validate(self, value, key=None, index=None):
       st = das.get_schema_type(self.name)
       return st.validate(value, key=key, index=index)
 
@@ -419,7 +437,14 @@ class SchemaType(TypeValidator):
          #st = das.get_schema_type(self.name)
          #self.default = st.make_default()
          self.default = das.make_default(self.name)
-      return super(SchemaType, self).make_default()
+      rv = super(SchemaType, self).make_default()
+      if isinstance(rv, das.fsets.FunctionSet):
+         return rv.__class__(data=rv.data._wrap(rv.data))
+      elif isinstance(rv, das.types.TypeBase):
+         return rv._wrap(rv)
+      else:
+         print("[das] SchemaType '%s' isn't a das.types" % self.name)
+         return rv
 
    def __repr__(self):
       s = "SchemaType('%s'" % self.name

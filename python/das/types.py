@@ -119,6 +119,9 @@ class Dict(TypeBase, dict):
          args[1] = self._adapt_value(args[1], key=args[0])
       super(Dict, self).setdefault(*args)
 
+   def copy(self):
+      return self._wrap(self)
+
    def update(self, *args, **kwargs):
       if len(args) == 1:
          a0 = args[0]
@@ -206,7 +209,7 @@ class Struct(TypeBase):
 
    # Override of dict.copy
    def _copy(self):
-      return self.__class__(self._dict.copy())
+      return self._wrap(self)
 
    # Override of dict.setdefault
    def _setdefault(self, *args):

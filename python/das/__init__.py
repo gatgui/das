@@ -47,6 +47,16 @@ def get_schema_type_name(typ):
    return SchemaTypesRegistry.instance.get_schema_type_name(typ)
 
 
+def set_schema_type_function_set(name, fn):
+   if not issubclass(fn, FunctionSet):
+      raise Exception("'fn' must be a sub-class of das.fsets.FunctionSet")
+   SchemaTypesRegistry.instance.set_schema_type_property(name, "function_set", fn)
+
+
+def get_schema_type_function_set(name):
+   return SchemaTypesRegistry.instance.get_schema_type_property(name, "function_set")
+
+
 def get_schema_path(name):
    return SchemaTypesRegistry.instance.get_schema_path(name)
 
@@ -135,6 +145,11 @@ def read(path, schema_type=None, ignore_meta=False, **funcs):
 
    rv._validate(sch)
 
+   if schema_type:
+      fn = get_schema_type_function_set(schema_type)
+      if fn:
+         rv = fn(rv)
+
    return rv
 
 
@@ -144,7 +159,7 @@ def copy(d, deep=True):
    else:
       rv = Struct(d._dict)
       for k, v in rv._dict.items():
-         if isinstance(v, Das):
+         if isinstance(v, Struct):
             rv._dict[k] = copy(v, deep=True)
       return rv
 
@@ -158,7 +173,7 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
    if not inline:
       stream.write(tindent)
 
-   if isinstance(d, (dict, Das)):
+   if isinstance(d, (dict, Struct)):
       stream.write("{\n")
       n = len(d)
       i = 0
@@ -204,6 +219,9 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
    elif isinstance(d, (str, unicode)):
       stream.write("'%s'" % d)
 
+   elif isinstance(d, FunctionSet):
+      pprint(d.data, stream=stream, indent=indent, depth=depth, inline=inline, eof=False)
+
    else:
       stream.write(str(d))
 
@@ -213,14 +231,19 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
 
 def write(d, path, indent="  "):
    # Validate before writing
-   d._validate()
+   if isinstance(d, FunctionSet):
+      d.data._validate()
+      schema_type = d.get_schema_type()
+   else:
+      d._validate()
+      schema_type = d._schema_type
 
    with open(path, "w") as f:
       f.write("# version: %s\n" % __version__)
       f.write("# author: %s\n" % os.environ["USER" if sys.platform != "win32" else "USER"])
       f.write("# date: %s\n" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
-      if d._schema_type:
-         st = get_schema_type_name(d._schema_type)
+      if schema_type:
+         st = get_schema_type_name(schema_type)
          f.write("# schema_type: %s\n" % st)
       pprint(d, stream=f, indent=indent)
 

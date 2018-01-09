@@ -22,6 +22,23 @@ for st in stl:
 
 print("=== FunctionSet tests using timeline.ClipSource schema type ===")
 
+class Range(das.FunctionSet):
+   def __init__(self, data=None):
+      # Make sure to initialize before calling base class constructor that will
+      # in turn call get_schema_type
+      self.schema_type = das.get_schema_type("timeline.Range")
+      super(Range, self).__init__(data=data)
+
+   def get_schema_type(self):
+      return self.schema_type
+
+   def extend(self, start, end):
+      if start < self.data[0]:
+         self.data[0] = start
+      if end > self.data[1]:
+         self.data[1] = end
+
+
 class ClipSource(das.FunctionSet):
    def __init__(self, data=None):
       # Make sure to initialize before calling base class constructor that will
@@ -51,9 +68,19 @@ class ClipSource(das.FunctionSet):
       else:
          self.data.clipRange = (clip_start, clip_end)
 
+das.set_schema_type_function_set("timeline.Range", Range)
+das.set_schema_type_function_set("timeline.ClipSource", ClipSource)
+
 das.write(das.make_default("timeline.ClipSource"), "./out.tl")
-cs = ClipSource()
+#cs = ClipSource()
+cs = das.make_default("timeline.ClipSource")
+print(type(cs))
+print(type(cs.data.dataRange))
+cs = das.read("./out.tl")
+print(type(cs))
+print(type(cs.data.dataRange))
 cs.read("./out.tl")
+print(type(cs.data.dataRange))
 cs.pprint()
 cs.data.dataRange = (100, 146)
 cs.set_media("./source.mov")

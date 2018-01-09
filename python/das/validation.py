@@ -288,7 +288,7 @@ class SchemaTypesRegistry(object):
       fn = self.get_schema_type_property(name, "function_set")
       rv = st.make_default()
       if fn is not None:
-         if isinstance(fn, das.FunctionSet):
+         if issubclass(fn, das.FunctionSet):
             return fn(data=rv)
          else:
             print("[das] Invalid function set for schema type '%s'" % name)
