@@ -3,7 +3,7 @@ import re
 import sys
 import datetime
 
-__version__ = "1.1.0"
+__version__ = "0.3.0"
 
 from .types import ReservedNameError, TypeBase, Tuple, Sequence, Set, Dict, Struct
 from .schematypes import ValidationError
