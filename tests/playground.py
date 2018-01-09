@@ -23,7 +23,7 @@ for st in stl:
 print("=== FunctionSet tests using timeline.ClipSource schema type ===")
 
 class Range(das.FunctionSet):
-   def __init__(self, data=None, create=True, validate=True):
+   def __init__(self, data=None, validate=True):
       # Make sure to initialize before calling base class constructor that will
       # in turn call get_schema_type
       self.schema_type = das.get_schema_type("timeline.Range")
@@ -48,7 +48,7 @@ class Range(das.FunctionSet):
 
 
 class ClipSource(das.FunctionSet):
-   def __init__(self, data=None, create=True, validate=True):
+   def __init__(self, data=None, validate=True):
       # Make sure to initialize before calling base class constructor that will
       # in turn call get_schema_type
       self.schema_type = das.get_schema_type("timeline.ClipSource")

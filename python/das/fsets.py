@@ -7,7 +7,7 @@ class SchemaTypeError(Exception):
 
 
 class FunctionSet(object):
-   def __init__(self, data=None, create=True, validate=True):
+   def __init__(self, data=None, validate=True):
       super(FunctionSet, self).__init__()
       schema_type = self.get_schema_type()
       if schema_type is None:
