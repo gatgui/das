@@ -137,12 +137,9 @@ def read(path, schema_type=None, ignore_meta=False, **funcs):
    else:
       sch, mod = None, None
 
-   rv = Struct()
    with open(path, "r") as f:
-      rv._update(**eval(f.read(), globals(), funcs))
+      rv = eval(f.read(), globals(), funcs)
 
-   #rv._validate(sch)
-   #return rv
    return (rv if sch is None else sch.validate(rv))
 
 
