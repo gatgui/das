@@ -48,8 +48,6 @@ def get_schema_type_name(typ):
 
 
 def set_schema_type_function_set(name, fn):
-   if not issubclass(fn, FunctionSet):
-      raise Exception("'fn' must be a sub-class of das.fsets.FunctionSet")
    SchemaTypesRegistry.instance.set_schema_type_property(name, "function_set", fn)
 
 
