@@ -17,16 +17,20 @@ class TypeValidator(object):
       if isinstance(value, das.FunctionSet):
          vv = self._validate(value.data, key=key, index=index)
          if not isinstance(vv, das.FunctionSet):
+            # Re-bind same function set
             return value.__class__(data=vv, validate=False)
          else:
+            # Auto bound function set in place, tt may not be the same though...
             return vv
       else:
          rv = self._validate(value, key=key, index=index)
          if not isinstance(rv, das.FunctionSet):
+            # Auto bind function set (if any)
             stn = das.get_schema_type_name(self)
             if stn:
                fn = das.get_schema_type_function_set(stn)
-               if fn and issubclass(fn, das.FunctionSet):
+               if fn:
+                  # 'fn' is guaranteed to be a subclass of FunctionSet
                   rv = fn(data=rv, validate=False)
          return rv
 
@@ -426,8 +430,8 @@ class SchemaType(TypeValidator):
 
    def make_default(self):
       if not self.default_validated and self.default is None:
-         # Use das.make_default to enable function set auto-binding
-         self.default = das.make_default(self.name)
+         st = das.get_schema_type(self.name)
+         self.default = st.make_default()
       return super(SchemaType, self).make_default()
 
    def __repr__(self):

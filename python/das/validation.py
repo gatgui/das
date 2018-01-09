@@ -273,7 +273,7 @@ class SchemaTypesRegistry(object):
          rv = location.get_schema_type_name(typ)
          if rv:
             return rv
-      # Not all types are named!
+      # Not all types are named
       return ""
 
    def set_schema_type_property(self, name, pname, pvalue):
@@ -288,12 +288,7 @@ class SchemaTypesRegistry(object):
       return self.properties.get(name, {}).get(pname, None)
 
    def make_default(self, name):
-      st = self.get_schema_type(name)
-      fn = self.get_schema_type_property(name, "function_set")
-      rv = st.make_default()
-      if fn is not None and issubclass(fn, das.FunctionSet) and not isinstance(rv, das.FunctionSet):
-         rv = fn(data=rv, validate=False)
-      return rv
+      return self.get_schema_type(name).make_default()
 
    def get_schema_path(self, name):
       self.load_schemas()
