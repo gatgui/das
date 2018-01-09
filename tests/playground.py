@@ -32,11 +32,19 @@ class Range(das.FunctionSet):
    def get_schema_type(self):
       return self.schema_type
 
+   def __iter__(self):
+      return iter(self.data)
+
+   def __getitem__(self, idx):
+      return self.data[idx]
+
    def extend(self, start, end):
-      if start < self.data[0]:
-         self.data[0] = start
-      if end > self.data[1]:
-         self.data[1] = end
+      cs, ce = self.data
+      if start < cs:
+         cs = start
+      if end > ce:
+         ce = end
+      self.data = (cs, ce)
 
 
 class ClipSource(das.FunctionSet):
@@ -49,6 +57,30 @@ class ClipSource(das.FunctionSet):
    def get_schema_type(self):
       return self.schema_type
 
+   @property
+   def media(self):
+      return self.data.media
+
+   @media.setter
+   def media(self, value):
+      self.data.media = value
+
+   @property
+   def dataRange(self):
+      return self.data.dataRange
+
+   @dataRange.setter
+   def dataRange(self, value):
+      self.data.dataRange = value
+
+   @property
+   def clipRange(self):
+      return self.data.clipRange
+
+   @clipRange.setter
+   def clipRange(self, value):
+      self.data.clipRange = value
+
    def set_media(self, path):
       _, ext = map(lambda x: x.lower(), os.path.splitext(path))
       if ext == ".fbx":
@@ -57,25 +89,24 @@ class ClipSource(das.FunctionSet):
          print("Get range from Alembic file")
       elif ext == ".mov":
          print("Get range from Movie file")
-      self.data.media = os.path.abspath(path).replace("\\", "/")
+      self.media = os.path.abspath(path).replace("\\", "/")
 
    def set_clip_offsets(self, start, end):
-      data_start, data_end = self.data.dataRange.data
+      data_start, data_end = self.dataRange
       clip_start = min(data_end, data_start + max(0, start))
       clip_end = max(data_start, data_end + min(end, 0))
       if clip_start == data_start and clip_end == data_end:
-         self.data.clipRange = None
+         self.clipRange = None
       else:
-         self.data.clipRange = (clip_start, clip_end)
+         self.clipRange = (clip_start, clip_end)
 
 das.set_schema_type_function_set("timeline.Range", Range)
 das.set_schema_type_function_set("timeline.ClipSource", ClipSource)
 
 print("-- make def (1)")
 dv = das.make_default("timeline.ClipSource")
-print("-- write")
+print("-- write (1)")
 das.write(dv, "./out.tl")
-#cs = ClipSource()
 print("-- make def (2)")
 cs = das.make_default("timeline.ClipSource")
 print("-- read (1)")
@@ -83,15 +114,15 @@ cs = das.read("./out.tl")
 print("-- read (2)")
 cs.read("./out.tl")
 cs.pprint()
-cs.data.dataRange = (100, 146)
+cs.dataRange = (100, 146)
+cs.dataRange.extend(102, 150)
 cs.set_media("./source.mov")
 cs.set_clip_offsets(1, -1)
 cs.pprint()
+print("-- write (2)")
 cs.write("./out.tl")
-print(type(cs.copy()))
 cs.copy().pprint()
 c = das.copy(cs.data)
-print(type(c.copy()))
 for k, v in c.iteritems():
    print("%s = %s" % (k, v))
 os.remove("./out.tl")

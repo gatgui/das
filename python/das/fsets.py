@@ -43,6 +43,12 @@ class FunctionSet(object):
       rv.bind(das.copy(self.data))
       return rv
 
+   def __repr__(self):
+      return self.data.__repr__()
+
+   def __str__(self):
+      return self.data.__str__()
+
    # The two following method are to impersonate TypeBase type
 
    def _validate(self, schema_type=None):
