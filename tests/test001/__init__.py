@@ -43,8 +43,8 @@ class TestCase(unittest.TestCase):
 
    def testWrite2(self):
       hud = das.read(self.InputFile, schema_type="hud.HUD")
-      hud.text.elements[2].align = ("top", "left")
-      self.assertRaises(Exception, das.write, self.OutputFile)
+      with self.assertRaises(Exception):
+         hud.text.elements[2].align = ("top", "left")
 
    def testCompare1(self):
       hud1 = das.read(self.InputFile, schema_type="hud.HUD")

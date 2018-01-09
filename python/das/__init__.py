@@ -143,25 +143,50 @@ def read(path, schema_type=None, ignore_meta=False, **funcs):
    with open(path, "r") as f:
       rv._update(**eval(f.read(), globals(), funcs))
 
-   rv._validate(sch)
-
-   if schema_type:
-      fn = get_schema_type_function_set(schema_type)
-      if fn:
-         rv = fn(rv)
-
-   return rv
+   #rv._validate(sch)
+   #return rv
+   return (rv if sch is None else sch.validate(rv))
 
 
 def copy(d, deep=True):
-   if not deep:
-      return d._copy()
+   if isinstance(d, list):
+      if deep:
+         rv = d.__class__([copy(x, deep=True) for x in d])
+      else:
+         rv = d.__class__(d[:])
+   elif isinstance(d, tuple):
+      if deep:
+         rv = d.__class__([copy(x, deep=True) for x in d])
+      else:
+         rv = d.__class__(d[:])
+   elif isinstance(d, set):
+      if deep:
+         rv = d.__class__([copy(x, deep=True) for x in d])
+      else:
+         rv = d.__class__([x for x in d])
+   elif isinstance(d, dict):
+      if deep:
+         rv = d.__class__()
+         for k, v in d.iteritems():
+            rv[k] = copy(v, deep=True)
+      else:
+         rv = d.copy()
+   elif isinstance(d, Struct):
+      if deep:
+         rv = d.__class__()
+         for k, v in d._dict.iteritems():
+            rv[k] = copy(v, deep=True)
+      else:
+         rv = d._copy()
+   elif isinstance(d, FunctionSet):
+      rv = d.__class__(data=copy(d.data), validate=False)
+   elif hasattr(d, "copy") and callable(getattr(d, "copy")):
+      rv = d.copy()
    else:
-      rv = Struct(d._dict)
-      for k, v in rv._dict.items():
-         if isinstance(v, Struct):
-            rv._dict[k] = copy(v, deep=True)
-      return rv
+      rv = d
+   if isinstance(rv, TypeBase) and isinstance(d, TypeBase):
+      rv._set_schema_type(d._get_schema_type())
+   return rv
 
 
 def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
@@ -230,13 +255,8 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
 
 
 def write(d, path, indent="  "):
-   # Validate before writing
-   if isinstance(d, FunctionSet):
-      d.data._validate()
-      schema_type = d.get_schema_type()
-   else:
-      d._validate()
-      schema_type = d._schema_type
+   d._validate()
+   schema_type = d._get_schema_type()
 
    with open(path, "w") as f:
       f.write("# version: %s\n" % __version__)

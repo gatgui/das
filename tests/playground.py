@@ -23,11 +23,11 @@ for st in stl:
 print("=== FunctionSet tests using timeline.ClipSource schema type ===")
 
 class Range(das.FunctionSet):
-   def __init__(self, data=None):
+   def __init__(self, data=None, create=True, validate=True):
       # Make sure to initialize before calling base class constructor that will
       # in turn call get_schema_type
       self.schema_type = das.get_schema_type("timeline.Range")
-      super(Range, self).__init__(data=data)
+      super(Range, self).__init__(data=data, validate=validate)
 
    def get_schema_type(self):
       return self.schema_type
@@ -40,11 +40,11 @@ class Range(das.FunctionSet):
 
 
 class ClipSource(das.FunctionSet):
-   def __init__(self, data=None):
+   def __init__(self, data=None, create=True, validate=True):
       # Make sure to initialize before calling base class constructor that will
       # in turn call get_schema_type
       self.schema_type = das.get_schema_type("timeline.ClipSource")
-      super(ClipSource, self).__init__(data=data)
+      super(ClipSource, self).__init__(data=data, validate=validate)
 
    def get_schema_type(self):
       return self.schema_type
@@ -71,16 +71,24 @@ class ClipSource(das.FunctionSet):
 das.set_schema_type_function_set("timeline.Range", Range)
 das.set_schema_type_function_set("timeline.ClipSource", ClipSource)
 
-das.write(das.make_default("timeline.ClipSource"), "./out.tl")
+print("-- make def (1)")
+dv = das.make_default("timeline.ClipSource")
+print(type(dv))
+print(type(dv.data))
+print(type(dv.data.dataRange))
+print(type(dv.data.dataRange.data))
+print("-- write")
+das.write(dv, "./out.tl")
 #cs = ClipSource()
+print("-- make def (2)")
 cs = das.make_default("timeline.ClipSource")
 print(type(cs))
+print(type(cs.data))
 print(type(cs.data.dataRange))
+print(type(cs.data.dataRange.data))
+print("-- read")
 cs = das.read("./out.tl")
-print(type(cs))
-print(type(cs.data.dataRange))
 cs.read("./out.tl")
-print(type(cs.data.dataRange))
 cs.pprint()
 cs.data.dataRange = (100, 146)
 cs.set_media("./source.mov")
@@ -91,7 +99,7 @@ print(type(cs.copy()))
 cs.copy().pprint()
 c = das.copy(cs.data)
 print(type(c.copy()))
-for k, v in c.iteritems():
+for k, v in c.data.iteritems():
    print("%s = %s" % (k, v))
 os.remove("./out.tl")
 

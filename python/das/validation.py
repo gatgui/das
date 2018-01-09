@@ -273,7 +273,8 @@ class SchemaTypesRegistry(object):
          rv = location.get_schema_type_name(typ)
          if rv:
             return rv
-      raise UnknownSchemaError(name)
+      # Not all types are named!
+      return ""
 
    def set_schema_type_property(self, name, pname, pvalue):
       props = self.properties.get(name, {})
@@ -287,14 +288,9 @@ class SchemaTypesRegistry(object):
       st = self.get_schema_type(name)
       fn = self.get_schema_type_property(name, "function_set")
       rv = st.make_default()
-      if fn is not None:
-         if issubclass(fn, das.FunctionSet):
-            return fn(data=rv)
-         else:
-            print("[das] Invalid function set for schema type '%s'" % name)
-            return rv
-      else:
-         return rv
+      if fn is not None and issubclass(fn, das.FunctionSet) and not isinstance(rv, das.FunctionSet):
+         rv = fn(data=rv, validate=False)
+      return rv
 
    def get_schema_path(self, name):
       self.load_schemas()

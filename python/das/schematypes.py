@@ -16,9 +16,19 @@ class TypeValidator(object):
    def validate(self, value, key=None, index=None):
       if isinstance(value, das.FunctionSet):
          vv = self._validate(value.data, key=key, index=index)
-         return value.__class__(data=vv)
+         if not isinstance(vv, das.FunctionSet):
+            return value.__class__(data=vv, validate=False)
+         else:
+            return vv
       else:
-         return self._validate(value, key=key, index=index)
+         rv = self._validate(value, key=key, index=index)
+         if not isinstance(rv, das.FunctionSet):
+            stn = das.get_schema_type_name(self)
+            if stn:
+               fn = das.get_schema_type_function_set(stn)
+               if fn and issubclass(fn, das.FunctionSet):
+                  rv = fn(data=rv, validate=False)
+         return rv
 
    def _validate(self, value, key=None, index=None):
       raise ValidationError("'validate' method is not implemented")
@@ -27,7 +37,7 @@ class TypeValidator(object):
       if not self.default_validated:
          self.default = self.validate(self.default)
          self.default_validated = True
-      return self.default
+      return das.copy(self.default)
 
    def __str__(self):
       return self.__repr__()
@@ -177,12 +187,6 @@ class Sequence(TypeValidator):
          rv._set_schema_type(self)
          return rv
 
-   def make_default(self):
-      dv = super(Sequence, self).make_default()
-      rv = das.types.Sequence(dv)
-      rv._set_schema_type(self)
-      return rv
-
    def __repr__(self):
       s = "Sequence(type=%s" % self.type
       sep = ", "
@@ -225,10 +229,7 @@ class Tuple(TypeValidator):
    def make_default(self):
       if not self.default_validated and self.default is None:
          self.default = tuple([t.make_default() for t in self.types])
-      dv = super(Tuple, self).make_default()
-      rv = das.types.Tuple(dv)
-      rv._set_schema_type(self)
-      return rv
+      return super(Tuple, self).make_default()
 
    def __repr__(self):
       s = "Tuple("
@@ -325,12 +326,6 @@ class Dict(TypeValidator):
          rv._set_schema_type(self)
          return rv
 
-   def make_default(self):
-      dv = super(Dict, self).make_default()
-      rv = das.types.Dict(dv)
-      rv._set_schema_type(self)
-      return rv
-
    def __repr__(self):
       s = "Dict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
       if self.default is not None:
@@ -355,9 +350,6 @@ class Class(TypeValidator):
       if not isinstance(value, self.klass):
          raise ValidationError("Expected a %s value, got %s" % (self.klass.__name__, type(value).__name__))
       return value
-
-   def make_default(self):
-      return super(Class, self).make_default().copy()
 
    def __repr__(self):
       return "Class(%s)" % self.klass.__name__
@@ -437,14 +429,17 @@ class SchemaType(TypeValidator):
          #st = das.get_schema_type(self.name)
          #self.default = st.make_default()
          self.default = das.make_default(self.name)
+
       rv = super(SchemaType, self).make_default()
+
       if isinstance(rv, das.fsets.FunctionSet):
-         return rv.__class__(data=rv.data._wrap(rv.data))
+         rv = rv.__class__(data=rv.data._wrap(rv.data), validate=False)
       elif isinstance(rv, das.types.TypeBase):
-         return rv._wrap(rv)
+         rv = rv._wrap(rv)
       else:
          print("[das] SchemaType '%s' isn't a das.types" % self.name)
-         return rv
+
+      return rv
 
    def __repr__(self):
       s = "SchemaType('%s'" % self.name
