@@ -10,17 +10,17 @@ os.environ["DAS_SCHEMA_PATH"] = os.pathsep.join(dirs)
 
 import das
 
-stl = das.list_schema_types("hud")
+def print_types():
+   print("=== Print default for all 'hud' schema types")
+   stl = das.list_schema_types("hud")
+   for st in stl:
+      print("=== %s" % st)
+      v = das.make_default(st)
+      print(type(v).__name__)
+      das.pprint(v)
+      if hasattr(v, "_schema_type"):
+         print(v._schema_type)
 
-for st in stl:
-   print("=== %s" % st)
-   v = das.make_default(st)
-   print(type(v).__name__)
-   das.pprint(v)
-   if hasattr(v, "_schema_type"):
-      print(v._schema_type)
-
-print("=== FunctionSet tests using timeline.ClipSource schema type ===")
 
 class Range(das.FunctionSet):
    def __init__(self, data=None, validate=True):
@@ -100,43 +100,71 @@ class ClipSource(das.FunctionSet):
       else:
          self.clipRange = (clip_start, clip_end)
 
-das.set_schema_type_function_set("timeline.Range", Range)
-das.set_schema_type_function_set("timeline.ClipSource", ClipSource)
 
-print("-- make def (1)")
-dv = das.make_default("timeline.ClipSource")
-print("-- write (1)")
-das.write(dv, "./out.tl")
-print("-- make def (2)")
-cs = das.make_default("timeline.ClipSource")
-print("-- read (1)")
-cs = das.read("./out.tl")
-print("-- read (2)")
-cs.read("./out.tl")
-cs.pprint()
-cs.dataRange = (100, 146)
-cs.dataRange.extend(102, 150)
-cs.set_media("./source.mov")
-cs.set_clip_offsets(1, -1)
-cs.pprint()
-print("-- write (2)")
-cs.write("./out.tl")
-cs.copy().pprint()
-c = das.copy(cs.data)
-for k, v in c.iteritems():
-   print("%s = %s" % (k, v))
-os.remove("./out.tl")
+def test_fsets():
+   print("=== FunctionSet tests using timeline.ClipSource schema type ===")
+   das.set_schema_type_function_set("timeline.Range", Range)
+   das.set_schema_type_function_set("timeline.ClipSource", ClipSource)
 
-print("=== Name conflict resolution ===")
-d = das.make_default("conflicts.DictMethod")
-das.pprint(d)
-print("keys = %s" % d.keys)
-print("_keys() -> %s" % d._keys())
-print("values = %s" % d.values)
-print("_values() -> %s" % d._values())
-print("items() -> %s" % d.items())
-for k, v in d.items():
-   print("%s = %s" % (k, v))
-das.pprint(d)
-d._clear()
-das.pprint(d)
+   print("-- make def (1)")
+   dv = das.make_default("timeline.ClipSource")
+   print("-- write (1)")
+   das.write(dv, "./out.tl")
+   print("-- make def (2)")
+   cs = das.make_default("timeline.ClipSource")
+   print("-- read (1)")
+   cs = das.read("./out.tl")
+   print("-- read (2)")
+   cs.read("./out.tl")
+   cs.pprint()
+   cs.dataRange = (100, 146)
+   cs.dataRange.extend(102, 150)
+   cs.set_media("./source.mov")
+   cs.set_clip_offsets(1, -1)
+   cs.pprint()
+   print("-- write (2)")
+   cs.write("./out.tl")
+   cs.copy().pprint()
+   c = das.copy(cs.data)
+   for k, v in c.iteritems():
+      print("%s = %s" % (k, v))
+   os.remove("./out.tl")
+
+
+def name_conflicts():
+   print("=== Name conflict resolution ===")
+   d = das.make_default("conflicts.DictMethod")
+   das.pprint(d)
+   print("keys = %s" % d.keys)
+   print("_keys() -> %s" % d._keys())
+   print("values = %s" % d.values)
+   print("_values() -> %s" % d._values())
+   print("items() -> %s" % d.items())
+   for k, v in d.items():
+      print("%s = %s" % (k, v))
+   das.pprint(d)
+   d._clear()
+   das.pprint(d)
+
+
+if __name__ == "__main__":
+   args = sys.argv[1:]
+   nargs = len(args)
+
+   funcs = {"print_types": print_types,
+            "test_fsets": test_fsets,
+            "name_conflicts": name_conflicts}
+
+   if nargs == 0:
+      print("Please specify function(s) to run (%s or all)" % ", ".join(funcs.keys()))
+
+   if "all" in args:
+      for f in funcs.values():
+         f()
+   else:
+      for arg in args:
+         f = funcs.get(arg, None)
+         if f is None:
+            print("Ignore non-existing function '%s'" % arg)
+         else:
+            f()
