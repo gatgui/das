@@ -288,6 +288,9 @@ class Struct(dict, TypeValidator):
       rv._set_schema_type(self)
       return rv
 
+   def __hash__(self):
+      return object.__hash__(self)
+
    def __repr__(self):
       s = "Struct("
       sep = ""

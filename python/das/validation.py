@@ -193,6 +193,9 @@ class SchemaTypesRegistry(object):
       self.path = ""
       self.locations = set()
       self.properties = {}
+      self.cache = {"name_to_schema": {},
+                    "name_to_type": {},
+                    "type_to_name": {}}
       SchemaTypesRegistry.instance = self
 
    def load_schemas(self, paths=None):
@@ -200,12 +203,16 @@ class SchemaTypesRegistry(object):
       if path == self.path:
          return
 
+      self.cache = {"name_to_schema": {},
+                    "name_to_type": {},
+                    "type_to_name": {}}
+
       locations = set()
       for d in path.split(os.pathsep):
          if not os.path.isdir(d):
             continue
          location = SchemaLocation(d, dont_load=True)
-         if not location in self.locations:
+         if not location in locations:
             locations.add(location)
 
       for location in self.locations:
@@ -219,62 +226,83 @@ class SchemaTypesRegistry(object):
       self.locations = locations
       self.path = path
 
+      # Create caches
+      nts = {}
+      ntt = {}
+      ttn = {}
+      for location in self.locations:
+         for sname in location.list_schemas():
+            schema = location.get_schema(sname)
+            if not sname in nts:
+               nts[sname] = schema
+            for tname in schema.list_types():
+               ttype = schema.get_type(tname)
+               if not tname in ntt:
+                  ntt[tname] = ttype
+               if not ttype in ttn:
+                  ttn[ttype] = tname
+      self.cache["name_to_schema"] = nts
+      self.cache["name_to_type"] = ntt
+      self.cache["type_to_name"] = ttn
+
+   def list_locations(self, sort=True):
+      self.load_schemas()
+      rv = [x.path for x in self.locations]
+      if sort:
+         rv.sort()
+      return rv
+
+   def get_location(self, path):
+      self.load_schemas()
+      for location in self.locations:
+         if os.path.issamefile(path, location.path):
+            return location
+      return None
+
    def list_schemas(self, sort=True):
       self.load_schemas()
-      rv = set()
-      for location in self.locations:
-         rv = rv.union(location.list_schemas(sort=False))
-      rv = list(rv)
+      rv = self.cache["name_to_schema"].keys()
       if sort:
          rv.sort()
       return rv
 
    def list_schema_types(self, schema=None, sort=True):
       self.load_schemas()
-      rv = set()
-      for location in self.locations:
-         rv = rv.union(location.list_schema_types(schema=schema, sort=False))
-      rv = list(rv)
+      if schema is None:
+         rv = self.cache["name_to_type"].keys()
+      else:
+         schema = self.cache["name_to_schema"].get(schema, None)
+         if schema:
+            rv = schema.list_types(sort=False)
+         else:
+            rv = []
       if sort:
          rv.sort()
       return rv
 
    def has_schema(self, name):
-      for location in self.locations:
-         if location.has_schema(name):
-            return True
-      return False
+      return (name in self.cache["name_to_schema"])
 
    def get_schema(self, name):
       self.load_schemas()
-      for location in self.locations:
-         rv = location.get_schema(name)
-         if rv is not None:
-            return rv
-      raise UnknownSchemaError(name)
+      schema = self.cache["name_to_schema"].get(name)
+      if schema is None:
+         raise UnknownSchemaError(name)
+      return schema
 
    def has_schema_type(self, name):
-      for location in self.locations:
-         if location.has_schema_type(name):
-            return True
-      return False
+      return (name in self.cache["name_to_type"])
 
    def get_schema_type(self, name):
       self.load_schemas()
-      for location in self.locations:
-         rv = location.get_schema_type(name)
-         if rv is not None:
-            return rv
-      raise UnknownSchemaError(name)
+      stype = self.cache["name_to_type"].get(name, None)
+      if stype is None:
+         raise UnknownSchemaError(name)
+      return stype
 
    def get_schema_type_name(self, typ):
       self.load_schemas()
-      for location in self.locations:
-         rv = location.get_schema_type_name(typ)
-         if rv:
-            return rv
-      # Not all types are named
-      return ""
+      return self.cache["type_to_name"].get(typ, "")
 
    def set_schema_type_property(self, name, pname, pvalue):
       props = self.properties.get(name, {})
