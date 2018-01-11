@@ -294,7 +294,13 @@ class Struct(dict, TypeValidator):
          rv = das.types.Struct()
          for k, v in self.iteritems():
             try:
-               rv[k] = v.validate(value[k])
+               vv = v.validate(value[k])
+               if isinstance(v, Deprecated):
+                  if vv is not None:
+                     das.print_once(v.message)
+                  else:
+                     continue
+               rv[k] = vv
             except KeyError, e:
                if not isinstance(v, Optional):
                   raise ValidationError("Invalid value for key '%s': %s" % (k, e))
@@ -451,6 +457,30 @@ class Optional(TypeValidator):
 
    def __repr__(self):
       return "Optional(type=%s)" % self.type
+
+
+class Deprecated(Optional):
+   def __init__(self, type, message="[das] Deprecated"):
+      super(Deprecated, self).__init__(type)
+      self.message = message
+
+   def _validate_self(self, value):
+      if value is None:
+         return True
+      else:
+         return super(Deprecated, self)._validate_self(value)
+
+   def _validate(self, value, key=None, index=None):
+      if value is None:
+         return True
+      else:
+         return super(Deprecated, self)._validate(value, key=key, index=index)
+
+   def make_default(self):
+      return None
+
+   def __repr__(self):
+      return "Deprecated(type=%s)" % self.type
 
 
 class Empty(TypeValidator):
