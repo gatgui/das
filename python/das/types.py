@@ -158,8 +158,13 @@ class Struct(TypeBase):
             raise AttributeError("'Struct' has not attribute '%s' (dict %s)" % (k, "has" if hasattr(self._dict, k) else "hasn't"))
 
    def __setattr__(self, k, v):
-      self._check_reserved(k)
-      self._dict[k] = self._adapt_value(v, key=k)
+      # Special case for __class__ member that we may want to modify for 
+      #   to enable dynamic function set binding
+      if k == "__class__":
+         super(Struct, self).__setattr__(k, v)
+      else:
+         self._check_reserved(k)
+         self._dict[k] = self._adapt_value(v, key=k)
 
    def __delattr__(self, k):
       del(self._dict[k])

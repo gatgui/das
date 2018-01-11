@@ -8,7 +8,7 @@ __version__ = "0.3.0"
 from .types import ReservedNameError, TypeBase, Tuple, Sequence, Set, Dict, Struct
 from .schematypes import ValidationError
 from .validation import UnknownSchemaError, Schema, SchemaLocation, SchemaTypesRegistry
-from .fsets import SchemaTypeError, FunctionSet
+from .fsets import SchemaTypeError, BindError, Mixin, FunctionSet, bind
 from . import schema
 
 # For backward compatibiilty
@@ -264,10 +264,11 @@ def write(d, path, indent="  "):
 
 # Utilities
 
-gPrintedMsgs = set()
+_PrintedMsgs = set()
+
 def print_once(msg):
-   global gPrintedMsgs
-   if msg in gPrintedMsgs:
+   global _PrintedMsgs
+   if msg in _PrintedMsgs:
       return
    print(msg)
-   gPrintedMsgs.add(msg)
+   _PrintedMsgs.add(msg)

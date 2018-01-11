@@ -131,6 +131,62 @@ def test_fsets():
    os.remove("./out.tl")
 
 
+def test_mixin():
+    class Fn(das.fsets.Mixin):
+        @classmethod
+        def get_schema_type(klass):
+            return "timeline.ClipSource"
+
+        def __init__(self, *args, **kwargs):
+            super(Fn, self).__init__()
+
+        def pprint(self):
+            das.pprint(self)
+
+    class Fn2(das.fsets.Mixin):
+        @classmethod
+        def get_schema_type(klass):
+            return "timeline.ClipSource"
+
+        def __init__(self, *args, **kwargs):
+            super(Fn2, self).__init__()
+
+        def echo(self):
+            print("From Fn2 Mixin")
+
+    class Fn3(das.fsets.Mixin):
+        @classmethod
+        def get_schema_type(klass):
+            return "timeline.Range"
+
+        def __init__(self, *args, **kwargs):
+            super(Fn2, self).__init__()
+
+        def echo(self):
+            print("From Fn3 Mixin")
+
+    data = das.make_default("timeline.ClipSource")
+    try:
+        data.pprint()
+    except Exception, e:
+        print(str(e))
+    das.fsets.bind([Fn, Fn2], data)
+    das.fsets.bind(Fn2, data)
+    das.fsets.bind(Fn, data)
+    try:
+        das.fsets.bind(Fn3, data)
+    except Exception, e:
+        print(str(e))
+    data.pprint()
+    c = das.copy(data)
+    das.fsets.bind(Fn2, c, reset=True)
+    c.echo()
+    try:
+        c.pprint()
+    except Exception, e:
+        print(str(e))
+
+
 def name_conflicts():
    print("=== Name conflict resolution ===")
    d = das.make_default("conflicts.DictMethod")
@@ -153,7 +209,8 @@ if __name__ == "__main__":
 
    funcs = {"print_types": print_types,
             "test_fsets": test_fsets,
-            "name_conflicts": name_conflicts}
+            "name_conflicts": name_conflicts,
+            "test_mixin": test_mixin}
 
    if nargs == 0:
       print("Please specify function(s) to run (%s or all)" % ", ".join(funcs.keys()))
