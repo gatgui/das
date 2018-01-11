@@ -57,9 +57,34 @@ def is_class_method(klass, name):
 def list_methods(klass):
    return filter(lambda x: is_instance_method(klass, x) and x not in _IgnoreMethods, dir(klass))
 
-def bind(fn, instance, reset=False, verbose=False):
+
+def get_bound_mixins(instance):
+   iclass = instance.__class__
+   iclassname = iclass.__name__
+   rv = []
+
+   cclassname = iclassname
+   _, b, m = _DynamicClasses.get(cclassname, (None, None, None))
+   while b is not None:
+      rv.append(m)
+      cclassname = b.__name__
+      _, b, m = _DynamicClasses.get(cclassname, (None, None, None))
+
+   rv.reverse()
+
+   return rv
+
+
+def has_bound_mixins(instance):
+   return (instance.__class__.__name__ in _DynamicClasses)
+
+
+def bind(mixins, instance, reset=False, verbose=False):
+   if instance is None or not mixins:
+      return instance
+
    if not isinstance(instance, das.types.TypeBase):
-      raise BindError("Mixin can only be bound to das override types")
+      raise BindError("Mixin can only be bound to das override types, got %s" % (type(instance).__name__))
 
    st = instance._get_schema_type()
    if st is None:
@@ -67,29 +92,30 @@ def bind(fn, instance, reset=False, verbose=False):
    else:
       st = das.get_schema_type_name(st)
 
-   if isinstance(fn, (tuple, list, set)):
-      for f in fn:
-         if not issubclass(f, Mixin):
-            raise Exception("'%s' must be a subclass of Mixin class" % f.__name__)
-      fns = list(fn)
-      fns.sort(key=lambda x: x.__name__)
-   elif issubclass(fn, Mixin):
-      fns = [fn]
+   if isinstance(mixins, (tuple, list, set)):
+      for mixin in mixins:
+         if not issubclass(mixin, Mixin):
+            raise BindError("'%s' must be a subclass of Mixin class" % mixin.__name__)
+      mixins = list(mixins)
+      mixins.sort(key=lambda x: x.__name__)
    else:
-      raise Exception("'%s' must be a subclass of Mixin class" % fn.__name__)
+      if issubclass(mixins, Mixin):
+         mixins = [mixins]
+      else:
+         raise BindError("'%s' must be a subclass of Mixin class" % mixins)
 
-   for fn in fns:
-      tst = fn.get_schema_type()
+   for mixin in mixins:
+      tst = mixin.get_schema_type()
       if not das.has_schema_type(tst):
-         raise SchemaTypeError("Invalid schema type '%s' for mixin '%s'" % (st, fn.__name__))
+         raise SchemaTypeError("Invalid schema type '%s' for mixin '%s'" % (st, mixin.__name__))
       elif tst != st:
-         raise SchemaTypeError("Schema type mismatch for mixin '%s': Expected '%s', got '%s'" % (fn.__name__, tst, st))
+         raise SchemaTypeError("Schema type mismatch for mixin '%s': Expected '%s', got '%s'" % (mixin.__name__, tst, st))
 
    # Get the original class in use before any mixin were bound
    iclass = instance.__class__
    iclassname = iclass.__name__
    _, baseclass, addclass = _DynamicClasses.get(iclassname, (None, iclass, None))
-   if not reset and addclass in fns:
+   if not reset and addclass in mixins:
       if verbose:
          print("[das] '%s' already bound" % addclass.__name__)
       return instance
@@ -98,84 +124,30 @@ def bind(fn, instance, reset=False, verbose=False):
       while cclass is not None:
          baseclass = cclass
          _, cclass, addclass = _DynamicClasses.get(cclass.__name__, (None, None, None))
-         if not reset and addclass in fns:
+         if not reset and addclass in mixins:
             if verbose:
                print("[das] '%s' already bound" % addclass.__name__)
             return instance
 
-   klassname = "_".join([baseclass.__name__] + [x.__name__ for x in fns])
+   klassname = "_".join([baseclass.__name__] + [x.__name__ for x in mixins])
    klass = _DynamicClasses.get(klassname, (None, None, None))[0]
 
    if klass is None:
       cclass = baseclass
       bmeths = set(list_methods(cclass))
 
-      for fn in fns:
-         fmeths = set(list_methods(fn))
+      for mixin in mixins:
+         fmeths = set(list_methods(mixin))
          i = bmeths.intersection(fmeths)
          if i:
             for n in i:
-               das.print_once("[das] Method '%s' from mixin '%s' is shadowed" % (n, fn.__name__))
+               das.print_once("[das] Method '%s' from mixin '%s' is shadowed" % (n, mixin.__name__))
          bmeths = bmeths.union(fmeths)
 
-         cclassname = cclass.__name__ + "_" + fn.__name__
-         klass = type(cclassname, (cclass, fn), {})
-         _DynamicClasses[cclassname] = (klass, cclass, fn)
+         cclassname = cclass.__name__ + "_" + mixin.__name__
+         klass = type(cclassname, (cclass, mixin), {})
+         _DynamicClasses[cclassname] = (klass, cclass, mixin)
          cclass = klass
 
    instance.__class__ = klass
    return instance
-
-
-class FunctionSet(object):
-   def __init__(self, data=None, validate=True):
-      super(FunctionSet, self).__init__()
-      schema_type = self.get_schema_type()
-      if schema_type is None:
-         raise SchemaTypeError("Invalid schema type '%s'" % schema_type)
-      if data is None:
-         self.data = schema_type.make_default()
-      elif validate:
-         self.bind(data)
-      else:
-         self.data = data
-
-   def get_schema_type(self):
-      raise None
-
-   def bind(self, data):
-      rv = self.get_schema_type().validate(data)
-      if isinstance(rv, FunctionSet):
-         self.data = rv.data
-      else:
-         self.data = rv
-
-   def read(self, path):
-      self.bind(das.read(path, ignore_meta=True))
-
-   def write(self, path):
-      das.write(self.data, path)
-
-   def pprint(self):
-      das.pprint(self.data)
-
-   def copy(self):
-      rv = self.__class__()
-      rv.bind(das.copy(self.data))
-      return rv
-
-   def __repr__(self):
-      return self.data.__repr__()
-
-   def __str__(self):
-      return self.data.__str__()
-
-   # The two following method are to impersonate TypeBase type
-
-   def _validate(self, schema_type=None):
-      if schema_type is not None and schema_type != self.get_schema_type():
-         raise das.ValidationError("FunctionSet schema type mismatch")
-      self.data._validate(schema_type=schema_type)
-
-   def _get_schema_type(self):
-      return self.get_schema_type()

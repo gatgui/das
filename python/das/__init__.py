@@ -8,7 +8,7 @@ __version__ = "0.3.0"
 from .types import ReservedNameError, TypeBase, Tuple, Sequence, Set, Dict, Struct
 from .schematypes import ValidationError
 from .validation import UnknownSchemaError, Schema, SchemaLocation, SchemaTypesRegistry
-from .fsets import SchemaTypeError, BindError, Mixin, FunctionSet, bind
+from .fsets import SchemaTypeError, BindError, Mixin, bind, has_bound_mixins, get_bound_mixins
 from . import schema
 
 # For backward compatibiilty
@@ -47,12 +47,19 @@ def get_schema_type_name(typ):
    return SchemaTypesRegistry.instance.get_schema_type_name(typ)
 
 
-def set_schema_type_function_set(name, fn):
-   SchemaTypesRegistry.instance.set_schema_type_property(name, "function_set", fn)
+def register_mixins(*mixins):
+   tmp = {}
+   for mixin in mixins:
+      st = mixin.get_schema_type()
+      lst = tmp.get(st, [])
+      lst.append(mixin)
+      tmp[st] = lst
+   for k, v in tmp.iteritems():
+      SchemaTypesRegistry.instance.set_schema_type_property(k, "mixins", v)
 
 
-def get_schema_type_function_set(name):
-   return SchemaTypesRegistry.instance.get_schema_type_property(name, "function_set")
+def get_registered_mixins(name):
+   return SchemaTypesRegistry.instance.get_schema_type_property(name, "mixins")
 
 
 def get_schema_path(name):
@@ -173,8 +180,6 @@ def copy(d, deep=True):
             rv[k] = copy(v, deep=True)
       else:
          rv = d._copy()
-   elif isinstance(d, FunctionSet):
-      rv = d.__class__(data=copy(d.data), validate=False)
    elif hasattr(d, "copy") and callable(getattr(d, "copy")):
       rv = d.copy()
    else:
@@ -238,9 +243,6 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
 
    elif isinstance(d, (str, unicode)):
       stream.write("'%s'" % d)
-
-   elif isinstance(d, FunctionSet):
-      pprint(d.data, stream=stream, indent=indent, depth=depth, inline=inline, eof=False)
 
    else:
       stream.write(str(d))

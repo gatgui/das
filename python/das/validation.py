@@ -306,9 +306,6 @@ class SchemaTypesRegistry(object):
 
    def set_schema_type_property(self, name, pname, pvalue):
       props = self.properties.get(name, {})
-      if pname == "function_set":
-         if not issubclass(pvalue, das.FunctionSet):
-            raise Exception("'function_set' property value must be a subclass of das.fsets.FunctionSet")
       props[pname] = pvalue
       self.properties[name] = props
 

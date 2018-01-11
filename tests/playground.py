@@ -22,89 +22,54 @@ def print_types():
          print(v._schema_type)
 
 
-class Range(das.FunctionSet):
-   def __init__(self, data=None, validate=True):
-      # Make sure to initialize before calling base class constructor that will
-      # in turn call get_schema_type
-      self.schema_type = das.get_schema_type("timeline.Range")
-      super(Range, self).__init__(data=data, validate=validate)
-
-   def get_schema_type(self):
-      return self.schema_type
-
-   def __iter__(self):
-      return iter(self.data)
-
-   def __getitem__(self, idx):
-      return self.data[idx]
-
-   def extend(self, start, end):
-      cs, ce = self.data
-      if start < cs:
-         cs = start
-      if end > ce:
-         ce = end
-      self.data = (cs, ce)
-
-
-class ClipSource(das.FunctionSet):
-   def __init__(self, data=None, validate=True):
-      # Make sure to initialize before calling base class constructor that will
-      # in turn call get_schema_type
-      self.schema_type = das.get_schema_type("timeline.ClipSource")
-      super(ClipSource, self).__init__(data=data, validate=validate)
-
-   def get_schema_type(self):
-      return self.schema_type
-
-   @property
-   def media(self):
-      return self.data.media
-
-   @media.setter
-   def media(self, value):
-      self.data.media = value
-
-   @property
-   def dataRange(self):
-      return self.data.dataRange
-
-   @dataRange.setter
-   def dataRange(self, value):
-      self.data.dataRange = value
-
-   @property
-   def clipRange(self):
-      return self.data.clipRange
-
-   @clipRange.setter
-   def clipRange(self, value):
-      self.data.clipRange = value
-
-   def set_media(self, path):
-      _, ext = map(lambda x: x.lower(), os.path.splitext(path))
-      if ext == ".fbx":
-         print("Get range from FBX file")
-      elif ext == ".abc":
-         print("Get range from Alembic file")
-      elif ext == ".mov":
-         print("Get range from Movie file")
-      self.media = os.path.abspath(path).replace("\\", "/")
-
-   def set_clip_offsets(self, start, end):
-      data_start, data_end = self.dataRange
-      clip_start = min(data_end, data_start + max(0, start))
-      clip_end = max(data_start, data_end + min(end, 0))
-      if clip_start == data_start and clip_end == data_end:
-         self.clipRange = None
-      else:
-         self.clipRange = (clip_start, clip_end)
-
-
 def test_fsets():
    print("=== FunctionSet tests using timeline.ClipSource schema type ===")
-   das.set_schema_type_function_set("timeline.Range", Range)
-   das.set_schema_type_function_set("timeline.ClipSource", ClipSource)
+
+   class Range(das.Mixin):
+      @classmethod
+      def get_schema_type(klass):
+         return "timeline.Range"
+
+      def __init__(self, *args, **kwargs):
+         super(Range, self).__init__(*args, **kwargs)
+
+      def expand(self, start, end):
+         cs, ce = self[0], self[1]
+         if start < cs:
+            cs = start
+         if end > ce:
+            ce = end
+         self[0], self[1] = cs, ce
+
+
+   class ClipSource(das.Mixin):
+      @classmethod
+      def get_schema_type(klass):
+         return "timeline.ClipSource"
+
+      def __init__(self, *args, **kwargs):
+         super(ClipSource, self).__init__(*args, **kwargs)
+
+      def set_media(self, path):
+         _, ext = map(lambda x: x.lower(), os.path.splitext(path))
+         if ext == ".fbx":
+            print("Get range from FBX file")
+         elif ext == ".abc":
+            print("Get range from Alembic file")
+         elif ext == ".mov":
+            print("Get range from Movie file")
+         self.media = os.path.abspath(path).replace("\\", "/")
+
+      def set_clip_offsets(self, start, end):
+         data_start, data_end = self.dataRange
+         clip_start = min(data_end, data_start + max(0, start))
+         clip_end = max(data_start, data_end + min(end, 0))
+         if clip_start == data_start and clip_end == data_end:
+            self.clipRange = None
+         else:
+            self.clipRange = (clip_start, clip_end)
+
+   das.register_mixins(Range, ClipSource)
 
    print("-- make def (1)")
    dv = das.make_default("timeline.ClipSource")
@@ -114,18 +79,16 @@ def test_fsets():
    cs = das.make_default("timeline.ClipSource")
    print("-- read (1)")
    cs = das.read("./out.tl")
-   print("-- read (2)")
-   cs.read("./out.tl")
-   cs.pprint()
+   das.pprint(cs)
    cs.dataRange = (100, 146)
-   cs.dataRange.extend(102, 150)
+   cs.dataRange.expand(102, 150)
    cs.set_media("./source.mov")
    cs.set_clip_offsets(1, -1)
-   cs.pprint()
+   das.pprint(cs)
    print("-- write (2)")
-   cs.write("./out.tl")
-   cs.copy().pprint()
-   c = das.copy(cs.data)
+   das.write(cs, "./out.tl")
+   c = das.copy(cs)
+   das.pprint(c)
    for k, v in c.iteritems():
       print("%s = %s" % (k, v))
    os.remove("./out.tl")
@@ -219,6 +182,7 @@ if __name__ == "__main__":
 
    if nargs == 0:
       print("Please specify function(s) to run (%s or all)" % ", ".join(funcs.keys()))
+      sys.exit(0)
 
    if "all" in args:
       for f in funcs.values():
