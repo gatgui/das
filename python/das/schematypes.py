@@ -306,6 +306,8 @@ class Struct(dict, TypeValidator):
    def make_default(self):
       rv = das.types.Struct()
       for k, t in self.iteritems():
+         if isinstance(t, Optional):
+            continue
          rv[k] = t.make_default()
       rv._set_schema_type(self)
       return rv
