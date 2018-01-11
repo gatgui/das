@@ -18,12 +18,12 @@ class TypeValidator(object):
       rv = self._validate(value, key=key, index=index)
       if mixins is not None:
          # Re-bind the same mixins that were found on original value
-         das.fsets.bind(mixins, rv, reset=True)
+         das.mixin.bind(mixins, rv, reset=True)
       elif key is None and index is None and not das.has_bound_mixins(rv):
          # Bind registered mixins for return value type if nothing bound yet
          mixins = das.get_registered_mixins(das.get_schema_type_name(self))
          if mixins:
-            das.fsets.bind(mixins, rv)
+            das.mixin.bind(mixins, rv)
       return rv
 
    def _validate_self(self, value):

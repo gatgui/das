@@ -8,7 +8,7 @@ __version__ = "0.3.0"
 from .types import ReservedNameError, TypeBase, Tuple, Sequence, Set, Dict, Struct
 from .schematypes import ValidationError
 from .validation import UnknownSchemaError, Schema, SchemaLocation, SchemaTypesRegistry
-from .fsets import SchemaTypeError, BindError, Mixin, bind, has_bound_mixins, get_bound_mixins
+from .mixin import SchemaTypeError, BindError, Mixin, bind, has_bound_mixins, get_bound_mixins
 from . import schema
 
 # For backward compatibiilty

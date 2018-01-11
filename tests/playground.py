@@ -22,8 +22,8 @@ def print_types():
          print(v._schema_type)
 
 
-def test_fsets():
-   print("=== FunctionSet tests using timeline.ClipSource schema type ===")
+def test_mixin1():
+   print("=== Mixin tests using timeline.ClipSource schema type ===")
 
    class Range(das.Mixin):
       @classmethod
@@ -94,8 +94,8 @@ def test_fsets():
    os.remove("./out.tl")
 
 
-def test_mixin():
-    class Fn(das.fsets.Mixin):
+def test_mixin2():
+    class Fn(das.mixin.Mixin):
         @classmethod
         def get_schema_type(klass):
             return "timeline.ClipSource"
@@ -110,7 +110,7 @@ def test_mixin():
         def pprint(self):
             das.pprint(self)
 
-    class Fn2(das.fsets.Mixin):
+    class Fn2(das.mixin.Mixin):
         @classmethod
         def get_schema_type(klass):
             return "timeline.ClipSource"
@@ -121,7 +121,7 @@ def test_mixin():
         def echo(self):
             print("From Fn2 Mixin")
 
-    class Fn3(das.fsets.Mixin):
+    class Fn3(das.mixin.Mixin):
         @classmethod
         def get_schema_type(klass):
             return "timeline.Range"
@@ -137,17 +137,17 @@ def test_mixin():
         data.pprint()
     except Exception, e:
         print(str(e))
-    das.fsets.bind([Fn, Fn2], data)
-    das.fsets.bind(Fn2, data)
-    das.fsets.bind(Fn, data)
+    das.mixin.bind([Fn, Fn2], data)
+    das.mixin.bind(Fn2, data)
+    das.mixin.bind(Fn, data)
     try:
-        das.fsets.bind(Fn3, data)
+        das.mixin.bind(Fn3, data)
     except Exception, e:
         print(str(e))
     data.pprint()
     c = data._copy()
     c = das.copy(data)
-    das.fsets.bind(Fn2, c, reset=True)
+    das.mixin.bind(Fn2, c, reset=True)
     c.echo()
     try:
         c.pprint()
@@ -176,9 +176,9 @@ if __name__ == "__main__":
    nargs = len(args)
 
    funcs = {"print_types": print_types,
-            "test_fsets": test_fsets,
+            "test_mixin1": test_mixin1,
             "name_conflicts": name_conflicts,
-            "test_mixin": test_mixin}
+            "test_mixin2": test_mixin2}
 
    if nargs == 0:
       print("Please specify function(s) to run (%s or all)" % ", ".join(funcs.keys()))
