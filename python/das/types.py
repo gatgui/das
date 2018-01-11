@@ -238,7 +238,7 @@ class Struct(TypeBase):
       elif hasattr(self._dict, k):
          if "_" + k in self.__dict__:
             raise ReservedNameError(k)
-         msg = "'%s' key conflicts with existing method of dict class, use '_%s()' to call it instead" % (k, k)
+         msg = "[das] %s's '%s(...)' method conflicts with data field '%s', use '_%s(...)' to call it instead" % (type(self).__name__, k, k, k)
          st = self._get_schema_type()
          if st is not None:
             n = das.get_schema_type_name(st)
