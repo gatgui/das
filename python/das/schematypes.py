@@ -325,6 +325,12 @@ class Struct(dict, TypeValidator):
       return s + ")"
 
 
+class StaticDict(Struct):
+   def __init__(self, **kwargs):
+      super(StaticDict, self).__init__(**kwargs)
+      das.print_once("[das] Schema type 'StaticDict' is deprecated, use 'Struct' instead")
+
+
 class Dict(TypeValidator):
    def __init__(self, ktype, vtype, default=None, **kwargs):
       super(Dict, self).__init__(default=({} if default is None else default))
@@ -366,6 +372,12 @@ class Dict(TypeValidator):
       for k, v in self.vtypeOverrides.iteritems():
          s += ", %s=%s" % (k, v)
       return s + ")"
+
+
+class DynamicDict(Dict):
+   def __init__(self, ktype, vtype, default=None, **kwargs):
+      super(DynamicDict, self).__init__(ktype, vtype, default=default, **kwargs)
+      das.print_once("[das] Schema type 'DynamicDict' is deprecated, use 'Dict' instead")
 
 
 class Class(TypeValidator):
