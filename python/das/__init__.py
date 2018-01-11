@@ -252,6 +252,8 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
 
 
 def write(d, path, indent="  "):
+   d._validate()
+
    schema_type = d._get_schema_type()
 
    with open(path, "w") as f:
