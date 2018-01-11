@@ -140,6 +140,10 @@ def test_mixin():
         def __init__(self, *args, **kwargs):
             super(Fn, self).__init__()
 
+        def _copy(self):
+            print("Fn._copy")
+            return self
+
         def pprint(self):
             das.pprint(self)
 
@@ -178,6 +182,7 @@ def test_mixin():
     except Exception, e:
         print(str(e))
     data.pprint()
+    c = data._copy()
     c = das.copy(data)
     das.fsets.bind(Fn2, c, reset=True)
     c.echo()

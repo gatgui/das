@@ -22,6 +22,7 @@ class Mixin(object):
 
 
 _DynamicClasses = {}
+_IgnoreMethods = set(["__init__", "__del__"])
 
 def is_method(klass, name):
    return inspect.ismethod(getattr(klass, name, None))
@@ -41,11 +42,20 @@ def is_overridden_method(klass, name):
       return False
    return (not is_inherited_method(klass, name) and not is_new_method(klass, name))
 
+def is_instance_method(klass, name):
+   if not is_method(klass, name):
+      return False
+   else:
+      return (getattr(klass, name).__self__ is not klass)
+
 def is_class_method(klass, name):
    if not is_method(klass, name):
       return False
    else:
       return (getattr(klass, name).__self__ is klass)
+
+def list_methods(klass):
+   return filter(lambda x: is_instance_method(klass, x) and x not in _IgnoreMethods, dir(klass))
 
 def bind(fn, instance, reset=False, verbose=False):
    if not isinstance(instance, das.types.TypeBase):
@@ -98,16 +108,18 @@ def bind(fn, instance, reset=False, verbose=False):
 
    if klass is None:
       cclass = baseclass
+      bmeths = set(list_methods(cclass))
 
       for fn in fns:
-         # # Give precedence to symbols in fn class,
-         # # maybe check for possible conflicts
-         # symbols = filter(lambda x: is_method(fn, x), dir(fn))
-         # print("%s symbol(s): %s" % (fn.__name__, symbols))
-         # tsymbols = filter(lambda x: not is_class_method(fn, x) and (is_overridden_method(fn, x) or is_new_method(fn, x)), symbols)
-         # print("%s target symbol(s): %s" % (fn.__name__, tsymbols))
+         fmeths = set(list_methods(fn))
+         i = bmeths.intersection(fmeths)
+         if i:
+            for n in i:
+               das.print_once("[das] Method '%s' from mixin '%s' is shadowed" % (n, fn.__name__))
+         bmeths = bmeths.union(fmeths)
+
          cclassname = cclass.__name__ + "_" + fn.__name__
-         klass = type(cclassname, (fn, cclass), {})
+         klass = type(cclassname, (cclass, fn), {})
          _DynamicClasses[cclassname] = (klass, cclass, fn)
          cclass = klass
 
