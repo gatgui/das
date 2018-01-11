@@ -12,7 +12,8 @@ class TypeBase(object):
       self.__dict__["_schema_type"] = None
 
    def _wrap(self, rhs):
-      rv = self.__class__(rhs)
+      st = self._get_schema_type()
+      rv = self.__class__(rhs if st is None else st._validate_self(rhs))
       rv._set_schema_type(self._get_schema_type())
       return rv
 
