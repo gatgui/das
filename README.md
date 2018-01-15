@@ -5,7 +5,7 @@ Dictionary As Struct
 ### Basic Usage
 Creating a struct from a standard dictionary is simply done by using the *das.Struct* class.
 
-For the most part, the functionality are identical to python *dict* class except for the fact that method names that conflicts with field names will be renamed with a leading *_* (a warning message will be issued once then)
+For the most part, the available instance methods are identical to python's *dict* class, but for the fact that method names that conflict with field names will be renamed with a leading *_* (a warning message will be issued once then)
 
 ```
 import das
