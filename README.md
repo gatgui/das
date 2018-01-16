@@ -42,11 +42,13 @@ For the most part, the available instance methods are identical to python's *dic
 shopping.schema
 ```
 {
-  "currency": String(default="Yen", choices=["Yen", "Euro", "Dollar"]),
+  "currency_names": String(default="yen", choices=["yen", "yens", "Yen", "Yens", "euro", "euros", "Euro", "Euros", "dollar", "dollars", "Dollar", "Dollars"]),
+
   "item": Struct(name=String(),
                  value=Real(min=0.0),
-                 currency=SchemaType("currency"),
+                 currency=SchemaType("currency_names"),
                  description=String()),
+
   "basket": Struct(size=Tuple(Real(), Real(), Real()),
                    items=Sequence(type=SchemaType("item")))
 }
@@ -108,6 +110,17 @@ class Basket(das.Mixin):
 
 
 das.register_mixins(Item, Basket)
+```
+
+```
+$ export DAS_SCHEMA_PATH=directory/of/shopping.schema
+$ python
+>>> import das
+>>> b = das.make_default("shopping.basket")
+>>> b.items.append(das.make("shopping.item", name="carottes", value=110))
+>>> b.items.append(das.make("shopping.item", name="meat", value=320))
+>>> print(b.value_in("euros"))
+
 ```
 #### Built-in schema types
 1. Boolean
