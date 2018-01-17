@@ -1,5 +1,6 @@
 import das
 import inspect
+import importlib
 
 
 class BindError(Exception):
@@ -147,6 +148,12 @@ def bind(mixins, instance, reset=False, verbose=False):
          cclassname = cclass.__name__ + "_" + mixin.__name__
          klass = type(cclassname, (cclass, mixin), {})
          _DynamicClasses[cclassname] = (klass, cclass, mixin)
+
+         # Also add class to the module the mixin is coming from
+         mod = importlib.import_module(mixin.__module__)
+         setattr(mod, klass.__name__, klass)
+         setattr(klass, "__module__", mixin.__module__)
+
          cclass = klass
 
    instance.__class__ = klass
