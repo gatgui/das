@@ -38,7 +38,9 @@ class Schema(object):
             self.module = imp.load_source("das.schema.%s" % self.name, pmp)
             setattr(das.schema, self.name, self.module)
          except Exception, e:
+            import traceback
             print("[das] Failed to load schema module '%s' (%s)" % (pmp, e))
+            traceback.print_exc()
 
       eval_locals = {"Boolean": das.schematypes.Boolean,
                      "Integer": das.schematypes.Integer,
