@@ -171,6 +171,21 @@ def name_conflicts():
    das.pprint(d)
 
 
+def do_shopping():
+   def make_item(name, value):
+      item = das.make_default("shopping.item")
+      item.name = name
+      item.value = value
+      return item
+
+   b = das.make_default("shopping.basket")
+   b.items.append(make_item("carottes", 110))
+   b.items.append(make_item("meat", 320))
+   das.pprint(b)
+   for c in ["yen", "euro", "dollar"]:
+      print("%f %s(s)" % (b.value_in(c), c))
+
+
 if __name__ == "__main__":
    args = sys.argv[1:]
    nargs = len(args)
@@ -178,7 +193,8 @@ if __name__ == "__main__":
    funcs = {"print_types": print_types,
             "test_mixin1": test_mixin1,
             "name_conflicts": name_conflicts,
-            "test_mixin2": test_mixin2}
+            "test_mixin2": test_mixin2,
+            "do_shopping": do_shopping}
 
    if nargs == 0:
       print("Please specify function(s) to run (%s or all)" % ", ".join(funcs.keys()))

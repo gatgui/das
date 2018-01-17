@@ -1,0 +1,10 @@
+{
+  "currency_names": String(default="Yen", choices=["Yen", "Euro", "Dollar"]),
+
+  "item": Struct(name=String(),
+                 value=Real(min=0.0),
+                 currency=SchemaType("currency_names"),
+                 description=String()),
+
+  "basket": Struct(items=Sequence(type=SchemaType("item")))
+}
