@@ -38,7 +38,9 @@ class Schema(object):
             self.module = imp.load_source("das.schema.%s" % self.name, pmp)
             setattr(das.schema, self.name, self.module)
          except Exception, e:
+            import traceback
             print("[das] Failed to load schema module '%s' (%s)" % (pmp, e))
+            traceback.print_exc()
 
       eval_locals = {"Boolean": das.schematypes.Boolean,
                      "Integer": das.schematypes.Integer,
@@ -120,6 +122,7 @@ class SchemaLocation(object):
       schema_files = glob.glob(self.path + "/*.schema")
       for schema_file in schema_files:
          # try:
+            print("[das] Load schema file: %s" % schema_file)
             schema = Schema(self, schema_file, dont_load=True)
             if SchemaTypesRegistry.instance.has_schema(schema.name):
                raise Exception("[das] Schema '%s' already registered in another schema")
@@ -314,6 +317,9 @@ class SchemaTypesRegistry(object):
 
    def make_default(self, name):
       return self.get_schema_type(name).make_default()
+
+   def make(self, _schema_type_name, *args, **kwargs):
+      return self.get_schema_type(_schema_type_name).make(*args, **kwargs)
 
    def get_schema_path(self, name):
       self.load_schemas()

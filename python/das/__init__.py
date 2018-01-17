@@ -62,6 +62,7 @@ def get_schema_type_name(typ):
 
 
 def register_mixins(*mixins):
+   print("[das] Register mixins: %s" % ", ".join(map(lambda x: x.__module__ + "." + x.__name__, mixins)))
    tmp = {}
    for mixin in mixins:
       st = mixin.get_schema_type()
@@ -86,6 +87,10 @@ def get_schema_module(name):
 
 def make_default(name):
    return SchemaTypesRegistry.instance.make_default(name)
+
+
+def make(_schema_type_name, name, *args, **kwargs):
+   return SchemaTypesRegistry.instance.make(_schema_type_name, *args, **kwargs)
 
 
 def adapt_value(value, schema_type=None, key=None, index=None):

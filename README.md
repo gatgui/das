@@ -35,26 +35,44 @@ For the most part, the available instance methods are identical to python's *dic
   }
 }
 ```
+One can also easily serialize/deserialize struct content to file
+```
+>>> das.write(s, "/path/to/file.ext")
+>>> s2 = das.read("/path/to/file.ext")
+>>> das.pprint(s2)
+{
+  'field4': 3.0,
+  'field5': 'bbb',
+  'group': {
+    'field1': [
+      0,
+      1,
+      2,
+      10
+    ],
+    'field2': 'aaa'
+  }
+}
+```
 
 ### Advanced Usage
 #### Type validation
 #### Schema
-shopping.schema
+tests/test005/shopping.schema
 ```
 {
-  "currency_names": String(default="yen", choices=["yen", "yens", "Yen", "Yens", "euro", "euros", "Euro", "Euros", "dollar", "dollars", "Dollar", "Dollars"]),
+  "currency_names": String(default="Yen", choices=["Yen", "Euro", "Dollar"]),
 
   "item": Struct(name=String(),
                  value=Real(min=0.0),
                  currency=SchemaType("currency_names"),
                  description=String()),
 
-  "basket": Struct(size=Tuple(Real(), Real(), Real()),
-                   items=Sequence(type=SchemaType("item")))
+  "basket": Struct(items=Sequence(type=SchemaType("item")))
 }
 ```
 #### Schema module & mixins
-shopping.py
+tests/test005/shopping.py
 ```
 import das
 
@@ -82,7 +100,7 @@ def convert_currencies(amount, source_currency, destination_currency):
   tc = get_currency_key(destination_currency)
   if fc is None or tc is None:
     raise Exception("Invalid currency conversion: %s -> %s" % (source_currency, destination_currency))
-  return (amount * CurrencyRages[tc] / CurrencyRates[fc])
+  return (amount * CurrencyRates[tc] / CurrencyRates[fc])
 
 
 class Item(das.Mixin):
@@ -91,7 +109,7 @@ class Item(das.Mixin):
     return "shopping.item"
 
   def __init__(self, *args, **kwargs):
-    super(Item, object).__init__(*args, **kwargs)
+    super(Item, self).__init__(*args, **kwargs)
 
   def value_in(self, currency=DefaultCurrency):
     return convert_currencies(self.value, self.currency, currency)
@@ -103,15 +121,16 @@ class Basket(das.Mixin):
     return "shopping.basket"
 
   def __init__(self, *args, **kwargs):
-    super(Item, object).__init__(*args, **kwargs)
+    super(Basket, self).__init__(*args, **kwargs)
 
   def value_in(self, currency=DefaultCurrency):
-    return reduce(lambda x, y: x+y.value_in(currency), self.items)
+    return reduce(lambda x, y: x + y.value_in(currency), self.items, 0.0)
 
 
 das.register_mixins(Item, Basket)
-```
 
+```
+Usage
 ```
 $ export DAS_SCHEMA_PATH=directory/of/shopping.schema
 $ python
@@ -119,9 +138,30 @@ $ python
 >>> b = das.make_default("shopping.basket")
 >>> b.items.append(das.make("shopping.item", name="carottes", value=110))
 >>> b.items.append(das.make("shopping.item", name="meat", value=320))
->>> print(b.value_in("euros"))
-
+>>> das.pprint(b)
+{
+  'items': [
+    {
+      'currency': 'Yen',
+      'description': '',
+      'name': '',
+      'value': 110.0
+    },
+    {
+      'currency': 'Yen',
+      'description': '',
+      'name': '',
+      'value': 320.0
+    }
+  ]
+}
+>>> for c in ["yen", "euro", "dollar"]:
+...   print("%f %s(s)" % (b.value_in(c), c))
+430.000000 yen(s)
+3.157752 euro(s)
+3.898459 dollar(s)
 ```
+
 #### Built-in schema types
 1. Boolean
 2. Integer
