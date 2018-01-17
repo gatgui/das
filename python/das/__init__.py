@@ -62,6 +62,7 @@ def get_schema_type_name(typ):
 
 
 def register_mixins(*mixins):
+   print("[das] Register mixins: %s" % ", ".join(map(lambda x: x.__module__ + "." + x.__name__, mixins)))
    tmp = {}
    for mixin in mixins:
       st = mixin.get_schema_type()

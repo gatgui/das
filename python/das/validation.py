@@ -122,6 +122,7 @@ class SchemaLocation(object):
       schema_files = glob.glob(self.path + "/*.schema")
       for schema_file in schema_files:
          # try:
+            print("[das] Load schema file: %s" % schema_file)
             schema = Schema(self, schema_file, dont_load=True)
             if SchemaTypesRegistry.instance.has_schema(schema.name):
                raise Exception("[das] Schema '%s' already registered in another schema")
