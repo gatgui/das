@@ -144,13 +144,13 @@ $ python
     {
       'currency': 'Yen',
       'description': '',
-      'name': '',
+      'name': 'carottes',
       'value': 110.0
     },
     {
       'currency': 'Yen',
       'description': '',
-      'name': '',
+      'name': 'meat',
       'value': 320.0
     }
   ]
