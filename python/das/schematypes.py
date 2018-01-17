@@ -38,6 +38,9 @@ class TypeValidator(object):
          self.default_validated = True
       return das.copy(self.default)
 
+   def make(self, *args, **kwargs):
+      return self._validate(args[0])
+
    def __str__(self):
       return self.__repr__()
 
@@ -202,6 +205,9 @@ class Sequence(TypeValidator):
          rv._set_schema_type(self)
          return rv
 
+   def make(self, *args, **kwargs):
+      return self._validate(args)
+
    def __repr__(self):
       s = "Sequence(type=%s" % self.type
       sep = ", "
@@ -250,6 +256,9 @@ class Tuple(TypeValidator):
       if not self.default_validated and self.default is None:
          self.default = tuple([t.make_default() for t in self.types])
       return super(Tuple, self).make_default()
+
+   def make(self, *args, **kwargs):
+      return self._validate(args)
 
    def __repr__(self):
       s = "Tuple("
@@ -319,6 +328,12 @@ class Struct(dict, TypeValidator):
          self.default._set_schema_type(self)
       return super(Struct, self).make_default()
 
+   def make(self, *args, **kwargs):
+      rv = self.make_default()
+      for k, v in kwargs.iteritems():
+         setattr(rv, k, v)
+      return rv
+
    def __hash__(self):
       return object.__hash__(self)
 
@@ -373,6 +388,9 @@ class Dict(TypeValidator):
                raise ValidationError("Invalid value for key '%s': %s" % (k, e))
          rv._set_schema_type(self)
          return rv
+
+   def make(self, *args, **kwargs):
+      return self._validate(kwargs)
 
    def __repr__(self):
       s = "Dict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
@@ -435,6 +453,9 @@ class Or(TypeValidator):
          self.default = self.type1.make_default()
       return super(Or, self).make_default()
 
+   def make(self, *args, **kwargs):
+      return self.type1.make(*args, **kwargs)
+
    def __repr__(self):
       s = "Or(%s, %s" % (self.type1, self.type2)
       if self.default is not None:
@@ -455,6 +476,9 @@ class Optional(TypeValidator):
 
    def make_default(self):
       return self.type.make_default()
+
+   def make(self, *args, **kwargs):
+      return self.type.make(*args, **kwargs)
 
    def __repr__(self):
       return "Optional(type=%s)" % self.type
@@ -526,6 +550,10 @@ class SchemaType(TypeValidator):
          st = das.get_schema_type(self.name)
          self.default = st.make_default()
       return super(SchemaType, self).make_default()
+
+   def make(self, *args, **kwargs):
+      st = das.get_schema_type(self.name)
+      return st.make(*args, **kwargs)
 
    def __repr__(self):
       s = "SchemaType('%s'" % self.name

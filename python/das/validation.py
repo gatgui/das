@@ -318,6 +318,9 @@ class SchemaTypesRegistry(object):
    def make_default(self, name):
       return self.get_schema_type(name).make_default()
 
+   def make(self, _schema_type_name, *args, **kwargs):
+      return self.get_schema_type(_schema_type_name).make(*args, **kwargs)
+
    def get_schema_path(self, name):
       self.load_schemas()
       if "." in name:
