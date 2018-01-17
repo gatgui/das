@@ -172,15 +172,9 @@ def name_conflicts():
 
 
 def do_shopping():
-   def make_item(name, value):
-      item = das.make_default("shopping.item")
-      item.name = name
-      item.value = value
-      return item
-
    b = das.make_default("shopping.basket")
-   b.items.append(make_item("carottes", 110))
-   b.items.append(make_item("meat", 320))
+   b.items.append(das.make("shopping.item", name="carottes", value=110))
+   b.items.append(das.make("shopping.item", name="meat", value=320))
    das.pprint(b)
    for c in ["yen", "euro", "dollar"]:
       print("%f %s(s)" % (b.value_in(c), c))
