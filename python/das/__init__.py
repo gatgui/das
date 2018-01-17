@@ -89,7 +89,7 @@ def make_default(name):
    return SchemaTypesRegistry.instance.make_default(name)
 
 
-def make(_schema_type_name, name, *args, **kwargs):
+def make(_schema_type_name, *args, **kwargs):
    return SchemaTypesRegistry.instance.make(_schema_type_name, *args, **kwargs)
 
 
