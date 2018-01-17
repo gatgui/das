@@ -310,13 +310,14 @@ class Struct(dict, TypeValidator):
          return rv
 
    def make_default(self):
-      rv = das.types.Struct()
-      for k, t in self.iteritems():
-         if isinstance(t, Optional):
-            continue
-         rv[k] = t.make_default()
-      rv._set_schema_type(self)
-      return rv
+      if not self.default_validated and self.default is None:
+         self.default = das.types.Struct()
+         for k, t in self.iteritems():
+            if isinstance(t, Optional):
+               continue
+            self.default[k] = t.make_default()
+         self.default._set_schema_type(self)
+      return super(Struct, self).make_default()
 
    def __hash__(self):
       return object.__hash__(self)
