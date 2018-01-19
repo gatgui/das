@@ -101,3 +101,10 @@ ENV/
 .mypy_cache/
 
 *.pyc
+
+/*.dblite
+/release
+/debug
+/eco
+/das.env.tmp
+/.vscode

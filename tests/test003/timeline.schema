@@ -1,0 +1,6 @@
+{
+   "Range": Sequence(type=Real(), size=2, default=(1, 1)),
+   "ClipSource": StaticDict(media=String(default=""),
+                            dataRange=SchemaType("Range"),
+                            clipRange=Or(Empty(), SchemaType("Range")))
+}

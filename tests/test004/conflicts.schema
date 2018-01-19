@@ -1,0 +1,5 @@
+{
+   "DictMethod": StaticDict(clear=Boolean(default=False),
+                            keys=Sequence(String(), default=[]),
+                            values=Sequence(Real(), default=[]))
+}

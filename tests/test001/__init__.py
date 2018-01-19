@@ -35,7 +35,7 @@ class TestCase(unittest.TestCase):
 
    def testRead2(self):
       rv = das.read(self.InputFile, schema_type="hud.HUD")
-      self.assertIsInstance(rv, das.struct.Das)
+      self.assertIsInstance(rv, das.types.Struct)
 
    def testWrite1(self):
       das.write(das.read(self.InputFile, schema_type="hud.HUD"), self.OutputFile)
@@ -43,8 +43,8 @@ class TestCase(unittest.TestCase):
 
    def testWrite2(self):
       hud = das.read(self.InputFile, schema_type="hud.HUD")
-      hud.text.elements[2].align = ("top", "left")
-      self.assertRaises(Exception, das.write, self.OutputFile)
+      with self.assertRaises(Exception):
+         hud.text.elements[2].align = ("top", "left")
 
    def testCompare1(self):
       hud1 = das.read(self.InputFile, schema_type="hud.HUD")
@@ -52,7 +52,7 @@ class TestCase(unittest.TestCase):
       hud2 = das.read(self.OutputFile, schema_type="hud.HUD")
       self.assertEqual(hud1, hud2)
 
-   def testCompare1(self):
+   def testCompare2(self):
       hud1 = das.read(self.InputFile, schema_type="hud.HUD")
       das.write(hud1, self.OutputFile)
       hud2 = das.read(self.OutputFile, schema_type="hud.HUD")
