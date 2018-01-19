@@ -95,64 +95,64 @@ def test_mixin1():
 
 
 def test_mixin2():
-    class Fn(das.mixin.Mixin):
-        @classmethod
-        def get_schema_type(klass):
-            return "timeline.ClipSource"
+   class Fn(das.mixin.Mixin):
+      @classmethod
+      def get_schema_type(klass):
+         return "timeline.ClipSource"
 
-        def __init__(self, *args, **kwargs):
-            super(Fn, self).__init__()
+      def __init__(self, *args, **kwargs):
+         super(Fn, self).__init__()
 
-        def _copy(self):
-            print("Fn._copy")
-            return self
+      def _copy(self):
+         print("Fn._copy")
+         return self
 
-        def pprint(self):
-            das.pprint(self)
+      def pprint(self):
+         das.pprint(self)
 
-    class Fn2(das.mixin.Mixin):
-        @classmethod
-        def get_schema_type(klass):
-            return "timeline.ClipSource"
+   class Fn2(das.mixin.Mixin):
+      @classmethod
+      def get_schema_type(klass):
+         return "timeline.ClipSource"
 
-        def __init__(self, *args, **kwargs):
-            super(Fn2, self).__init__()
+      def __init__(self, *args, **kwargs):
+         super(Fn2, self).__init__()
 
-        def echo(self):
-            print("From Fn2 Mixin")
+      def echo(self):
+         print("From Fn2 Mixin")
 
-    class Fn3(das.mixin.Mixin):
-        @classmethod
-        def get_schema_type(klass):
-            return "timeline.Range"
+   class Fn3(das.mixin.Mixin):
+      @classmethod
+      def get_schema_type(klass):
+         return "timeline.Range"
 
-        def __init__(self, *args, **kwargs):
-            super(Fn2, self).__init__()
+      def __init__(self, *args, **kwargs):
+         super(Fn2, self).__init__()
 
-        def echo(self):
-            print("From Fn3 Mixin")
+      def echo(self):
+         print("From Fn3 Mixin")
 
-    data = das.make_default("timeline.ClipSource")
-    try:
-        data.pprint()
-    except Exception, e:
-        print(str(e))
-    das.mixin.bind([Fn, Fn2], data)
-    das.mixin.bind(Fn2, data)
-    das.mixin.bind(Fn, data)
-    try:
-        das.mixin.bind(Fn3, data)
-    except Exception, e:
-        print(str(e))
-    data.pprint()
-    c = data._copy()
-    c = das.copy(data)
-    das.mixin.bind(Fn2, c, reset=True)
-    c.echo()
-    try:
-        c.pprint()
-    except Exception, e:
-        print(str(e))
+   data = das.make_default("timeline.ClipSource")
+   try:
+      data.pprint()
+   except Exception, e:
+      print(str(e))
+   das.mixin.bind([Fn, Fn2], data)
+   das.mixin.bind(Fn2, data)
+   das.mixin.bind(Fn, data)
+   try:
+      das.mixin.bind(Fn3, data)
+   except Exception, e:
+      print(str(e))
+   data.pprint()
+   c = data._copy()
+   c = das.copy(data)
+   das.mixin.bind(Fn2, c, reset=True)
+   c.echo()
+   try:
+      c.pprint()
+   except Exception, e:
+      print(str(e))
 
 
 def name_conflicts():
