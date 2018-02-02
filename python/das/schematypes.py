@@ -294,21 +294,24 @@ class Struct(dict, TypeValidator):
 
    def _validate(self, value, key=None, index=None):
       if key is not None:
-         if not key in self:
-            return das.adapt_value(value)
+         vtype = self.get(key, None)
+         if vtype is None:
+            # return das.adapt_value(value)
+            raise ValidationError("Invalid key '%s'" % key)
          else:
-            return self[key].validate(value)
+            vv = self[key].validate(value)
+            if vv is not None and isinstance(vtype, Deprecated):
+               das.print_once(vtype.message) 
+            return vv
       else:
          self._validate_self(value)
          rv = das.types.Struct()
+         # don't set schema type just yet
          for k, v in self.iteritems():
             try:
                vv = v.validate(value[k])
-               if isinstance(v, Deprecated):
-                  if vv is not None:
-                     das.print_once(v.message)
-                  else:
-                     continue
+               if vv is not None and isinstance(v, Deprecated):
+                  das.print_once(v.message)
                rv[k] = vv
             except KeyError, e:
                if not isinstance(v, Optional):
