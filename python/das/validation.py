@@ -56,6 +56,7 @@ class Schema(object):
                      "Or": das.schematypes.Or,
                      "Optional": das.schematypes.Optional,
                      "Empty": das.schematypes.Empty,
+                     "Deprecated": das.schematypes.Deprecated,
                      "SchemaType": das.schematypes.SchemaType}
       if self.module is not None and hasattr(self.module, "__all__"):
          for an in self.module.__all__:
