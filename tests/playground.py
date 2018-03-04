@@ -180,6 +180,22 @@ def do_shopping():
       print("%f %s(s)" % (b.value_in(c), c))
 
 
+def do_multior():
+   b = das.make_default("multior.Parameter")
+   das.pprint(b)
+   b.min = 1
+   b.max = 10.0
+   b.softMin = False
+   b.softMax = "hello"
+   try:
+      b.min = [0]
+   except:
+      pass
+   das.pprint(b)
+   print(b._get_schema_type())
+   print(das.get_schema_type("multior.Value"))
+
+
 if __name__ == "__main__":
    args = sys.argv[1:]
    nargs = len(args)
@@ -188,7 +204,8 @@ if __name__ == "__main__":
             "test_mixin1": test_mixin1,
             "name_conflicts": name_conflicts,
             "test_mixin2": test_mixin2,
-            "do_shopping": do_shopping}
+            "do_shopping": do_shopping,
+            "do_multior": do_multior}
 
    if nargs == 0:
       print("Please specify function(s) to run (%s or all)" % ", ".join(funcs.keys()))

@@ -434,33 +434,40 @@ class Class(TypeValidator):
 
 
 class Or(TypeValidator):
-   def __init__(self, type1, type2, default=None):
-      super(Or, self).__init__(default=default)
-      self.type1 = type1
-      self.type2 = type2
+   def __init__(self, *types, **kwargs):
+      super(Or, self).__init__(default=kwargs.get("default", None))
+      if len(types) < 2:
+         raise Exception("Schema type 'Or' requires at least two types") 
+      self.types = types
 
    def _validate_self(self, value):
-      try:
-         return self.type1._validate_self(value)
-      except ValidationError, e1:
-         return self.type2._validate_self(value)
+      for typ in self.types:
+         try:
+            return typ._validate_self(value)
+         except ValidationError, e:
+            continue
+      raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(value).__name__)
+      return None
 
    def _validate(self, value, key=None, index=None):
-      try:
-         return self.type1.validate(value, key=key, index=index)
-      except ValidationError, e1:
-         return self.type2.validate(value, key=key, index=index)
+      for typ in self.types:
+         try:
+            return typ.validate(value, key=key, index=index)
+         except ValidationError, e:
+            continue
+      raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(value).__name__)
+      return None
 
    def make_default(self):
       if not self.default_validated and self.default is None:
-         self.default = self.type1.make_default()
+         self.default = self.types[0].make_default()
       return super(Or, self).make_default()
 
    def make(self, *args, **kwargs):
-      return self.type1.make(*args, **kwargs)
+      return self.types[0].make(*args, **kwargs)
 
    def __repr__(self):
-      s = "Or(%s, %s" % (self.type1, self.type2)
+      s = "Or(%s" % ", ".join(map(str, self.types))
       if self.default is not None:
          s += ", default=%s" % self.default
       return s + ")"

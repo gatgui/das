@@ -1,0 +1,8 @@
+{
+   "Value": Or(Boolean(), Integer(), Real(), String(), default=0),
+   "Parameter": Struct(value=SchemaType("Value"),
+                       min=Optional(SchemaType("Value")),
+                       max=Optional(SchemaType("Value")),
+                       softMin=Optional(SchemaType("Value")),
+                       softMax=Optional(SchemaType("Value")))
+}
