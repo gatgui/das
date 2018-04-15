@@ -127,7 +127,7 @@ def adapt_value(value, schema_type=None, key=None, index=None):
 
 
 def validate(d, schema):
-   get_schema_type(schema).validate(d)
+   return get_schema_type(schema).validate(d)
 
 
 def read_meta(path):
