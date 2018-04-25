@@ -156,7 +156,7 @@ class Struct(TypeBase):
                #print("Forward '%s' to dict class '%s'" % (k, k))
                return getattr(self._dict, k)
          else:
-            raise AttributeError("'Struct' has not attribute '%s' (dict %s)" % (k, "has" if hasattr(self._dict, k) else "hasn't"))
+            raise AttributeError("'Struct' has no attribute '%s' (dict %s)" % (k, "has" if hasattr(self._dict, k) else "hasn't"))
 
    def __setattr__(self, k, v):
       # Special case for __class__ member that we may want to modify for 

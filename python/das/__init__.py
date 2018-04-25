@@ -127,7 +127,7 @@ def adapt_value(value, schema_type=None, key=None, index=None):
 
 
 def validate(d, schema):
-   get_schema_type(schema).validate(d)
+   return get_schema_type(schema).validate(d)
 
 
 def read_meta(path):
@@ -145,15 +145,7 @@ def read_meta(path):
    return md
 
 
-def read(path, schema_type=None, ignore_meta=False, **funcs):
-   # Read header data
-   md = {}
-   if not ignore_meta:
-      md = read_meta(path)
-
-   if schema_type is None:
-      schema_type = md.get("schema_type", None)
-
+def read_string(s, schema_type=None, **funcs):
    if schema_type is not None:
       sch = get_schema_type(schema_type)
       mod = get_schema_module(schema_type)
@@ -163,10 +155,24 @@ def read(path, schema_type=None, ignore_meta=False, **funcs):
    else:
       sch, mod = None, None
 
-   with open(path, "r") as f:
-      rv = eval(f.read(), globals(), funcs)
+   rv = eval(s, globals(), funcs)
 
    return (rv if sch is None else sch.validate(rv))
+
+
+def read(path, schema_type=None, ignore_meta=False, **funcs):
+   # Read header data
+   md = {}
+   if not ignore_meta:
+      md = read_meta(path)
+
+   if schema_type is None:
+      schema_type = md.get("schema_type", None)
+
+   with open(path, "r") as f:
+      src = f.read()
+
+   return read_string(src, schema_type=schema_type, **funcs)
 
 
 def copy(d, deep=True):

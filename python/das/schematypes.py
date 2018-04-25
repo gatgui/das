@@ -1,5 +1,6 @@
 import re
 import das
+import imp
 
 
 class ValidationError(Exception):
@@ -412,14 +413,33 @@ class DynamicDict(Dict):
 
 class Class(TypeValidator):
    def __init__(self, klass, default=None):
-      if not hasattr(klass, "copy"):
-         raise Exception("Schema class '%s' has no 'copy' method")
+      if not isinstance(klass, (str, unicode)):
+         self.klass = self._validate_class(klass)
+      else:
+         self.klass = self._class(klass)
+      super(Class, self).__init__(default=(self.klass() if default is None else default))
+
+   def _validate_class(self, c):
+      if not hasattr(c, "copy"):
+         raise Exception("Schema class '%s' has no 'copy' method" % c.__name__)
       try:
-         klass()
+         c()
       except:
-         raise Exception("Schema class '%s' constructor cannot be used without arguments")
-      super(Class, self).__init__(default=(klass() if default is None else default))
-      self.klass = klass
+         raise Exception("Schema class '%s' constructor cannot be used without arguments" % c.__name__)
+      return c
+
+   def _class(self, class_name):
+      c = None
+      for i in class_name.split("."):
+         if c is None:
+            g = globals()
+            if not i in g:
+               c = imp.load_module(i, *imp.find_module(i))
+            else:
+               c = globals()[i]
+         else:
+            c = getattr(c, i)
+      return self._validate_class(c)
 
    def _validate_self(self, value):
       if not isinstance(value, self.klass):
@@ -430,7 +450,12 @@ class Class(TypeValidator):
       return self._validate_self(value)
 
    def __repr__(self):
-      return "Class(%s)" % self.klass.__name__
+      cmod = self.klass.__module__
+      if cmod != "__main__":
+         cmod += "."
+      else:
+         cmod = ""
+      return "Class(\"%s.%s\")" % (cmod, self.klass.__name__)
 
 
 class Or(TypeValidator):
