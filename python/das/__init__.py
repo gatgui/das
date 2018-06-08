@@ -283,7 +283,7 @@ def write(d, path, indent="  "):
 
    with open(path, "w") as f:
       f.write("# version: %s\n" % __version__)
-      f.write("# author: %s\n" % os.environ["USER" if sys.platform != "win32" else "USER"])
+      f.write("# author: %s\n" % os.environ["USER" if sys.platform != "win32" else "USERNAME"])
       f.write("# date: %s\n" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
       if schema_type:
          st = get_schema_type_name(schema_type)
