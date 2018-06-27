@@ -66,18 +66,31 @@ class Boolean(TypeValidator):
 
 
 class Integer(TypeValidator):
-   def __init__(self, default=None, min=None, max=None):
+   def __init__(self, default=None, min=None, max=None, enum=None):
       super(Integer, self).__init__(default=(0 if default is None else default))
       self.min = min
       self.max = max
+      self.enum = enum
+      if self.enum is not None:
+         self.enumvals = set(self.enum.values())
 
    def _validate_self(self, value):
+      if self.enum is not None:
+         if isinstance(value, basestring):
+            if not value in self.enum:
+               raise ValidationError("Expected a enumeration string in %s, got '%s'" % (self.enum.keys(), value))
+            else:
+               value = self.enum[value]
+         elif isinstance(value, (int, long)):
+            if not value in self.enumvals:
+               raise ValidationError("Expected a enumeration value (string or integer) in %s, got %s" % (self.enum, value))
       if not isinstance(value, (int, long)):
          raise ValidationError("Expected an integer value, got %s" % type(value).__name__)
-      if self.min is not None and value < self.min:
-         raise ValidationError("Integer value out of range, %d < %d" % (value, self.min))
-      if self.max is not None and value > self.max:
-         raise ValidationError("Integer value out of range, %d > %d" % (value, self.max))
+      if self.enum is None:
+         if self.min is not None and value < self.min:
+            raise ValidationError("Integer value out of range, %d < %d" % (value, self.min))
+         if self.max is not None and value > self.max:
+            raise ValidationError("Integer value out of range, %d > %d" % (value, self.max))
       return long(value)
 
    def _validate(self, value, key=None, index=None):
@@ -94,6 +107,9 @@ class Integer(TypeValidator):
          sep = ", "
       if self.max is not None:
          s += "%smax=%d" % (sep, self.max)
+         sep = ", "
+      if self.enum is not None:
+         s += "%senum={%s}" % (sep, ", ".join(map(lambda x: "'%s': %s" % x, self.enum.items())))
       return s + ")"
 
 
@@ -130,9 +146,10 @@ class Real(TypeValidator):
 
 
 class String(TypeValidator):
-   def __init__(self, default=None, choices=None, matches=None):
+   def __init__(self, default=None, choices=None, matches=None, strict=True):
       super(String, self).__init__(default=("" if default is None else default))
       self.choices = choices
+      self.strict = strict
       self.matches = None
       if choices is None and matches is not None:
          if type(matches) in (str, unicode):
@@ -143,8 +160,14 @@ class String(TypeValidator):
    def _validate_self(self, value):
       if not isinstance(value, (str, unicode)):
          raise ValidationError("Expected a string value, got %s" % type(value).__name__)
-      if self.choices is not None and not value in self.choices:
-         raise ValidationError("String value must be on of %s, got '%s'" % (self.choices, value))
+      if self.choices is not None and self.strict:
+         if callable(self.choices):
+            valid = (value in self.choices())
+         else:
+            valid = (value in self.choices)
+         if not valid:
+            choices = (self.choices if not callable(self.choices) else self.choices())
+            raise ValidationError("String value must be on of %s, got '%s'" % (choices, value))
       if self.matches is not None and not self.matches.match(value):
          raise ValidationError("String value '%s' doesn't match pattern '%s'" % (value, self.matches.pattern))
       return str(value)
@@ -159,12 +182,22 @@ class String(TypeValidator):
          s += "default='%s'" % self.default
          sep = ", "
       if self.choices is not None:
-         s += "%schoices=[" % sep
-         sep = ""
-         for c in self.choices:
-            s += "%s'%s'" % (sep, c)
-            sep = ", "
-         s += "]"
+         if callable(self.choices):
+            if self.choices.__module__ != "__main__":
+               s += "%schoices=%s" % (sep, self.choices.__name__)
+            else:
+               s += "%schoices=%s.%s" % (sep, self.choices.__module__, self.choices.__name__)
+         else:
+            s += "%schoices=[" % sep
+            sep = ""
+            for c in self.choices:
+               s += "%s'%s'" % (sep, c)
+               sep = ", "
+            s += "]"
+         s += ", strict=%s" % self.strict
+         sep = ", "
+      if self.matches is not None:
+         s += ", matches='%s'" % (sep, self.matches)
       return s + ")"
 
 

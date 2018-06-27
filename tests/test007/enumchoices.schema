@@ -1,0 +1,12 @@
+{
+   "Enum": Integer(default=0, enum={"Off": 0, "On": 1}),
+   "StrictStaticChoice": String(default="hello", choices=["hello", "world"], strict=True),
+   "StaticChoice": String(default="hello", choices=["hello", "world"], strict=False),
+   "StrictDynamicChoice": String(default="aaa", choices=mychoices, strict=True),
+   "DynamicChoice": String(default="aaa", choices=mychoices, strict=False),
+   "All": Struct(enum=SchemaType("Enum"),
+                 sschoice=SchemaType("StrictStaticChoice"),
+                 schoice=SchemaType("StaticChoice"),
+                 sdchoice=SchemaType("StrictDynamicChoice"),
+                 dchoice=SchemaType("DynamicChoice"))
+}
