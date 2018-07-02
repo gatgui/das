@@ -149,7 +149,8 @@ def _read_file(path, skip_content=False):
                if skip_content:
                   break
                else:
-                  content += l
+                  # Convert line endings to LF on the fly
+                  content += l.rstrip() + "\n"
    return md, content
 
 
@@ -157,27 +158,33 @@ def read_meta(path):
    return _read_file(path, skip_content=True)[0]
 
 
-def _decode(d, encoding):
+def decode(d, encoding):
    if isinstance(d, list):
-      rv = d.__class__([_decode(x, encoding) for x in d])
+      rv = d.__class__([decode(x, encoding) for x in d])
    elif isinstance(d, tuple):
-      rv = d.__class__([_decode(x, encoding) for x in d])
+      rv = d.__class__([decode(x, encoding) for x in d])
    elif isinstance(d, set):
-      rv = d.__class__([_decode(x, encoding) for x in d])
+      rv = d.__class__([decode(x, encoding) for x in d])
    elif isinstance(d, dict):
       rv = d.__class__()
       for k, v in d.iteritems():
-         rv[k] = _decode(v, encoding)
+         rv[k] = decode(v, encoding)
    elif isinstance(d, Struct):
       rv = d.__class__()
       for k, v in d._dict.iteritems():
-         rv[k] = _decode(v, encoding)
+         rv[k] = decode(v, encoding)
    elif isinstance(d, str):
       try:
          d.decode("ascii")
          return d
       except:
-         return d.decode(encoding)
+         rv = d.decode(encoding)
+         return rv
+   elif isinstance(d, unicode):
+      try:
+         return d.encode("ascii")
+      except:
+         return d
    elif hasattr(d, "_decode") and callable(getattr(d, "_decode")):
       rv = d._decode(encoding)
    else:
@@ -203,7 +210,7 @@ def read_string(s, schema_type=None, encoding=None, **funcs):
    rv = eval(s, globals(), funcs)
 
    if encoding:
-      rv = _decode(rv, encoding)
+      rv = decode(rv, encoding)
 
    return (rv if sch is None else sch.validate(rv))
 

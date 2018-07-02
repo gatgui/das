@@ -71,16 +71,18 @@ class Integer(TypeValidator):
       self.min = min
       self.max = max
       self.enum = enum
+      self.encoding = None
       if self.enum is not None:
          self.enumvals = set(self.enum.values())
 
    def _validate_self(self, value):
       if self.enum is not None:
          if isinstance(value, basestring):
-            if not value in self.enum:
-               raise ValidationError("Expected a enumeration string in %s, got '%s'" % (self.enum.keys(), value))
+            v = das.decode(value, self.encoding)
+            if not v in self.enum:
+               raise ValidationError("Expected a enumeration string in %s, got %s" % (self.enum.keys(), repr(value)))
             else:
-               value = self.enum[value]
+               value = self.enum[v]
          elif isinstance(value, (int, long)):
             if not value in self.enumvals:
                raise ValidationError("Expected a enumeration value (string or integer) in %s, got %s" % (self.enum, value))
@@ -95,6 +97,15 @@ class Integer(TypeValidator):
 
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
+
+   def _decode(self, encoding):
+      if self.enum:
+         self.encoding = encoding
+         e = {}
+         for k, v in self.enum.iteritems():
+            e[das.decode(k, encoding)] = v
+         self.enum = e
+      return self
 
    def __repr__(self):
       s = "Integer(";
@@ -151,6 +162,7 @@ class String(TypeValidator):
       self.choices = choices
       self.strict = strict
       self.matches = None
+      self.encoding = None
       if choices is None and matches is not None:
          if isinstance(matches, basestring):
             self.matches = re.compile(matches)
@@ -160,20 +172,32 @@ class String(TypeValidator):
    def _validate_self(self, value):
       if not isinstance(value, basestring):
          raise ValidationError("Expected a string value, got %s" % type(value).__name__)
+      v = das.decode(value, self.encoding)
       if self.choices is not None and self.strict:
          if callable(self.choices):
-            valid = (value in self.choices())
+            choices = map(lambda x: das.decode(x, self.encoding), self.choices())
          else:
-            valid = (value in self.choices)
-         if not valid:
-            choices = (self.choices if not callable(self.choices) else self.choices())
-            raise ValidationError("String value must be on of %s, got '%s'" % (choices, value))
-      if self.matches is not None and not self.matches.match(value):
-         raise ValidationError("String value '%s' doesn't match pattern '%s'" % (value, self.matches.pattern))
-      return value
+            choices = self.choices
+         if not v in choices:
+            raise ValidationError("String value must be on of %s, got %s" % (repr(choices), repr(v)))
+      if self.matches is not None and not self.matches.match(v):
+         raise ValidationError("String value %s doesn't match pattern '%s'" % (repr(value), self.matches.pattern))
+      return v
 
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
+
+   def _decode(self, encoding):
+      self.encoding = encoding
+      if self.default:
+         self.default = das.decode(self.default, encoding)
+      if self.choices:
+         if not callable(self.choices):
+            self.choices = map(lambda x: das.decode(x, encoding), self.choices)
+      if self.matches:
+         if isinstance(self.matches, basestring):
+            self.matches = das.decode(self.matches, encoding)
+      return self
 
    def __repr__(self):
       s = "String(";
