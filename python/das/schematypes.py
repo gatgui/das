@@ -71,14 +71,13 @@ class Integer(TypeValidator):
       self.min = min
       self.max = max
       self.enum = enum
-      self.encoding = None
       if self.enum is not None:
          self.enumvals = set(self.enum.values())
 
    def _validate_self(self, value):
       if self.enum is not None:
          if isinstance(value, basestring):
-            v = das.decode(value, self.encoding)
+            v = das.ascii_or_unicode(value)
             if not v in self.enum:
                raise ValidationError("Expected a enumeration string in %s, got %s" % (self.enum.keys(), repr(value)))
             else:
@@ -100,7 +99,6 @@ class Integer(TypeValidator):
 
    def _decode(self, encoding):
       if self.enum:
-         self.encoding = encoding
          e = {}
          for k, v in self.enum.iteritems():
             e[das.decode(k, encoding)] = v
@@ -162,7 +160,6 @@ class String(TypeValidator):
       self.choices = choices
       self.strict = strict
       self.matches = None
-      self.encoding = None
       if choices is None and matches is not None:
          if isinstance(matches, basestring):
             self.matches = re.compile(matches)
@@ -172,10 +169,10 @@ class String(TypeValidator):
    def _validate_self(self, value):
       if not isinstance(value, basestring):
          raise ValidationError("Expected a string value, got %s" % type(value).__name__)
-      v = das.decode(value, self.encoding)
+      v = das.ascii_or_unicode(value)
       if self.choices is not None and self.strict:
          if callable(self.choices):
-            choices = map(lambda x: das.decode(x, self.encoding), self.choices())
+            choices = map(lambda x: das.ascii_or_unicode(x), self.choices())
          else:
             choices = self.choices
          if not v in choices:
@@ -188,7 +185,6 @@ class String(TypeValidator):
       return self._validate_self(value)
 
    def _decode(self, encoding):
-      self.encoding = encoding
       if self.default:
          self.default = das.decode(self.default, encoding)
       if self.choices:

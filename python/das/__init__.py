@@ -158,8 +158,30 @@ def read_meta(path):
    return _read_file(path, skip_content=True)[0]
 
 
+def ascii_or_unicode(s, encoding=None):
+   if isinstance(s, str):
+      try:
+         s.decode("ascii")
+         return s
+      except Exception, e:
+         if encoding is None:
+            raise Exception("Input string must be 'ascii' encoded (%s)" % e)
+         try:
+            return s.decode(encoding)
+         except Exception, e:
+            raise Exception("Input string must be 'ascii' or '%s' encoded (%s)" % (encoding, e))
+   elif isinstance(s, unicode):
+      try:
+         return s.encode("ascii")
+      except:
+         return s
+   else:
+      raise Exception("'ascii_or_unicode' only works on string types (str, unicode)")
+
 def decode(d, encoding):
-   if isinstance(d, list):
+   if isinstance(d, basestring):
+      return ascii_or_unicode(d, encoding=encoding)
+   elif isinstance(d, list):
       rv = d.__class__([decode(x, encoding) for x in d])
    elif isinstance(d, tuple):
       rv = d.__class__([decode(x, encoding) for x in d])
@@ -173,18 +195,6 @@ def decode(d, encoding):
       rv = d.__class__()
       for k, v in d._dict.iteritems():
          rv[k] = decode(v, encoding)
-   elif isinstance(d, str):
-      try:
-         d.decode("ascii")
-         return d
-      except:
-         rv = d.decode(encoding)
-         return rv
-   elif isinstance(d, unicode):
-      try:
-         return d.encode("ascii")
-      except:
-         return d
    elif hasattr(d, "_decode") and callable(getattr(d, "_decode")):
       rv = d._decode(encoding)
    else:
@@ -203,7 +213,7 @@ def read_string(s, schema_type=None, encoding=None, **funcs):
       sch, mod = None, None
 
    if not encoding:
-      print("[das] Warning: No encoding specified, using system's default.")
+      print("[das] Warning: das.read assumes system default encoding for unicode characters unless explicitely set.")
    else:
       s = ("# encoding: %s\n" % encoding) + s
 
@@ -360,12 +370,12 @@ def write(d, path, indent="  ", encoding=None):
 
    schema_type = d._get_schema_type()
 
-   if encoding is None:
-      print("[das] Warning: Assuming UTF-8 encoding for non-unicode strings.")
+   if encoding is None and schema_type:
       encoding = "utf8"
 
    with open(path, "wb") as f:
-      f.write("# encoding: %s\n" % encoding)
+      if encoding is not None:
+         f.write("# encoding: %s\n" % encoding)
       f.write("# version: %s\n" % __version__)
       f.write("# author: %s\n" % os.environ["USER" if sys.platform != "win32" else "USERNAME"])
       f.write("# date: %s\n" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
