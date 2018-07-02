@@ -178,6 +178,7 @@ def ascii_or_unicode(s, encoding=None):
    else:
       raise Exception("'ascii_or_unicode' only works on string types (str, unicode)")
 
+
 def decode(d, encoding):
    if isinstance(d, basestring):
       return ascii_or_unicode(d, encoding=encoding)

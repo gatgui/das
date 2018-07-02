@@ -25,6 +25,18 @@ class TypeValidator(object):
          mixins = das.get_registered_mixins(das.get_schema_type_name(self))
          if mixins:
             das.mixin.bind(mixins, rv)
+      # Try to call custom validation function
+      if hasattr(rv, "_schema_validation"):
+         try:
+            rv._schema_validation()
+         except Exception, e:
+            fn = ""
+            cm = rv._schema_validation.im_class.__module__
+            if cm != "__main__":
+               fn = cm + "."
+            fn += rv._schema_validation.im_class.__name__
+            fn += "._schema_validation"
+            raise ValidationError("'%s' failed (%s)" % e)
       return rv
 
    def _validate_self(self, value):
