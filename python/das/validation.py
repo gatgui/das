@@ -15,14 +15,17 @@ class UnknownSchemaError(Exception):
 class Schema(object):
    def __init__(self, location, path, dont_load=False):
       super(Schema, self).__init__()
-      name = os.path.splitext(os.path.basename(path))[0]
-      if "." in name:
-         raise Exception("Schema file base name must not contain '.'")
-      self.name = name
       self.path = path
       self.location = location
       self.module = None
       self.types = {}
+      self.name = das.read_meta(path).get("name", None)
+      if not self.name:
+         name = os.path.splitext(os.path.basename(path))[0]
+         if "." in name:
+            raise Exception("Schema file base name must not contain '.'")
+         else:
+            self.name = name
       if not dont_load:
          self.load()
 
@@ -31,6 +34,8 @@ class Schema(object):
          return
 
       self.unload()
+
+      md, content = das._read_file(self.path)
 
       pmp = os.path.splitext(self.path)[0] + ".py"
       if os.path.isfile(pmp):
@@ -62,10 +67,14 @@ class Schema(object):
          for an in self.module.__all__:
             eval_locals[an] = getattr(self.module, an)
 
-      names = []
-      with open(self.path, "r") as f:
+      # May start thinking about other metadata
+      # - das version
+      # - schema version
+      # - ...
+
+      if content:
          das.schematypes.SchemaType.CurrentSchema = self.name
-         rv = eval(f.read(), globals(), eval_locals)
+         rv = das.read_string(content, encoding=md.get("encoding", None), **eval_locals)
          das.schematypes.SchemaType.CurrentSchema = ""
          for typename, validator in rv.iteritems():
             k = "%s.%s" % (self.name, typename)

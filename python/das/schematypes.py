@@ -152,13 +152,13 @@ class String(TypeValidator):
       self.strict = strict
       self.matches = None
       if choices is None and matches is not None:
-         if type(matches) in (str, unicode):
+         if isinstance(matches, basestring):
             self.matches = re.compile(matches)
          else:
             self.matches = matches
 
    def _validate_self(self, value):
-      if not isinstance(value, (str, unicode)):
+      if not isinstance(value, basestring):
          raise ValidationError("Expected a string value, got %s" % type(value).__name__)
       if self.choices is not None and self.strict:
          if callable(self.choices):
@@ -170,7 +170,7 @@ class String(TypeValidator):
             raise ValidationError("String value must be on of %s, got '%s'" % (choices, value))
       if self.matches is not None and not self.matches.match(value):
          raise ValidationError("String value '%s' doesn't match pattern '%s'" % (value, self.matches.pattern))
-      return str(value)
+      return value
 
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
@@ -179,7 +179,7 @@ class String(TypeValidator):
       s = "String(";
       sep = ""
       if self.default is not None and self.default != "":
-         s += "default='%s'" % self.default
+         s += "default=%s" % repr(self.default)
          sep = ", "
       if self.choices is not None:
          if callable(self.choices):
@@ -191,13 +191,13 @@ class String(TypeValidator):
             s += "%schoices=[" % sep
             sep = ""
             for c in self.choices:
-               s += "%s'%s'" % (sep, c)
+               s += "%s%s" % (sep, repr(c))
                sep = ", "
             s += "]"
          s += ", strict=%s" % self.strict
          sep = ", "
       if self.matches is not None:
-         s += ", matches='%s'" % (sep, self.matches)
+         s += ", matches=%s" % (sep, repr(self.matches))
       return s + ")"
 
 

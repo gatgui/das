@@ -130,22 +130,62 @@ def validate(d, schema):
    return get_schema_type(schema).validate(d)
 
 
-def read_meta(path):
-   md = {}
+def _read_file(path, skip_content=False):
    mde = re.compile("^\s*([^:]+):\s*(.*)\s*$")
-   with open(path, "r") as f:
-      for l in f.readlines():
-         l = l.strip()
-         if l.startswith("#"):
-            m = mde.match(l[1:])
-            if m is not None:
-               md[m.group(1)] = m.group(2)
-         else:
-            break
-   return md
+   reading_content = False
+   content = ""
+   md = {}
+   if os.path.isfile(path):
+      with open(path, "rb") as f:
+         for l in f.readlines():
+            sl = l.strip()
+            if sl.startswith("#"):
+               if not reading_content:
+                  m = mde.match(sl[1:])
+                  if m is not None:
+                     md[m.group(1)] = m.group(2)
+            else:
+               reading_content = True
+               if skip_content:
+                  break
+               else:
+                  content += l
+   return md, content
 
 
-def read_string(s, schema_type=None, **funcs):
+def read_meta(path):
+   return _read_file(path, skip_content=True)[0]
+
+
+def _decode(d, encoding):
+   if isinstance(d, list):
+      rv = d.__class__([_decode(x, encoding) for x in d])
+   elif isinstance(d, tuple):
+      rv = d.__class__([_decode(x, encoding) for x in d])
+   elif isinstance(d, set):
+      rv = d.__class__([_decode(x, encoding) for x in d])
+   elif isinstance(d, dict):
+      rv = d.__class__()
+      for k, v in d.iteritems():
+         rv[k] = _decode(v, encoding)
+   elif isinstance(d, Struct):
+      rv = d.__class__()
+      for k, v in d._dict.iteritems():
+         rv[k] = _decode(v, encoding)
+   elif isinstance(d, str):
+      try:
+         d.decode("ascii")
+         return d
+      except:
+         return d.decode(encoding)
+   elif hasattr(d, "_decode") and callable(getattr(d, "_decode")):
+      rv = d._decode(encoding)
+   else:
+      rv = d
+   return rv
+
+
+def read_string(s, schema_type=None, encoding=None, **funcs):
    if schema_type is not None:
       sch = get_schema_type(schema_type)
       mod = get_schema_module(schema_type)
@@ -155,24 +195,29 @@ def read_string(s, schema_type=None, **funcs):
    else:
       sch, mod = None, None
 
+   if not encoding:
+      print("[das] Warning: No encoding specified, using system's default.")
+   else:
+      s = ("# encoding: %s\n" % encoding) + s
+
    rv = eval(s, globals(), funcs)
+
+   if encoding:
+      rv = _decode(rv, encoding)
 
    return (rv if sch is None else sch.validate(rv))
 
 
 def read(path, schema_type=None, ignore_meta=False, **funcs):
    # Read header data
-   md = {}
-   if not ignore_meta:
-      md = read_meta(path)
+   md, src = _read_file(path)
 
-   if schema_type is None:
+   if schema_type is None and not ignore_meta:
       schema_type = md.get("schema_type", None)
 
-   with open(path, "r") as f:
-      src = f.read()
+   encoding = md.get("encoding", None)
 
-   return read_string(src, schema_type=schema_type, **funcs)
+   return read_string(src, schema_type=schema_type, encoding=encoding, **funcs)
 
 
 def copy(d, deep=True):
@@ -214,7 +259,7 @@ def copy(d, deep=True):
    return rv
 
 
-def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
+def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encoding=None):
    if stream is None:
       stream = sys.stdout
 
@@ -230,9 +275,20 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
       keys = [k for k in d]
       keys.sort()
       for k in keys:
+         # We assume string keys are 'ascii'
+         if isinstance(k, unicode):
+            try:
+               k = k.encode("ascii")
+            except:
+               raise Exception("Non-ascii keys are not supported!")
+         elif isinstance(k, str):
+            try:
+               k.decode("ascii")
+            except:
+               raise Exception("Non-ascii keys are not supported!")
          stream.write("%s%s'%s': " % (tindent, indent, k))
          v = d[k]
-         pprint(v, stream, indent=indent, depth=depth+1, inline=True, eof=False)
+         pprint(v, stream, indent=indent, depth=depth+1, inline=True, eof=False, encoding=encoding)
          i += 1
          if i >= n:
             stream.write("\n")
@@ -245,7 +301,7 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
       n = len(d)
       i = 0
       for v in d:
-         pprint(v, stream, indent=indent, depth=depth+1, inline=False, eof=False)
+         pprint(v, stream, indent=indent, depth=depth+1, inline=False, eof=False, encoding=encoding)
          i += 1
          if i >= n:
             stream.write("\n")
@@ -258,7 +314,7 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
       n = len(d)
       i = 0
       for v in d:
-         pprint(v, stream, indent=indent, depth=depth+1, inline=False, eof=False)
+         pprint(v, stream, indent=indent, depth=depth+1, inline=False, eof=False, encoding=encoding)
          i += 1
          if i >= n:
             stream.write("\n")
@@ -266,8 +322,24 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
             stream.write(",\n")
       stream.write("%s])" % tindent)
 
-   elif isinstance(d, (str, unicode)):
-      stream.write("'%s'" % d)
+   elif isinstance(d, str):
+      try:
+         d.decode("ascii")
+         stream.write("'%s'" % d)
+      except Exception, e:
+         if not encoding:
+            raise Exception("Non-ascii string value found but no encoding provided (%s)." % e)
+         try:
+            stream.write(repr(d.decode(encoding)))
+         except Exception, e:
+            raise Exception("Non-ascii string value cannot be decoded to '%s' (%s)." % (encoding, e))
+
+   elif isinstance(d, unicode):
+      try:
+         s = d.encode("ascii")
+         stream.write("'%s'" % s)
+      except:
+         stream.write(repr(d))
 
    else:
       stream.write(str(d))
@@ -276,19 +348,24 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
       stream.write("\n")
 
 
-def write(d, path, indent="  "):
+def write(d, path, indent="  ", encoding=None):
    d._validate()
 
    schema_type = d._get_schema_type()
 
-   with open(path, "w") as f:
+   if encoding is None:
+      print("[das] Warning: Assuming UTF-8 encoding for non-unicode strings.")
+      encoding = "utf8"
+
+   with open(path, "wb") as f:
+      f.write("# encoding: %s\n" % encoding)
       f.write("# version: %s\n" % __version__)
       f.write("# author: %s\n" % os.environ["USER" if sys.platform != "win32" else "USERNAME"])
       f.write("# date: %s\n" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
       if schema_type:
          st = get_schema_type_name(schema_type)
          f.write("# schema_type: %s\n" % st)
-      pprint(d, stream=f, indent=indent)
+      pprint(d, stream=f, indent=indent, encoding=encoding)
 
 
 # Utilities
