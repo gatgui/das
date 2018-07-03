@@ -41,7 +41,11 @@ def has_schema():
    return SchemaTypesRegistry.instance.has_schema()
 
 
-def get_schema(name):
+def get_schema(name_or_type):
+   if not isinstance(name_or_type, basestring):
+      name = get_schema_type_name(name_or_type)
+   else:
+      name = name_or_type.split(".")[0]
    return SchemaTypesRegistry.instance.get_schema(name)
 
 
@@ -226,12 +230,39 @@ def read_string(s, schema_type=None, encoding=None, **funcs):
    return (rv if sch is None else sch.validate(rv))
 
 
+def is_version_compatible(ver, minver):
+   try:
+      spl0 = map(int, ver.split("."))
+      spl1 = map(int, minver.split("."))
+      if spl0[0] != spl1[0] or spl0[1] < spl1[1]:
+         return False
+      else:
+         return True
+   except:
+      return None
+
+
 def read(path, schema_type=None, ignore_meta=False, **funcs):
    # Read header data
    md, src = _read_file(path)
 
+   schema_version = None
    if schema_type is None and not ignore_meta:
       schema_type = md.get("schema_type", None)
+
+   if schema_type:
+      schema = get_schema(schema_type)
+      if schema:
+         schema_version = md.get("schema_version", None)
+         if schema_version:
+            if not schema.version:
+               raise Exception("[das] Schema version cannot be checked")
+            else:
+               compat = is_version_compatible(schema.version, schema_version)
+               if compat is None:
+                  raise Exception("[das] Schema version and/or file required schema version are badly specified")
+               elif not compat:
+                  raise Exception("[das] Schema is not compatible with the file required version")
 
    encoding = md.get("encoding", None)
 
@@ -383,6 +414,9 @@ def write(d, path, indent="  ", encoding=None):
       if schema_type:
          st = get_schema_type_name(schema_type)
          f.write("# schema_type: %s\n" % st)
+         sn = get_schema(st)
+         if sn and sn.version is not None:
+            f.write("# schema_version: %s\n" % sn.version)
       pprint(d, stream=f, indent=indent, encoding=encoding)
 
 
