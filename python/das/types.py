@@ -7,9 +7,22 @@ class ReservedNameError(Exception):
 
 
 class TypeBase(object):
+   @classmethod
+   def TransferGlobalValidator(klass, src, dst):
+      if isinstance(src, klass) and isinstance(dst, klass):
+         dst._set_validate_globally_cb(src._gvalidate)
+      return dst
+
+   @classmethod
+   def ValidateGlobally(klass, inst):
+      if isinstance(inst, klass):
+         inst._gvalidate()
+      return inst
+
    def __init__(self):
       super(TypeBase, self).__init__()
       self.__dict__["_schema_type"] = None
+      self.__dict__["_validate_globally_cb"] = None
 
    def _wrap(self, rhs):
       st = self._get_schema_type()
@@ -27,11 +40,34 @@ class TypeBase(object):
          schema_type.validate(self)
       self._set_schema_type(schema_type)
 
+   def _gvalidate(self):
+      if self._get_schema_type() is not None:
+         gvcb = self._get_validate_globally_cb()
+         if gvcb is not None:
+            gvcb()
+         if hasattr(self, "_validate_globally"):
+            try:
+               self._validate_globally()
+            except Exception, e:
+               fn = ""
+               cm = self._validate_globally.im_class.__module__
+               if cm != "__main__":
+                  fn = cm + "."
+               fn += self._validate_globally.im_class.__name__
+               fn += "._validate_globally"
+               raise das.ValidationError("'%s' failed (%s)" % (fn, e))
+
    def _get_schema_type(self):
       return self.__dict__["_schema_type"]
 
    def _set_schema_type(self, schema_type):
       self.__dict__["_schema_type"] = schema_type
+
+   def _get_validate_globally_cb(self):
+      return self.__dict__["_validate_globally_cb"]
+
+   def _set_validate_globally_cb(self, cb):
+      self.__dict__["_validate_globally_cb"] = cb
 
 
 class Tuple(TypeBase, tuple):
@@ -42,7 +78,11 @@ class Tuple(TypeBase, tuple):
    def __add__(self, y):
       n = len(self)
       rv = super(Tuple, self).__add__(tuple([self._adapt_value(x, index=n+i) for i, x in enumerate(y)]))
+      self._gvalidate()
       return self._wrap(rv)
+
+   def __getitem__(self, i):
+      return TypeBase.TransferGlobalValidator(self, super(Tuple, self).__getitem__(idx))
 
 
 class Sequence(TypeBase, list):
@@ -53,29 +93,42 @@ class Sequence(TypeBase, list):
    def __iadd__(self, y):
       n = len(self)
       rv = super(Sequence, self).__iadd__([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
+      self._gvalidate()
       return self._wrap(rv)
 
    def __add__(self, y):
       n = len(self)
       rv = super(Sequence, self).__add__([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
+      self._gvalidate()
       return self._wrap(rv)
 
    def __setitem__(self, i, y):
       super(Sequence, self).__setitem__(i, self._adapt_value(y, index=i))
+      self._gvalidate()
 
    def __setslice__(self, i, j, y):
       super(Sequence, self).__setslice__(i, j, [self._adapt_value(x, index=i+k) for k, x in enumerate(y)])
+      self._gvalidate()
 
    def insert(self, i, y):
       super(Sequence, self).insert(i, self._adapt_value(y, index=i))
+      self._gvalidate()
 
    def append(self, y):
       n = len(self)
       super(Sequence, self).append(self._adapt_value(y, index=n))
+      self._gvalidate()
 
    def extend(self, y):
       n = len(self)
       super(Sequence, self).extend([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
+      self._gvalidate()
+
+   def __getitem__(self, i):
+      return TypeBase.TransferGlobalValidator(self, super(Sequence, self).__getitem__(i))
+
+   def __getslice__(self, i, j):
+      return self._wrap(super(Sequence, self).__getslice__(i, j))
 
 
 class Set(TypeBase, set):
@@ -85,26 +138,36 @@ class Set(TypeBase, set):
 
    def __iand__(self, y):
       rv = super(Set, self).__iand__(map(lambda x: self._adapt_value(x), y))
+      self._gvalidate()
       return self._wrap(rv)
 
    def __isub__(self, y):
       rv = super(Set, self).__isub__(map(lambda x: self._adapt_value(x), y))
+      self._gvalidate()
       return self._wrap(rv)
 
    def __ior__(self, y):
       rv = super(Set, self).__ior__(map(lambda x: self._adapt_value(x), y))
+      self._gvalidate()
       return self._wrap(rv)
 
    def __ixor__(self, y):
       rv = super(Set, self).__ixor__(map(lambda x: self._adapt_value(x), y))
+      self._gvalidate()
       return self._wrap(rv)
 
    def add(self, e):
       super(Set, self).add(self._adapt_value(e))
+      self._gvalidate()
 
    def update(self, *args):
       for y in args:
          super(Set, self).update(map(lambda x: self._adapt_value(x), y))
+      self._gvalidate()
+
+   def __iter__(self):
+      for item in super(Set, self).__iter__():
+         yield TypeBase.TransferGlobalValidator(self, item)
 
 
 class Dict(TypeBase, dict):
@@ -114,6 +177,7 @@ class Dict(TypeBase, dict):
 
    def __setitem__(self, k, v):
       super(Dict, self).__setitem__(k, self._adapt_value(v, key=k))
+      self._gvalidate()
 
    def setdefault(self, *args):
       if len(args) >= 2:
@@ -134,6 +198,24 @@ class Dict(TypeBase, dict):
                self[k] = self._adapt_value(v, key=k)
       for k, v in kwargs.iteritems():
          self[k] = self._adapt_value(v, key=k)
+      self._gvalidate()
+
+   def __getitem__(self, k):
+      return TypeBase.TransferGlobalValidator(self, super(Dict, self).__getitem__(k))
+
+   def itervalues(self):
+      for v in super(Dict, self).itervalues():
+         yield TypeBase.TransferGlobalValidator(self, v)
+
+   def values(self):
+      return [x for x in self.itervalues()]
+
+   def iteritems(self):
+      for k, v in super(Dict, self).iteritems():
+         yield k, TypeBase.TransferGlobalValidator(self, v)
+
+   def items(self):
+      return [x for x in self.iteritems()]
 
 
 class Struct(TypeBase):
@@ -144,7 +226,7 @@ class Struct(TypeBase):
 
    def __getattr__(self, k):
       try:
-         return self._dict[k]
+         return TypeBase.TransferGlobalValidator(self, self._dict[k])
       except KeyError:
          if hasattr(self._dict, k):
             # Look for an override method of the same name prefixed by '_' in current class
@@ -166,19 +248,23 @@ class Struct(TypeBase):
       else:
          self._check_reserved(k)
          self._dict[k] = self._adapt_value(v, key=k)
+         self._gvalidate()
 
    def __delattr__(self, k):
       del(self._dict[k])
+      self._gvalidate()
 
    def __getitem__(self, k):
-      return self._dict.__getitem__(k)
+      return TypeBase.TransferGlobalValidator(self, self._dict.__getitem__(k))
 
    def __setitem__(self, k, v):
       self._check_reserved(k)
       self._dict.__setitem__(k, self._adapt_value(v, key=k))
+      self._gvalidate()
 
    def __delitem__(self, k):
-      return self._dict.__delitem__(k)
+      self._dict.__delitem__(k)
+      self._gvalidate()
 
    def __contains__(self, k):
       return self._dict.__contains__(k)
@@ -231,6 +317,7 @@ class Struct(TypeBase):
       for k, v in self._dict.items():
          self._check_reserved(k)
          self._dict[k] = self._adapt_value(v, key=k)
+      self._gvalidate()
 
    def _check_reserved(self, k):
       if hasattr(self.__class__, k):
@@ -246,4 +333,18 @@ class Struct(TypeBase):
                msg = "[%s] %s" % (n, msg)
          das.print_once(msg)
          self.__dict__["_" + k] = getattr(self._dict, k)
+
+   def _itervalues(self):
+      for v in self._dict.itervalues():
+         yield TypeBase.TransferGlobalValidator(self, v)
+
+   def _values(self):
+      return [x for x in self.itervalues()]
+
+   def _iteritems(self):
+      for k, v in self._dict.iteritems():
+         yield k, TypeBase.TransferGlobalValidator(self, v)
+
+   def _items(self):
+      return [x for x in self.iteritems()]
 
