@@ -455,6 +455,68 @@ def write(d, path, indent="  ", encoding=None):
       pprint(d, stream=f, indent=indent, encoding=encoding)
 
 
+def generate_empty_schema(path, name=None, version=None, author=None):
+   with open(path, "wb") as f:
+      if not name:
+         name = os.path.basename(path).split(".")[0]
+      if not author:
+         author = os.environ["USER" if sys.platform != "win32" else "USERNAME"]
+      if not version:
+         version = "1.0"
+      f.write("# encoding: utf8\n")
+      f.write("# name: %s\n" % name)
+      f.write("# version: %s\n" % version)
+      f.write("# das_minimum_version: %s\n" % __version__)
+      f.write("# author: %s\n" % author)
+      f.write("# date: %s\n" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
+      f.write("{\n")
+      f.write("}\n\n")
+
+
+def update_schema_metadata(path, name=None, version=None, author=None):
+   md, content = _read_file(path)
+   changed = False
+
+   if not "encoding" in md:
+      md["encoding"] = "ascii"
+      changed = True
+
+   if name:
+      if md.get("name", "") != name:
+         md["name"] = name
+         changed = True
+   elif not "name" in md:
+      md["name"] = os.path.basename(path).split(".")[0]
+      changed = True
+
+   if version:
+      if md.get("version", "") != version:
+         md["version"] = version
+         changed = True
+   
+   if author:
+      if md.get("author", "") != author:
+         md["author"] = author
+         changed = True
+   
+   if not "das_minimum_version" in md:
+      md["das_minimum_version"] = __version__
+      changed = True
+
+   if changed:
+      md["date"] = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+
+      with open(path, "wb") as f:
+         for mdn in ("encoding", "name", "version", "das_minimum_version", "author", "date"):
+            if not mdn in md:
+               continue
+            f.write("# %s: %s\n" % (mdn, md[mdn]))
+         f.write(content)
+
+   else:
+      print("[das] No need to update schema metadata")
+
+
 # Utilities
 
 _PrintedMsgs = set()
