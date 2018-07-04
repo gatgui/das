@@ -6,6 +6,24 @@ class ReservedNameError(Exception):
       super(ReservedNameError, self).__init__("'%s' is a reserved name" % name)
 
 
+class VersionError(Exception):
+   def __init__(self, msg=None, current_version=None, required_version=None):
+      fullmsg = "ersion error"
+      if required_version:
+         fullmsg += ": %s required" % required_version
+      else:
+         fullmsg += ": no requirements"
+      if current_version:
+         fullmsg += ", %s in use" % current_version
+      else:
+         fullmsg += ", no version info"
+      if msg:
+         fullmsg = msg + " v" + fullmsg
+      else:
+         fullmsg = "V" + fullmsg
+      super(VersionError, self).__init__(fullmsg)
+
+
 class TypeBase(object):
    @classmethod
    def TransferGlobalValidator(klass, src, dst):

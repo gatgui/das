@@ -12,6 +12,11 @@ class UnknownSchemaError(Exception):
       super(UnknownSchemaError, self).__init__("'%s' is not a known schema%s" % (name, " type" if "." in name else ""))
 
 
+class SchemaVersionError(das.VersionError):
+   def __init__(self, name, current_version=None, required_version=None):
+      super(SchemaVersionError, self).__init__("Schema '%s'" % name, current_version, required_version)
+
+
 class Schema(object):
    def __init__(self, location, path, dont_load=False):
       super(Schema, self).__init__()
@@ -41,14 +46,14 @@ class Schema(object):
       dmv = md.get("das_minimum_version", None)
       if dmv is not None:
          try:
-            wmaj, wmin = map(int, dmv.split("."))
+            spl = map(int, dmv.split("."))
+            wmaj, wmin = spl[0], spl[1]
          except:
-            print("'das_minimum_version' must follow MAJOR.MINOR format")
+            raise Exception("'das_minimum_version' must follow MAJOR.MINOR format")
          else:
             dmaj, dmin, _ = map(int, das.__version__.split("."))
             if wmaj != dmaj or wmin > dmin:
-               print("[das] Schema '%s' defined in %s requires das >=%s.0, got %s" % (self.name, self.path, dmv, das.__version__))
-               return  False
+               raise das.VersionError("Library", current_version=das.__version__, required_version=dmv)
 
       pmp = os.path.splitext(self.path)[0] + ".py"
       if os.path.isfile(pmp):
@@ -83,7 +88,7 @@ class Schema(object):
       if content:
          self.version = md.get("version", None)
          if self.version is None:
-            print("[das] Schema '%s' defined in %s is unversioned" % (self.name, self.path))
+            das.print_once("[das] Schema '%s' defined in %s is unversioned" % (self.name, self.path))
 
          das.schematypes.SchemaType.CurrentSchema = self.name
          rv = das.read_string(content, encoding=md.get("encoding", None), **eval_locals)

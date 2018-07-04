@@ -327,6 +327,8 @@ class Tuple(TypeValidator):
 
 
 class Struct(dict, TypeValidator):
+   UseDefaultForMissingFields = False
+
    def __init__(self, **kwargs):
       hasdefault = ("default" in kwargs)
       default = None
@@ -344,7 +346,11 @@ class Struct(dict, TypeValidator):
          raise ValidationError("Expected a dict value, got %s" % type(value).__name__)
       for k, v in self.iteritems():
          if not k in value and not isinstance(v, Optional):
-            raise ValidationError("Missing key '%s'" % k)
+            if self.UseDefaultForMissingFields:
+               # print("[das] Use default value for field '%s'" % k)
+               value[k] = v.make_default()
+            else:
+               raise ValidationError("Missing key '%s'" % k)
       return value
 
    def _validate(self, value, key=None, index=None):

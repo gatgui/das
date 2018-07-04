@@ -6,6 +6,7 @@ import datetime
 __version__ = "0.5.0"
 
 from .types import (ReservedNameError,
+                    VersionError,
                     TypeBase,
                     Tuple,
                     Sequence,
@@ -14,6 +15,7 @@ from .types import (ReservedNameError,
                     Struct)
 from .schematypes import ValidationError
 from .validation import (UnknownSchemaError,
+                         SchemaVersionError,
                          Schema,
                          SchemaLocation,
                          SchemaTypesRegistry)
@@ -207,7 +209,7 @@ def decode(d, encoding):
    return rv
 
 
-def read_string(s, schema_type=None, encoding=None, **funcs):
+def read_string(s, schema_type=None, encoding=None, strict_schema=True, **funcs):
    if schema_type is not None:
       sch = get_schema_type(schema_type)
       mod = get_schema_module(schema_type)
@@ -218,7 +220,7 @@ def read_string(s, schema_type=None, encoding=None, **funcs):
       sch, mod = None, None
 
    if not encoding:
-      print("[das] Warning: das.read assumes system default encoding for unicode characters unless explicitely set.")
+      print_once("[das] Warning: das.read assumes system default encoding for unicode characters unless explicitely set.")
    else:
       s = ("# encoding: %s\n" % encoding) + s
 
@@ -227,24 +229,44 @@ def read_string(s, schema_type=None, encoding=None, **funcs):
    if encoding:
       rv = decode(rv, encoding)
 
-   return (rv if sch is None else sch.validate(rv))
+   if sch is None:
+      return rv
+   else:
+      try:
+         schematypes.Struct.UseDefaultForMissingFields = (True if not strict_schema else False)
+         return sch.validate(rv)
+      finally:
+         schematypes.Struct.UseDefaultForMissingFields = False
 
 
-def is_version_compatible(ver, minver):
+# returns: -2 if version check could not be performed
+#          -1 imcompatible
+#           0 forward compatible
+#           1 fully compatible
+#           2 backward compatible
+def is_version_compatible(reqver, curver):
    try:
-      spl0 = map(int, ver.split("."))
-      spl1 = map(int, minver.split("."))
-      if spl0[0] != spl1[0] or spl0[1] < spl1[1]:
-         return False
+      cur = map(int, curver.split("."))
+      req = map(int, reqver.split("."))
+      if req[0] != cur[0]:
+         return -1
+      elif req[1] > cur[1]:
+         return 0
       else:
-         return True
+         return (1 if req[1] == cur[1] else 2)
    except:
-      return None
+      return -2
 
 
-def read(path, schema_type=None, ignore_meta=False, **funcs):
+def read(path, schema_type=None, ignore_meta=False, strict_schema=None, **funcs):
    # Read header data
-   md, src = _read_file(path)
+   md, src = _read_file(path)  
+
+   libver = md.get("version", None)
+   if libver:
+      compat = is_version_compatible(libver, __version__)
+      if compat <= 0:
+         raise VersionError("Library", current_version=__version__, required_version=libver)
 
    schema_version = None
    if schema_type is None and not ignore_meta:
@@ -256,17 +278,30 @@ def read(path, schema_type=None, ignore_meta=False, **funcs):
          schema_version = md.get("schema_version", None)
          if schema_version:
             if not schema.version:
-               raise Exception("[das] Schema version cannot be checked")
+               raise SchemaVersionError(schema.name, required_version=schema_version)
             else:
-               compat = is_version_compatible(schema.version, schema_version)
-               if compat is None:
-                  raise Exception("[das] Schema version and/or file required schema version are badly specified")
-               elif not compat:
-                  raise Exception("[das] Schema is not compatible with the file required version")
+               compat = is_version_compatible(schema_version, schema.version)
+               if compat == -2:
+                  # Invalid version specifications
+                  raise SchemaVersionError(schema.name, current_version=schema.version, required_version=schema_version)
+               elif compat == -1:
+                  # Incompatible schema
+                  raise SchemaVersionError(schema.name, current_version=schema.version, required_version=schema_version)
+               elif compat == 2:
+                  print_once("[das] Warning: '%s' data was saved using an older version of the schema, newly added fields will be set to their default value" % schema_type)
+                  if strict_schema is None:
+                     strict_schema = False
+               elif compat == 0:
+                  print_once("[das] Warning: '%s' data was saved using a newer version of the schema, you may loose information in the process" % schema_type)
 
    encoding = md.get("encoding", None)
+   if encoding is None:
+      print_once("[das] Warning: No encoding specified in file '%s'." % path.replace("\\", "/"))
 
-   return read_string(src, schema_type=schema_type, encoding=encoding, **funcs)
+   if strict_schema is None:
+      strict_schema = True
+
+   return read_string(src, schema_type=schema_type, encoding=encoding, strict_schema=strict_schema, **funcs)
 
 
 def copy(d, deep=True):

@@ -85,4 +85,5 @@ LICENSE        text eol=lf
 *.tl           text eol=lf
 *.env.tmp      text eol=lf
 *.person       text eol=lf
+*.compat       text eol=lf
 
