@@ -88,7 +88,7 @@ class Schema(object):
       if content:
          self.version = md.get("version", None)
          if self.version is None:
-            das.print_once("[das] Schema '%s' defined in %s is unversioned" % (self.name, self.path))
+            das.print_once("[das] Warning: Schema '%s' defined in %s is unversioned" % (self.name, self.path))
 
          das.schematypes.SchemaType.CurrentSchema = self.name
          rv = das.read_string(content, encoding=md.get("encoding", None), **eval_locals)

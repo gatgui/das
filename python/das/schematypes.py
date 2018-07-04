@@ -416,7 +416,7 @@ class Struct(dict, TypeValidator):
 class StaticDict(Struct):
    def __init__(self, **kwargs):
       super(StaticDict, self).__init__(**kwargs)
-      das.print_once("[das] Schema type 'StaticDict' is deprecated, use 'Struct' instead")
+      das.print_once("[das] Warning: Schema type 'StaticDict' is deprecated, use 'Struct' instead")
 
 
 class Dict(TypeValidator):
@@ -468,7 +468,7 @@ class Dict(TypeValidator):
 class DynamicDict(Dict):
    def __init__(self, ktype, vtype, default=None, **kwargs):
       super(DynamicDict, self).__init__(ktype, vtype, default=default, **kwargs)
-      das.print_once("[das] Schema type 'DynamicDict' is deprecated, use 'Dict' instead")
+      das.print_once("[das] Warning: Schema type 'DynamicDict' is deprecated, use 'Dict' instead")
 
 
 class Class(TypeValidator):
