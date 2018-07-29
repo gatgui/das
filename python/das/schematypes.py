@@ -303,7 +303,7 @@ class Tuple(TypeValidator):
                tmp[i] = self.types[i].validate(value[i])
             except ValidationError, e:
                raise ValidationError("Invalid tuple element: %s" % e)
-         rv = das.types.Sequence(tmp)
+         rv = das.types.Tuple(tmp)
          rv._set_schema_type(self)
          return rv
 
