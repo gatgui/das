@@ -288,7 +288,7 @@ class Tuple(TypeValidator):
          raise ValidationError("Expected a tuple value, got %s" % type(value).__name__)
       n = len(value)
       if n != len(self.types):
-         raise ValidationError("Expected a tuple of size %d, got %d", (len(self.types), n))
+         raise ValidationError("Expected a tuple of size %d, got %d" % (len(self.types), n))
       return value
 
    def _validate(self, value, key=None, index=None):
