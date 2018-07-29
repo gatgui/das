@@ -100,7 +100,7 @@ class Tuple(TypeBase, tuple):
       return self._wrap(rv)
 
    def __getitem__(self, i):
-      return TypeBase.TransferGlobalValidator(self, super(Tuple, self).__getitem__(idx))
+      return TypeBase.TransferGlobalValidator(self, super(Tuple, self).__getitem__(i))
 
 
 class Sequence(TypeBase, list):
