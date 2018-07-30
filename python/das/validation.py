@@ -58,8 +58,9 @@ class Schema(object):
       pmp = os.path.splitext(self.path)[0] + ".py"
       if os.path.isfile(pmp):
          try:
-            self.module = imp.load_source("das.schema.%s" % self.name, pmp)
-            setattr(das.schema, self.name, self.module)
+            modname = os.path.splitext(os.path.basename(self.path))[0]
+            self.module = imp.load_source("das.schema.%s" % modname, pmp)
+            setattr(das.schema, modname, self.module)
          except Exception, e:
             import traceback
             print("[das] Failed to load schema module '%s' (%s)" % (pmp, e))
