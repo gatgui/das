@@ -86,4 +86,5 @@ LICENSE        text eol=lf
 *.env.tmp      text eol=lf
 *.person       text eol=lf
 *.compat       text eol=lf
+bin/dasedit    text eol=lf
 

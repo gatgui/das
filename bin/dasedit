@@ -1,0 +1,148 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import das
+
+if __name__ == "__main__":
+   schema_type = None
+   strict_schema = None
+   verbose = False
+   file_path = None
+   data = None
+
+   args = sys.argv[1:]
+   n = len(args)
+   i = 0
+
+   while i < n:
+      arg = args[i]
+
+      if arg in ("-st", "--schema-type"):
+         i += 1
+         if i >= n:
+            print("-st/--schema-type flag expects an argument")
+            sys.exit(1)
+         schema_type = args[i]
+
+      elif arg in ("-ss", "--strict-schema"):
+         i += 1
+         if i >= n:
+            print("-ss/--strict-schema flag expects an argument")
+            sys.exit(1)
+         if args[i].lower() in ("1", "on", "true"):
+            strict_schema = True
+         elif args[i].lower() in ("0", "off", "false"):
+            strict_schema = False
+         else:
+            print("Invalid value '%s' for -ss/--strict-schema flag")
+            sys.exit(1)
+
+      elif arg in ("-v", "--verbose"):
+         verbose = True
+
+      elif arg in ("-h", "--help"):
+         print("USAGE")
+         print("  dasedit [OPTIONS] path?")
+         print("")
+         print("SYNOPSIS")
+         print("  -st/--schema-type <s>                     : Explicitely set file schema type")
+         print("  -ss/--strict-schema 0|1|on|off|true|false : Toggle strict schema check on/off")
+         print("  -v/--verbose                              : Enable verbose mode")
+         print("  -h/--help                                 : Show this help")
+         print("")
+         sys.exit(0)
+
+      else:
+         if file_path is not None:
+            print("dasedit only accepts one positional argument")
+            sys.exit(1)
+         else:
+            file_path = arg
+
+      i += 1
+
+   if file_path and os.path.isfile(file_path):
+      try:
+         data = das.read(file_path, schema_type=schema_type, strict_schema=strict_schema)
+         if data._get_schema_type() is None:
+            print("Data has no schema type")
+            data = None
+      except Exception, e:
+         print("Not a valid das file: %s (%s)" % (file_path, e))
+         data = None
+
+   try:
+      from Qt import QtCore
+      from Qt import QtGui
+      from Qt import QtWidgets
+      import das.qtui
+
+      class Window(QtWidgets.QMainWindow):
+         def __init__(self, data=None, path=None, parent=None):
+            super(Window, self).__init__(parent)
+            self.data = data
+            self.path = path
+            self.setWindowTitle("DaS Simple Editor")
+            menuBar = self.menuBar()
+            actionOpen = QtWidgets.QAction(self)
+            actionOpen.setText("Open")
+            actionOpen.setShortcut("Ctrl+O")
+            actionOpen.triggered.connect(self.onOpen)
+            actionSave = QtWidgets.QAction(self)
+            actionSave.setText("Save")
+            actionSave.setShortcut("Ctrl+S")
+            actionSave.triggered.connect(self.onSave)
+            actionSaveAs = QtWidgets.QAction(self)
+            actionSaveAs.setText("Save As...")
+            actionSaveAs.setShortcut("Ctrl+A")
+            actionSaveAs.triggered.connect(self.onSaveAs)
+            actionQuit = QtWidgets.QAction(self)
+            actionQuit.setText("Quit")
+            actionQuit.setShortcut("Ctrl+Q")
+            actionQuit.triggered.connect(self.close)
+            menuFile = menuBar.addMenu("File")
+            menuFile.addAction(actionOpen)
+            menuFile.addAction(actionSave)
+            menuFile.addAction(actionSaveAs)
+            menuFile.addSeprator()
+            menuFile.addAction(actionQuit)
+            actionAbout = QtWidgets.QAction(self)
+            actionAbout.setText('About')
+            actionAbout.triggered.connect(self.onAbout)
+            menuHelp = menuBar.addMenu('Help')
+            menuHelp.addAction(actionAbout)
+            self.statusBar = QtWidgets.QStatusBar()
+            self.setStatusBar(self.statusBar)
+            centralWidget = QtWidgets.QFrame()
+            layout = QtWidgets.QVBoxLayout()
+            layout.setContentsMargins(10, 10, 10, 10)
+            layout.setSpacing(5)
+            self.editWidget = das.qtui.Editor(data, parent=centralWidget)
+            layout.addWidget(self.editWidget)
+            centralWidget.setLayout(layout)
+            self.setCentralWidget(centralWidget)
+
+         def onOpen(self):
+            pass
+
+         def onSave(self):
+            pass
+
+         def onSaveAs(self):
+            pass
+
+         def onAbout(self):
+            pass
+
+
+      app = QtGui.QApplication([sys.argv[0]])
+      win = None
+      win.Show()
+      app._exec()
+
+   except:
+      print("Qt not found in environment")
+      das.pprint(data)
+
+   sys.exit(0)
