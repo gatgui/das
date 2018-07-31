@@ -222,6 +222,43 @@ class String(TypeValidator):
       return s + ")"
 
 
+class Set(TypeValidator):
+   def __init__(self, type, default=None):
+      super(Set, self).__init__(default=(set() if default is None else default))
+      self.type = type
+
+   def _validate_self(self, value):
+      if not isinstance(value, (tuple, list, set)):
+         raise ValidationError("Expected a set value, got %s" % type(value).__name__)
+      return value
+
+   def _validate(self, value, key=None, index=None):
+      if index is not None:
+         return self.type.validate(value)
+      else:
+         self._validate_self(value)
+         tmp = [None] * len(value)
+         i = 0
+         for item in value:
+            try:
+               tmp[i] = self.type.validate(item)
+            except ValidationError, e:
+               raise ValidationError("Invalid set element: %s" % e)
+            i += 1
+         rv = das.types.Set(tmp)
+         rv._set_schema_type(self)
+         return rv
+
+   def make(self, *args, **kwargs):
+      return self._validate(args)
+
+   def __repr__(self):
+      s = "Set(type=%s" % self.type
+      if self.default is not None:
+         s += ", default=%s" % self.default
+      return s + ")"
+
+
 class Sequence(TypeValidator):
    def __init__(self, type, default=None, size=None, min_size=None, max_size=None):
       super(Sequence, self).__init__(default=([] if default is None else default))

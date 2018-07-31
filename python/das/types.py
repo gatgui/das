@@ -150,37 +150,37 @@ class Sequence(TypeBase, list):
 
 
 class Set(TypeBase, set):
-   def __init__(self, *args):
+   def __init__(self, args):
       TypeBase.__init__(self)
-      set.__init__(self, *args)
+      set.__init__(self, args)
 
    def __iand__(self, y):
-      rv = super(Set, self).__iand__(map(lambda x: self._adapt_value(x), y))
+      rv = super(Set, self).__iand__(set([self._adapt_value(x, index=i) for i, x in enumerate(y)]))
       self._gvalidate()
       return self._wrap(rv)
 
    def __isub__(self, y):
-      rv = super(Set, self).__isub__(map(lambda x: self._adapt_value(x), y))
+      rv = super(Set, self).__isub__(set([self._adapt_value(x, index=i) for i, x in enumerate(y)]))
       self._gvalidate()
       return self._wrap(rv)
 
    def __ior__(self, y):
-      rv = super(Set, self).__ior__(map(lambda x: self._adapt_value(x), y))
+      rv = super(Set, self).__ior__(set([self._adapt_value(x, index=i) for i, x in enumerate(y)]))
       self._gvalidate()
       return self._wrap(rv)
 
    def __ixor__(self, y):
-      rv = super(Set, self).__ixor__(map(lambda x: self._adapt_value(x), y))
+      rv = super(Set, self).__ixor__(set([self._adapt_value(x, index=i) for i, x in enumerate(y)]))
       self._gvalidate()
       return self._wrap(rv)
 
    def add(self, e):
-      super(Set, self).add(self._adapt_value(e))
+      super(Set, self).add(self._adapt_value(e, index=len(self)))
       self._gvalidate()
 
    def update(self, *args):
       for y in args:
-         super(Set, self).update(map(lambda x: self._adapt_value(x), y))
+         super(Set, self).update([self._adapt_value(x, index=i) for i, x in enumerate(y)])
       self._gvalidate()
 
    def __iter__(self):

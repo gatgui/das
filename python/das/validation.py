@@ -70,6 +70,7 @@ class Schema(object):
                      "Integer": das.schematypes.Integer,
                      "Real": das.schematypes.Real,
                      "String": das.schematypes.String,
+                     "Set": das.schematypes.Set,
                      "Sequence": das.schematypes.Sequence,
                      "Tuple": das.schematypes.Tuple,
                      "StaticDict": das.schematypes.StaticDict, # Deprecated
