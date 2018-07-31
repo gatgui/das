@@ -244,6 +244,7 @@ class Struct(TypeBase):
 
    def __getattr__(self, k):
       try:
+         k = self._get_alias(k)
          return TypeBase.TransferGlobalValidator(self, self._dict[k])
       except KeyError:
          if hasattr(self._dict, k):
@@ -264,28 +265,31 @@ class Struct(TypeBase):
       if k == "__class__":
          super(Struct, self).__setattr__(k, v)
       else:
+         k = self._get_alias(k)
          self._check_reserved(k)
          self._dict[k] = self._adapt_value(v, key=k)
          self._gvalidate()
 
    def __delattr__(self, k):
-      del(self._dict[k])
+      del(self._dict[self._get_alias(k)])
       self._gvalidate()
 
    def __getitem__(self, k):
+      k = self._get_alias(k)
       return TypeBase.TransferGlobalValidator(self, self._dict.__getitem__(k))
 
    def __setitem__(self, k, v):
+      k = self._get_alias(k)
       self._check_reserved(k)
       self._dict.__setitem__(k, self._adapt_value(v, key=k))
       self._gvalidate()
 
    def __delitem__(self, k):
-      self._dict.__delitem__(k)
+      self._dict.__delitem__(self._get_alias(k))
       self._gvalidate()
 
    def __contains__(self, k):
-      return self._dict.__contains__(k)
+      return self._dict.__contains__(self._get_alias(k))
 
    def __cmp__(self, oth):
       return self._dict.__cmp__(oth._dict if isinstance(oth, Struct) else oth)
@@ -333,9 +337,17 @@ class Struct(TypeBase):
    def _update(self, *args, **kwargs):
       self._dict.update(*args, **kwargs)
       for k, v in self._dict.items():
+         k = self._get_alias(k)
          self._check_reserved(k)
          self._dict[k] = self._adapt_value(v, key=k)
       self._gvalidate()
+
+   def _get_alias(self, k):
+      st = self._get_schema_type()
+      if st is not None:
+         if isinstance(st[k], das.schematypes.Alias):
+            return st[k].name
+      return k
 
    def _check_reserved(self, k):
       if hasattr(self.__class__, k):

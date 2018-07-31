@@ -82,7 +82,8 @@ class Schema(object):
                      "Optional": das.schematypes.Optional,
                      "Empty": das.schematypes.Empty,
                      "Deprecated": das.schematypes.Deprecated,
-                     "SchemaType": das.schematypes.SchemaType}
+                     "SchemaType": das.schematypes.SchemaType,
+                     "Alias": das.schematypes.Alias}
       if self.module is not None and hasattr(self.module, "__all__"):
          for an in self.module.__all__:
             eval_locals[an] = getattr(self.module, an)

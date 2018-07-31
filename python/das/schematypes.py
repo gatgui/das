@@ -382,6 +382,9 @@ class Struct(dict, TypeValidator):
       if not isinstance(value, (dict, das.types.Struct)):
          raise ValidationError("Expected a dict value, got %s" % type(value).__name__)
       for k, v in self.iteritems():
+         # Don't check aliases
+         if isinstance(v, Alias):
+            continue
          if not k in value and not isinstance(v, Optional):
             if self.UseDefaultForMissingFields:
                # print("[das] Use default value for field '%s'" % k)
@@ -397,7 +400,9 @@ class Struct(dict, TypeValidator):
             # return das.adapt_value(value)
             raise ValidationError("Invalid key '%s'" % key)
          else:
-            vv = self[key].validate(value)
+            if isinstance(vtype, Alias):
+               vtype = self[vtype.name]
+            vv = vtype.validate(value)
             if vv is not None and isinstance(vtype, Deprecated):
                das.print_once(vtype.message) 
             return vv
@@ -406,6 +411,9 @@ class Struct(dict, TypeValidator):
          rv = das.types.Struct()
          # don't set schema type just yet
          for k, v in self.iteritems():
+            # don't add aliases to dictionary
+            if isinstance(v, Alias):
+               continue
             try:
                vv = v.validate(value[k])
                if vv is not None and isinstance(v, Deprecated):
@@ -423,7 +431,7 @@ class Struct(dict, TypeValidator):
       if not self.default_validated and self.default is None:
          self.default = das.types.Struct()
          for k, t in self.iteritems():
-            if isinstance(t, Optional):
+            if isinstance(t, (Alias, Optional)):
                continue
             self.default[k] = t.make_default()
          self.default._set_schema_type(self)
@@ -657,6 +665,24 @@ class Empty(TypeValidator):
 
    def __repr__(self):
       return "Empty()"
+
+
+class Alias(TypeValidator):
+   def __init__(self, name):
+      super(Alias, self).__init__()
+      self.name = name
+
+   def _validate_self(self, value):
+      return value
+
+   def _validate(self, value, key=None, index=None):
+      return self._validate_self(value)
+
+   def make_default(self):
+      return None
+
+   def __repr__(self):
+      return "Alias(%s)" % repr(self.name)
 
 
 class SchemaType(TypeValidator):

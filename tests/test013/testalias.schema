@@ -1,0 +1,7 @@
+# encoding: utf8
+# version: 1.0
+# das_minimum_version: 0.5.0
+{
+   "MyStruct": Struct(margin=String(default="none", choices=["none", "horizontal", "vertical", "both"]),
+                      defaultMargin=Alias("margin"))
+}
