@@ -17,7 +17,8 @@ prjs = [
    {  "name": "das",
       "type": "install",
       "install": {
-         "python/das": excons.glob("python/das/*.py")
+         "python/das": excons.glob("python/das/*.py"),
+         "python/das/importlib-1.0.4": excons.glob("python/das/importlib-1.0.4/*")
       }
    }
 ]
