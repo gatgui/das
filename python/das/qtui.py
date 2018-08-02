@@ -1,4 +1,5 @@
 import das
+import math
 
 NoUI = False
 
@@ -23,9 +24,10 @@ if not NoUI:
 
 
    class ModelItem(object):
-      def __init__(self, name, data, type=None, parent=None, row=0):
+      def __init__(self, name, data, type=None, parent=None, row=0, key=None):
          super(ModelItem, self).__init__()
          self.row = row
+         self.key = None
          self.name = name
          self.parent = parent
          self.update(data, type)
@@ -89,12 +91,15 @@ if not NoUI:
          self.multi = False
          self.data = data
          self.type = type
+         self.invalid = True
 
          if self.data is not None:
             if self.type is None:
                self.type = self.data._get_schema_type()
                if self.type is None:
                   raise Exception("No schema type for model item")
+
+            self.invalid = False
 
             self.optional = isinstance(self.type, das.schematypes.Optional)
 
@@ -153,7 +158,7 @@ if not NoUI:
                      v = self.data[k]
                      ks = str(k)
                      vtype = self.type.vtypeOverrides.get(k, self.type.vtype)
-                     self.children.append(ModelItem(ks, v, type=vtype, parent=self, row=i))
+                     self.children.append(ModelItem(ks, v, type=vtype, parent=self, row=i, key=k))
                      i += 1
 
 
@@ -163,49 +168,383 @@ if not NoUI:
 
       def createEditor(self, parent, viewOptions, modelIndex):
          item = modelIndex.internalPointer()
-         # Boolean, Integer, Real, String, Or, Empty, Class, Alias?
-         # for 'Or' -> string field
-         # for 'Empty' -> not editable if only type
-         #             -> if inside a Or ... what? Or(String(), Empty())
-         #                '' is a valid string... how to set None? (Empty)
-         # Class will be a mother fucker too, we need to be able to build it from string
-         # and convert value to string too
-         # => require 'string_to_value', 'value_to_string' method to edit Class
-         return None
+         rv = None
+         if item.editable:
+            if item.multi:
+               rv = self.createOrEditor(parent, item)
+            else:
+               if isinstance(item.type, das.schematypes.Boolean):
+                  rv = self.createBoolEditor(parent, item)
+               elif isinstance(item.type, das.schematypes.Integer):
+                  rv = self.createIntEditor(parent, item)
+               elif isinstance(item.type, das.schematypes.Real):
+                  rv = self.createFltEditor(parent, item)
+               elif isinstance(item.type, das.schematypes.String):
+                  rv = self.createStrEditor(parent, item)
+               elif isinstance(item.type, das.schematypes.Class):
+                  rv = self.createClassEditor(parent, item)
+               # Ignore 'Empty' and 'Alias'
+         return rv
 
-      def strToBool(self, s):
-         ls = s.lower()
-         if ls in ("1", "on", "yes", "true", "0", "off", "no", "false"):
-            return (ls in ("1", "on", "yes", "true"))
+      def createOrEditor(self, parent, item):
+         rv = QtWidgets.QLineEdit(parent)
+         def textChanged(txt):
+            # Check if it matches any of the Or types
+            item.invalid = False
+         rv.textChanged.connect(textChanged)
+         rv.setProperty("setEditorData", self.setOrEditorData)
+         rv.setProperty("setModelData", self.setOrModelData)
+         return rv
+
+      def createBoolEditor(self, parent, item):
+         rv = QtWidgets.QCheckBox(parent)
+         rv.setProperty("setEditorData", self.setBoolEditorData)
+         rv.setProperty("setModelData", self.setBoolModelData)
+         return rv
+
+      def createIntEditor(self, parent, item):
+         if item.type.enum is not None:
+            rv = QtWidgets.QComboBox(parent)
+            for k, v in item.type.enum.iteritems():
+               rv.addItem(k, userData=v)
+         elif item.type.min is not None and item.type.max is not None:
+            rv = QtWidgets.QFrame(parent)
+            fld = QtWidgets.QLineEdit(rv)
+            fld.setObjectName("field")
+            sld = QtWidgets.QSlider(QtCore.Qt.Horizontal, rv)
+            sld.setObjectName("slider")
+            sld.setTracking(True)
+            sld.setMinimum(item.type.min)
+            sld.setMaximum(item.type.max)
+            lay = QtWidgets.QHBoxLayout()
+            lay.setContentsMargins(0, 0, 0, 0)
+            lay.setContentsSpacing(2)
+            lay.addWidget(fld, 0)
+            lay.addWidget(sld, 1)
+            rv.setLayout(lay)
+            def textChanged(txt):
+               try:
+                  val = int(txt)
+                  if val < item.type.min:
+                     val = item.type.min
+                     fld.blockSignals(True)
+                     fld.setText(str(val))
+                     fld.blockSignals(False)
+                  elif val > item.type.max:
+                     val = item.type.max
+                     fld.blockSignals(True)
+                     fld.setText(str(val))
+                     fld.blockSignals(False)
+                  sld.blockSignals(True)
+                  sld.setValue(val)
+                  sld.blockSignals(False)
+                  item.invalid = False
+               except:
+                  item.invalid = True
+            def sliderChanged(val):
+               fld.blockSignals(True)
+               fld.setText(str(val))
+               fld.blockSignals(False)
+               item.invalid = False
+            sld.valueChanged.connect(sliderChanged)
+            fld.textChanged.connect(textChanged)
          else:
-            return None
+            rv = QtWidgets.QLineEdit(parent)
+            def textChanged(txt):
+               try:
+                  val = int(txt)
+                  item.invalid = False
+               except:
+                  item.invalid = True
+            rv.textChanged.connect(textChanged)
+         rv.setProperty("setEditorData", self.setIntEditorData)
+         rv.setProperty("setModelData", self.setIntModelData)
+         return rv
 
-      def boolToStr(self, b):
-         return ("true" if b else "false")
+      def createFltEditor(self, parent, item):
+         if item.type.min is not None and item.type.max is not None:
+            rv = QtWidgets.QFrame(parent)
+            fld = QtWidgets.QLineEdit(rv)
+            fld.setObjectName("field")
+            sld = QtWidgets.QSlider(QtCore.Qt.Horizontal, rv)
+            sld.setObjectName("slider")
+            sld.setTracking(True)
+            sldscl = 10000.0
+            sldmin = int(math.floor(item.type.min * sldscl))
+            sldmax = int(math.ceil(item.type.max * sldscl))
+            sld.setMinimum(sldmin)
+            sld.setMaximum(sldmax)
+            lay = QtWidgets.QHBoxLayout()
+            lay.setContentsMargins(0, 0, 0, 0)
+            lay.setContentsSpacing(2)
+            lay.addWidget(fld, 0)
+            lay.addWidget(sld, 1)
+            rv.setLayout(lay)
+            def textChanged(txt):
+               try:
+                  val = float(txt)
+                  if val < item.type.min:
+                     val = item.type.min
+                     fld.blockSignals(True)
+                     fld.setText(str(val))
+                     fld.blockSignals(False)
+                  elif val > item.type.max:
+                     val = item.type.max
+                     fld.blockSignals(True)
+                     fld.setText(str(val))
+                     fld.blockSignals(False)
+                  sld.blockSignals(True)
+                  sld.setValue(math.floor(0.5 + val * sldscl))
+                  sld.blockSignals(False)
+                  item.invalid = False
+               except:
+                  item.invalid = True
+            def sliderChanged(val):
+               # as we round down slider min value and round up slider max value
+               # we may need to adjust here
+               if val < item.type.min:
+                  val = item.type.min
+               elif val > item.type.max:
+                  val = item.type.max
+               fld.blockSignals(True)
+               fld.setText(str(val))
+               fld.blockSignals(False)
+               item.invalid = False
+            sld.valueChanged.connect(sliderChanged)
+            fld.textChanged.connect(textChanged)
+         else:
+            rv = QtWidgets.QLineEdit(parent)
+            def textChanged(txt):
+               try:
+                  val = float(txt)
+                  item.invalid = False
+               except:
+                  item.invalid = True
+            rv.textChanged.connect(textChanged)
+         rv.setProperty("setEditorData", self.setFltEditorData)
+         rv.setProperty("setModelData", self.setFltModelData)
+         return rv
 
-      def strToReal(self, s):
-         try:
-            return float(s)
-         except:
-            return None
+      def createStrEditor(self, parent, item):
+         if item.type.choices is not None:
+            rv = QtWidgets.QComboBox(parent)
+            rv.addItems(item.type.choices)
+            rv.setEditable(not item.type.strict)
+         else:
+            rv = QtWidgets.QLineEdit(parent)
+            def textChanged(txt):
+               if item.type.matches is not None:
+                  item.invalid = (not item.type.matches(txt))
+               else:
+                  item.invalid = False
+            rv.textChanged.connect(textChanged)
+         rv.setProperty("setEditorData", self.setStrEditorData)
+         rv.setProperty("setModelData", self.setStrModelData)
+         return rv
 
-      def realToStr(self, r):
-         return str(r)
-
-      def strToInt(self, s):
-         try:
-            return long(s)
-         except:
-            return None
-
-      def intToStr(self, i):
-         return str(i)
+      def createClassEditor(self, parent, item):
+         rv = QtWidgets.QLineEdit(parent)
+         def textChanged(txt):
+            # try:
+            #    item.data.string_to_value()
+            # except:
+            #    pass
+            pass
+         rv.textChanged.connect(textChanged)
+         rv.setProperty("setEditorData", self.setClassEditorData)
+         rv.setProperty("setModelData", self.setClassModelData)
+         return rv
 
       def setEditorData(self, widget, modelIndex):
-         pass
+         item = modelIndex.internalPointer()
+         func = widget.property("setEditorData")
+         if func:
+            func(widget, item)
+
+      def setOrEditorData(self, widget, item):
+         if isinstance(item.data, bool):
+            s = ("true" if item.data else "false")
+         elif item.data is None:
+            # Can't this be a valid string value too?
+            s = "none"
+         else:
+            s = str(item.data)
+         widget.setText(s)
+
+      def setBoolEditorData(self, widget, item):
+         widget.setCheckState(QtCore.Qt.Checked if item.data else QtCore.Qt.Unchecked)
+
+      def setIntEditorData(self, widget, item):
+         if item.type.enum is not None:
+            widget.setCurrentIndex(widget.findData(item.data))
+         else:
+            if item.type.min is not None and item.type.max is not None:
+               fld = widget.findChild("field")
+            else:
+               fld = widget
+            fld.setText(str(item.data))
+
+      def setFltEditorData(self, widget, item):
+         if item.type.min is not None and item.type.max is not None:
+            fld = widget.findChild("field")
+         else:
+            fld = widget
+         fld.setText(str(item.data))
+
+      def setStrEditorData(self, widget, item):
+         if item.type.choices is not None:
+            if item.type.strict:
+               widget.setCurrentIndex(widget.findText(item.data))
+            else:
+               idx = widget.findText(item.data)
+               if idx == -1:
+                  widget.setEditText(item.data)
+               else:
+                  widget.setCurrentIndex(idx)
+         else:
+            widget.setText(item.data)
+
+      def setClassEditorData(self, widget, item):
+         widget.setText(item.data.value_to_string())
 
       def setModelData(self, widget, model, modelIndex):
-         pass
+         item = modelIndex.internalPointer()
+         if not item.invalid:
+            func = widget.property("setModelData")
+            if func:
+               func(widget, model, modelIndex)
+
+      def setItemData(self, item, data):
+         if item.parent:
+            if item.parent.mapping:
+               # use item.name as key
+               if item.parent.mappingkeytype is not None:
+                  # Not name as name is a string and mappingkeytype may not be
+                  item.parent.data[item.key] = data
+               else:
+                  item.parent.data[item.name] = data
+            else:
+               if item.parent.resizable:
+                  if isinstance(item.parent.type, das.schematypes.Sequence):
+                     item.parent.data[item.row] = data
+                  else:
+                     # in a set, may end up the the need to remove current item
+                     # if it is a duplicate!
+                     item.parent.data.add(data)
+               else:
+                  seq = list(item.parent.data)
+                  seq[item.row] = data
+                  self.setItemData(item.parent, das.types.Tuple(seq))
+         item.data = data
+
+      def setOrModelData(self, widget, model, modelIndex):
+         allowEmpty = False
+         allowBool = False
+         allowInt = False
+         allowFlt = False
+         allowStr = False
+         allowClass = False
+         for t in item.type.types:
+            if isinstance(t, das.schematypes.Empty):
+               allowEmpty = True
+            elif isinstance(t, das.schematypes.Boolean):
+               allowBool = True
+            elif isinstance(t, das.schematypes.Integer):
+               allowInt = True
+            elif isinstance(t, das.schematypes.Real):
+               allowFlt = True
+            elif isinstance(t, das.schematypes.String):
+               allowStr = True
+            elif isinstance(t, das.schematypes.Class):
+               allowClass = True
+
+         s = widget.text()
+
+         if allowNone and s.startswith("!:"):
+            s = s[2:]
+            allowNone = False
+
+         if allowNone and s.lower() == "none":
+            item.data = None
+
+         if allowBool and s.lower() in ("on", "yes", "true", "off", "no", "false"):
+            v = (s.lower() in ("on", "yes", "true"))
+            try:
+               item.data = v
+               return
+            except:
+               pass
+
+         if allowFlt:
+            try:
+               item.data = float(v)
+               return
+            except:
+               pass
+
+         if allowInt:
+            # could be an enum
+            try:
+               item.data = int(v)
+               return
+            except:
+               pass
+
+         if allowClass:
+            try:
+               item.data.copy().string_to_value(s)
+               item.data.string_to_value(s)
+               return
+            except:
+               pass
+
+         if allowStr:
+            try:
+               item.data = s
+               return
+            except:
+               # Could not set value
+               pass
+
+      def setBoolModelData(self, widget, model, modelIndex):
+         item = modelIndex.internalPointer()
+         data = (widget.checkState() == QtCore.Qt.Checked)
+         self.setItemData(item, data)
+
+      def setIntModelData(self, widget, model, modelIndex):
+         item = modelIndex.internalPointer()
+         if item.type.enum is not None:
+            data = item.type.enum[widget.currentText()]
+         else:
+            if item.type.min is not None and item.type.max is not None:
+               fld = widget.findChild("field")
+            else:
+               fld = widget
+            data = long(fld.text())
+         self.setItemData(item, data)
+
+      def setFltModelData(self, widget, model, modelIndex):
+         item = modelIndex.internalPointer()
+         if item.type.min is not None and item.type.max is not None:
+            fld = widget.findChild("field")
+         else:
+            fld = widget
+         data = float(fld.text())
+         self.setItemData(item, data)
+
+      def setStrModelData(self, widget, model, modelIndex):
+         item = modelIndex.internalPointer()
+         if item.type.choices is not None:
+            data = widget.currentText()
+         else:
+            data = widget.text()
+         self.setItemData(item, data)
+
+      def setClassModelData(self, widget, model, modelIndex):
+         item = modelIndex.internalPointer()
+         data = widget.text()
+         # self.setItemData(item, data)
+         # => self.item.data.string_to_value(data)
 
       def updateEditorGeometry(self, widget, viewOptions, modelIndex):
          widget.setGeometry(viewOptions.rect)
@@ -254,13 +593,17 @@ if not NoUI:
          else:
             flags = QtCore.Qt.NoItemFlags
             flags = flags | QtCore.Qt.ItemIsSelectable
-            flags = flags | QtCore.Qt.ItemIsEnabled
+            # disable values for compount types
+            #flags = flags | QtCore.Qt.ItemIsEnabled
             item = index.internalPointer()
             if index.column() == 0:
+               flags = flags | QtCore.Qt.ItemIsEnabled
                # flags = flags | QtCore.Qt.ItemIsUserCheckable
                if item.mappingkeytype is not None:
                   flags = flags | QtCore.Qt.ItemIsEditable
             elif index.column() == 1:
+               if not item.compound:
+                  flags = flags | QtCore.Qt.ItemIsEnabled
                if item.editable:
                   flags = flags | QtCore.Qt.ItemIsEditable
                
@@ -341,7 +684,15 @@ if not NoUI:
 
          elif index.column() == 1:
             if not item.compound:
-               rv = str(item.data)
+               if role == QtCore.Qt.DisplayRole:
+                  rv = str(item.data)
+                  if isinstance(item.data, bool):
+                     rv = rv.lower()
+               else:
+                  rv = item.data
+            else:
+               if role == QtCore.Qt.DisplayRole:
+                  rv = "---"
 
          if rv is not None and role == QtCore.Qt.DisplayRole:
             # artificially add spaces for more readability
@@ -366,6 +717,13 @@ if not NoUI:
 
             item = index.internalPointer()
             if not item.compound:
+               #if isinstance(t, das.schematypes.Boolean)
+               if item.multi:
+                  # try one by one
+                  for t in item.type.types:
+                     pass
+               else:
+                  pass
                # set from parent if it exists
                pass
             else:
@@ -402,11 +760,11 @@ if not NoUI:
       def __init__(self, data, parent=None):
          super(Editor, self).__init__(parent)
          self.model = Model(data, parent=self)
-         #self.delegate = ModelItemDelegate(parent=self)
+         self.delegate = ModelItemDelegate(parent=self)
          self.setModel(self.model)
          self.expandedState = {}
          self.checkedState = {}
-         #self.setItemDelegate(self.delegate)
+         self.setItemDelegate(self.delegate)
          QtCompat.setSectionResizeMode(self.header(), QtWidgets.QHeaderView.ResizeToContents)
          self.setAnimated(True)
          self.setHeaderHidden(False)
@@ -428,6 +786,9 @@ if not NoUI:
             pos = self.viewport().mapFromGlobal(gpos)
             modelIndex = self.indexAt(pos)
             item = (None if (modelIndex is None or not modelIndex.isValid()) else modelIndex.internalPointer())
+            # Maybe more:
+            # Container > Add
+            #           > Remove
             actionExpandUnder = menu.addAction("Expand Under")
             actionExpandUnder.setEnabled(True if item and item.compound else False)
             actionExpandUnder.triggered.connect(self.makeOnExpandUnder(modelIndex))
