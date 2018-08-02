@@ -90,8 +90,10 @@ class TypeBase(object):
 
 class Tuple(TypeBase, tuple):
    def __init__(self, *args):
-      TypeBase.__init__(self)
-      tuple.__init__(self, *args)
+      # Funny, we need to declare *args here, but at the time we reach
+      # the core of the method, tuple is already created
+      # Maybe because tuple is immutable?
+      super(Tuple, self).__init__()
 
    def __add__(self, y):
       n = len(self)
