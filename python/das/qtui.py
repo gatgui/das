@@ -179,7 +179,7 @@ if not NoUI:
          self.typename = None
          self.buttons = []
          layout = QtWidgets.QVBoxLayout()
-         label = QtWidgets.QLabel("There are several eligible types for the inputed data.\mPlease select desired one from the list:", self)
+         label = QtWidgets.QLabel("There are several eligible types for the inputed data.\nPlease select desired one from the list:", self)
          layout.addWidget(label, 0)
          group = QtWidgets.QGroupBox("Eligible types", self)
          groupl = QtWidgets.QVBoxLayout()
@@ -278,7 +278,7 @@ if not NoUI:
             sld.setMaximum(item.type.max)
             lay = QtWidgets.QHBoxLayout()
             lay.setContentsMargins(0, 0, 0, 0)
-            lay.setContentsSpacing(2)
+            lay.setSpacing(2)
             lay.addWidget(fld, 0)
             lay.addWidget(sld, 1)
             rv.setLayout(lay)
@@ -329,14 +329,14 @@ if not NoUI:
             sld = QtWidgets.QSlider(QtCore.Qt.Horizontal, rv)
             sld.setObjectName("slider")
             sld.setTracking(True)
-            sldscl = 10000.0
-            sldmin = int(math.floor(item.type.min * sldscl))
-            sldmax = int(math.ceil(item.type.max * sldscl))
+            self.sldscl = 10000.0
+            sldmin = int(math.floor(item.type.min * self.sldscl))
+            sldmax = int(math.ceil(item.type.max * self.sldscl))
             sld.setMinimum(sldmin)
             sld.setMaximum(sldmax)
             lay = QtWidgets.QHBoxLayout()
             lay.setContentsMargins(0, 0, 0, 0)
-            lay.setContentsSpacing(2)
+            lay.setSpacing(2)
             lay.addWidget(fld, 0)
             lay.addWidget(sld, 1)
             rv.setLayout(lay)
@@ -354,7 +354,7 @@ if not NoUI:
                      fld.setText(str(val))
                      fld.blockSignals(False)
                   sld.blockSignals(True)
-                  sld.setValue(math.floor(0.5 + val * sldscl))
+                  sld.setValue(int(math.floor(0.5 + val * self.sldscl)))
                   sld.blockSignals(False)
                   item.invalid = False
                except:
@@ -362,6 +362,7 @@ if not NoUI:
             def sliderChanged(val):
                # as we round down slider min value and round up slider max value
                # we may need to adjust here
+               val = val / self.sldscl
                if val < item.type.min:
                   val = item.type.min
                elif val > item.type.max:
@@ -439,14 +440,18 @@ if not NoUI:
             widget.setCurrentIndex(widget.findData(item.data))
          else:
             if item.type.min is not None and item.type.max is not None:
-               fld = widget.findChild("field")
+               fld = widget.findChild(QtWidgets.QLineEdit, "field")
+               sld = widget.findChild(QtWidgets.QSlider, "slider")
+               sld.setValue(item.data)
             else:
                fld = widget
             fld.setText(str(item.data))
 
       def setFltEditorData(self, widget, item):
          if item.type.min is not None and item.type.max is not None:
-            fld = widget.findChild("field")
+            fld = widget.findChild(QtWidgets.QLineEdit, "field")
+            sld = widget.findChild(QtWidgets.QSlider, "slider")
+            sld.setValue(int(math.floor(0.5 + item.data * self.sldscl)))
          else:
             fld = widget
          fld.setText(str(item.data))
@@ -477,6 +482,7 @@ if not NoUI:
       def setOrModelData(self, widget, model, modelIndex):
          s = widget.text()
 
+         item = modelIndex.internalPointer()
          values = []
 
          for t in item.type.types:
@@ -525,7 +531,7 @@ if not NoUI:
 
          if len(values) == 1:
             _, v = values[0]
-            mode.setData(modelIndex, v, QtCore.Qt.EditRole)
+            model.setData(modelIndex, v, QtCore.Qt.EditRole)
 
       def setBoolModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
@@ -538,7 +544,7 @@ if not NoUI:
             data = item.type.enum[widget.currentText()]
          else:
             if item.type.min is not None and item.type.max is not None:
-               fld = widget.findChild("field")
+               fld = widget.findChild(QtWidgets.QLineEdit, "field")
             else:
                fld = widget
             data = long(fld.text())
@@ -547,7 +553,7 @@ if not NoUI:
       def setFltModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
          if item.type.min is not None and item.type.max is not None:
-            fld = widget.findChild("field")
+            fld = widget.findChild(QtWidgets.QLineEdit, "field")
          else:
             fld = widget
          data = float(fld.text())
@@ -709,15 +715,22 @@ if not NoUI:
          elif index.column() == 1:
             if not item.compound:
                if role == QtCore.Qt.DisplayRole:
-                  rv = str(item.data)
-                  if isinstance(item.data, (bool, NoneType)):
-                     rv = rv.lower()
-                  rv = "\t" + rv
+                  if not item.editable:
+                     rv = "---"
+                  #elif isinstance(item.type, das.schematypes.Class):
+                  elif hasattr(item.data, "value_to_string"):
+                     rv = item.data.value_to_string()
+                  else:
+                     rv = str(item.data)
+                     if isinstance(item.data, (bool, type(None))):
+                        rv = rv.lower()
                else:
                   rv = item.data
             else:
-               if role == QtCore.Qt.DisplayRole:
-                  rv = "\t---"
+               rv = "---"
+
+         if role == QtCore.Qt.DisplayRole and index.column() == 1:
+            rv = "    " + rv
 
          return rv
 
@@ -930,7 +943,7 @@ if not NoUI:
                checked = (QtCore.Qt.Checked if self.checkedState.get(k, False) else QtCore.Qt.Unchecked)
                self.model.setData(index, checked, QtCore.Qt.CheckStateRole)
 
-         nr = self.model.rowCount(parentIndex)
+         nr = self.model.rowCount(index)
          for r in xrange(nr):
             self.restoreCheckedState(index=self.model.index(r, 0, index))
 

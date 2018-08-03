@@ -13,7 +13,7 @@ class CustomClass(object):
    def __repr__(self):
       return "CustomClass(%s)" % repr(self._value)
 
-    def __cmp__(self, oth):
+   def __cmp__(self, oth):
       return self._value.__cmp__(oth._value)
 
    def copy(self):
