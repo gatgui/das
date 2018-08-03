@@ -27,7 +27,7 @@ if not NoUI:
       def __init__(self, name, data, type=None, parent=None, row=0, key=None):
          super(ModelItem, self).__init__()
          self.row = row
-         self.key = None
+         self.key = key
          self.name = name
          self.parent = parent
          self.update(data, type)
