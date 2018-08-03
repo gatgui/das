@@ -1,0 +1,23 @@
+# encoding: utf8
+# schema_type: edittest.everything
+{
+   "set_value": set([False, -1, 0.33, "test", None]),
+   "dict_value": {(0.0, 0.0): None,
+                  (1.0, 0.0): -3.2,
+                  (0.0, 1.0): 15,
+                  (1.0, 1.0): True,
+                  (0.5, 0.5): "center"},
+   "sequence_value": [(-2.0, 0.0),
+                      (-1.0, 0.0),
+                      (0.0, 0.0)],
+   "struct_value": {"boolean_value": True,
+                    "integer_value": 2,
+                    "bounded_integer_value": 8,
+                    "enum_value": 3,
+                    "real_value": 0.86,
+                    "bounded_real_value": 2.61,
+                    "string_value": "tomorrow",
+                    "choice_value": "tuesday",
+                    "loose_choice_value": "midnight",
+                    "class_value": CustomClass({"start_frame": 0, "end_frame": 123}),"empty_value": None}
+}

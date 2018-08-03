@@ -1,0 +1,25 @@
+# encoding: utf8
+# version: 1.0.0
+# das_minimum_version: 0.5
+{
+   "pod_value": Or(Boolean(default=False), Integer(default=0), Real(default=0.0), String(default=""), Empty()),
+   "struct_value": Struct(boolean_value=Boolean(default=False),
+                          integer_value=Integer(default=0),
+                          bounded_integer_value=Integer(default=5, min=0, max=10),
+                          enum_value=Integer(default=0, enum={"left": 0, "right": 1, "top": 2, "bottom": 3}),
+                          real_value=Real(default=0.0),
+                          bounded_real_value=Real(default=5.0, min=0.0, max=10.0),
+                          string_value=String(default="hello"),
+                          choice_value=String(default="monday", choices=["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]),
+                          loose_choice_value=String(default="morning", choices=["morning", "noon" "afternoon", "evening", "night"], strict=False),
+                          class_value=Class("CustomClass", default=CustomClass()),
+                          empty_value=Empty()),
+   "tuple_value": Tuple(Real(default=0.0, min=0.0, max=1.0), Real(default=0.0, min=0.0, max=1.0)),
+   "sequence_value": Sequence(SchemaType("tuple_value")),
+   "dict_value": Dict(ktype=SchemaType("tuple_value"), vtype=SchemaType("pod_value")),
+   "set_value": Set(type=SchemaType("pod_value")),
+   "everything": Struct(set_value=SchemaType("set_value"),
+                        dict_value=SchemaType("dict_value"),
+                        sequence_value=SchemaType("sequence_value"),
+                        struct_value=SchemaType("struct_value"))
+}
