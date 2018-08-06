@@ -17,6 +17,7 @@
                     "real_value": 0.86,
                     "bounded_real_value": 2.61,
                     "string_value": "tomorrow",
+                    "matching_string_value": "myvar0",
                     "choice_value": "tuesday",
                     "loose_choice_value": "midnight",
                     "class_value": CustomClass({"start_frame": 0, "end_frame": 123}),"empty_value": None}

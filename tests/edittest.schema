@@ -10,6 +10,7 @@
                           real_value=Real(default=0.0),
                           bounded_real_value=Real(default=5.0, min=0.0, max=10.0),
                           string_value=String(default="hello"),
+                          matching_string_value=String(default="varname", matches="[_a-zA-Z][_a-zA-Z0-9]*"),
                           choice_value=String(default="monday", choices=["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]),
                           loose_choice_value=String(default="morning", choices=["morning", "noon", "afternoon", "evening", "night"], strict=False),
                           class_value=Class(CustomClass, default=CustomClass()),
