@@ -95,7 +95,9 @@ if not NoUI:
          self.mapping = False
          self.mappingkeys = None
          self.mappingkeytype = None
+         self.uniformmapping = True # mapping of uniform type values
          self.resizable = False
+         self.orderable = False # orderable compound
          self.optional = False
          self.editable = False
          self.multi = False
@@ -122,6 +124,7 @@ if not NoUI:
          if self.compound:
             if isinstance(self.type, das.schematypes.Sequence):
                self.resizable = True
+               self.orderable = True
                for i in xrange(len(self.data)):
                   itemname = "%s[%d]" % (self.name, i)
                   itemdata = self.data[i]
@@ -129,6 +132,7 @@ if not NoUI:
 
             elif isinstance(self.type, das.schematypes.Tuple):
                self.resizable = False
+               self.orderable = True
                for i in xrange(len(self.data)):
                   itemname = "%s[%d]" % (self.name, i)
                   itemdata = self.data[i]
@@ -136,6 +140,7 @@ if not NoUI:
 
             elif isinstance(self.type, das.schematypes.Set):
                self.resizable = True
+               self.orderable = False
                i = 0
                for itemdata in self.data:
                   itemname = "%s[%d]" % (self.name, i)
@@ -144,8 +149,10 @@ if not NoUI:
 
             elif isinstance(self.type, (das.schematypes.Struct, das.schematypes.StaticDict)):
                self.resizable = False
+               self.orderable = False
                self.mapping = True
                self.mappingkeys = {}
+               self.uniformmapping = False
                for k, t in self.type.iteritems():
                   if isinstance(t, das.schematypes.Alias):
                      continue
@@ -161,8 +168,10 @@ if not NoUI:
 
             elif isinstance(self.type, (das.schematypes.Dict, das.schematypes.DynamicDict)):
                self.resizable = True
+               self.orderable = False
                self.mapping = True
                self.mappingkeytype = self.type.ktype
+               self.uniformmapping = (len(self.type.vtypeOverrides) == 0)
                i = 0
                dkeys = [x for x in self.data.iterkeys()]
                for k in sorted(dkeys):
@@ -259,6 +268,7 @@ if not NoUI:
       def createEditor(self, parent, viewOptions, modelIndex):
          item = modelIndex.internalPointer()
          rv = None
+         # Beware of column
          if item.editable:
             if item.multi:
                rv = self.createOrEditor(parent, item)
@@ -502,6 +512,7 @@ if not NoUI:
             else:
                fld = widget
             fld.setText(str(item.data))
+            # set focus and selection on field
 
       def setFltEditorData(self, widget, item):
          if item.type.min is not None and item.type.max is not None:
@@ -511,6 +522,7 @@ if not NoUI:
          else:
             fld = widget
          fld.setText(str(item.data))
+         # set focus and selection on field
 
       def setStrEditorData(self, widget, item):
          if item.type.choices is not None:
@@ -638,6 +650,30 @@ if not NoUI:
          else:
             return None
 
+      def findIndex(self, s):
+         spl = s.split(".")
+         cnt = len(spl)
+         idx = 0
+         parentIndex = QtCore.QModelIndex()
+         curKey = ""
+         while idx < len(spl):
+            curKey = curKey + ("." if curKey else "") + spl[idx]
+            nr = self.rowCount(parentIndex)
+            for r in xrange(nr):
+               index = self.index(r, 0, parentIndex)
+               if index.isValid():
+                  item = index.internalPointer()
+                  if item.name == curKey:
+                     parentIndex = index
+                     curKey = ""
+                     break
+            idx += 1
+         if curKey:
+            print("Can't find index for '%s'" % s)
+            return None
+         else:
+            return parentIndex
+
       def rebuild(self):
          self.beginResetModel()
          self._buildItemsTree()
@@ -645,21 +681,28 @@ if not NoUI:
 
       def flags(self, index):
          if not index.isValid():
-            return QtCore.Qt.ItemNoFlags
+            return QtCore.Qt.NoItemFlags
          else:
-            flags = QtCore.Qt.NoItemFlags
-            flags = flags | QtCore.Qt.ItemIsSelectable
-            # disable values for compount types
-            #flags = flags | QtCore.Qt.ItemIsEnabled
+            flags = QtCore.Qt.ItemIsSelectable
             item = index.internalPointer()
+
+            if item.parent and not item.parent.mapping and item.parent.orderable:
+               flags = flags | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsDropEnabled
+
+            if item.compound  and not item.mapping and item.orderable:
+               flags = flags | QtCore.Qt.ItemIsDropEnabled
+
             if index.column() == 0:
                flags = flags | QtCore.Qt.ItemIsEnabled
                # flags = flags | QtCore.Qt.ItemIsUserCheckable
-               if item.mappingkeytype is not None:
-                  flags = flags | QtCore.Qt.ItemIsEditable
+               if item.parent:
+                  if item.parent.mapping and item.parent.mappingkeytype is not None:
+                     flags = flags | QtCore.Qt.ItemIsEditable
+
             elif index.column() == 1:
                if not item.compound:
                   flags = flags | QtCore.Qt.ItemIsEnabled
+               # any other cases?
                if item.editable:
                   flags = flags | QtCore.Qt.ItemIsEditable
                
@@ -696,7 +739,6 @@ if not NoUI:
             if item.parent is None:
                return QtCore.QModelIndex()
             else:
-               #return self.createIndex(item.parent.row, index.column(), item.parent)
                return self.createIndex(item.parent.row, 0, item.parent)
 
       def index(self, row, col, parentIndex):
@@ -845,6 +887,85 @@ if not NoUI:
       def columnCount(self, index):
          return len(self._headers)
 
+      def supportedDragActions(self):
+         return QtCore.Qt.MoveAction
+
+      def supportedDropActions(self):
+         return QtCore.Qt.MoveAction
+
+      def mimeTypes(self):
+         return ["text/plain"]
+
+      def mimeData(self, indices):
+         sl = []
+         for index in indices:
+            sl.append(index.internalPointer().fullname())
+         data = QtCore.QMimeData()
+         data.setText("\n".join(sl))
+         return data
+
+      def dropMimeData(self, data, action, row, column, parentIndex):
+         if not data.hasFormat("text/plain"):
+            return False
+         elif action == QtCore.Qt.IgnoreAction:
+            return False
+
+         indices = []
+         for s in set(data.text().split("\n")):
+            index = self.findIndex(s.strip())
+            if index and index.isValid():
+               indices.append(index)
+
+         if len(indices) != 1:
+            return False
+
+         srcindex = indices[0]
+         srcitem = srcindex.internalPointer()
+
+         if row == -1 and column == -1:
+            # Dropped on an item
+            tgtindex = parentIndex
+            tgtitem = tgtindex.internalPointer()
+            if tgtitem == srcitem.parent:
+               # Move element to last position
+               seq = tgtitem.data
+               if not tgtitem.resizable:
+                  seq = list(seq)
+               tgtitem.data = tgtitem.data[:srcitem.row] + tgtitem.data[srcitem.row+1:] + [srcitem.data]
+               self.rebuild()
+               self.internallyRebuilt.emit()
+            elif tgtitem.parent == srcitem.parent:
+               # Copy element data
+               data = das.copy(srcitem.data)
+               das.pprint(data)
+               self.setData(tgtindex, data, QtCore.Qt.EditRole)
+            else:
+               return False
+
+         else:
+            # Dropped between 2 items
+            tgtindex = self.index(row, column, parentIndex)
+            tgtitem = tgtindex.internalPointer()
+            if tgtitem.parent == srcitem.parent:
+               # Move element before tgtindex
+               pitem = srcitem.parent
+               seq = pitem.data
+               if not pitem.resizable:
+                  seq = list(seq)
+               # remove source element from sequence
+               seq = seq[:srcitem:row] + seq[srcitem.row+1:]
+               idx = tgtitem.row
+               if tgtitem.row > srcitem.row:
+                  idx -= 1
+               seq.insert(idx, srcitem.data)
+               pitem.data = seq
+               self.rebuild()
+               self.internallyRebuilt.emit()
+            else:
+               return False
+
+         return True
+
 
    class Editor(QtWidgets.QTreeView):
       def __init__(self, data, parent=None):
@@ -863,6 +984,9 @@ if not NoUI:
          self.setRootIsDecorated(True)
          self.setSortingEnabled(False)
          # self.setUniformRowHeights(True)
+         self.setDragEnabled(True)
+         self.setAcceptDrops(True)
+         self.setDropIndicatorShown(True)
          self.model.internallyRebuilt.connect(self.restoreExpandedState)
          self.model.dataChanged.connect(self.onContentChanged)
          self.collapsed.connect(self.onItemCollapsed)
