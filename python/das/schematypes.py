@@ -164,8 +164,10 @@ class String(TypeValidator):
       if choices is None and matches is not None:
          if isinstance(matches, basestring):
             self.matches = re.compile(matches)
-         else:
+         elif isinstance(matches, re._pattern_type):
             self.matches = matches
+         else:
+            raise Exception("String schema type 'matches' option must be a string or a compiled regular expression")
 
    def _validate_self(self, value):
       if not isinstance(value, basestring):
@@ -218,7 +220,7 @@ class String(TypeValidator):
          s += ", strict=%s" % self.strict
          sep = ", "
       if self.matches is not None:
-         s += ", matches=%s" % (sep, repr(self.matches))
+         s += ", matches=%s" % (sep, repr(self.matches.pattern))
       return s + ")"
 
 
