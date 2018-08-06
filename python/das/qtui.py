@@ -268,22 +268,42 @@ if not NoUI:
       def createEditor(self, parent, viewOptions, modelIndex):
          item = modelIndex.internalPointer()
          rv = None
-         # Beware of column
-         if item.editable:
-            if item.multi:
-               rv = self.createOrEditor(parent, item)
+         if modelIndex.column() == 0:
+            if item.parent and item.parent.mapping and item.parent.mappingkeytype is not None:
+               rv = self.createMappingKeyEditor(parent, item)
+         elif modelIndex.column() == 1:
+            if item.editable:
+               if item.multi:
+                  rv = self.createOrEditor(parent, item)
+               else:
+                  if isinstance(item.type, das.schematypes.Boolean):
+                     rv = self.createBoolEditor(parent, item)
+                  elif isinstance(item.type, das.schematypes.Integer):
+                     rv = self.createIntEditor(parent, item)
+                  elif isinstance(item.type, das.schematypes.Real):
+                     rv = self.createFltEditor(parent, item)
+                  elif isinstance(item.type, das.schematypes.String):
+                     rv = self.createStrEditor(parent, item)
+                  elif isinstance(item.type, das.schematypes.Class):
+                     rv = self.createClassEditor(parent, item)
+                  # Ignore 'Empty' and 'Alias'
+         return rv
+
+      def createMappingKeyEditor(self, parent, item):
+         rv = QtWidgets.QLineEdit(parent)
+         def textChanged(txt):
+            try:
+               val = eval(txt)
+               newkey = das.copy(item.key)
+               newkey = val
+            except Exception, e:
+               item.invalid = True
+               item.errmsg = "Invalid value for item key '%s': %s" % (item.fullname(), e)
             else:
-               if isinstance(item.type, das.schematypes.Boolean):
-                  rv = self.createBoolEditor(parent, item)
-               elif isinstance(item.type, das.schematypes.Integer):
-                  rv = self.createIntEditor(parent, item)
-               elif isinstance(item.type, das.schematypes.Real):
-                  rv = self.createFltEditor(parent, item)
-               elif isinstance(item.type, das.schematypes.String):
-                  rv = self.createStrEditor(parent, item)
-               elif isinstance(item.type, das.schematypes.Class):
-                  rv = self.createClassEditor(parent, item)
-               # Ignore 'Empty' and 'Alias'
+               item.invalid = False
+         rv.textChanged.connect(textChanged)
+         rv.setProperty("setEditorData", self.setMappingKeyEditorData)
+         rv.setProperty("setModelData", self.setMappingKeyModelData)
          return rv
 
       def createOrEditor(self, parent, item):
@@ -291,7 +311,7 @@ if not NoUI:
          def textChanged(txt):
             item.invalid = (len(self._getValidOrValues(txt, item)) == 0)
             if item.invalid:
-               item.errmsg = "Invalid value for item '%s': Doesn't match any of the eligible types" % (item.fullname(), e)
+               item.errmsg = "Invalid value for item '%s': Doesn't match any of the eligible types" % item.fullname()
          rv.textChanged.connect(textChanged)
          rv.setProperty("setEditorData", self.setOrEditorData)
          rv.setProperty("setModelData", self.setOrModelData)
@@ -488,6 +508,9 @@ if not NoUI:
          if func:
             func(widget, item)
 
+      def setMappingKeyEditorData(self, widget, item):
+         widget.setText(str(item.key))
+
       def setOrEditorData(self, widget, item):
          if isinstance(item.data, bool):
             s = ("true" if item.data else "false")
@@ -549,6 +572,9 @@ if not NoUI:
          else:
             # Maybe emit a message?
             pass
+
+      def setMappingKeyModelData(self, widget, model, modelIndex):
+         model.setData(modelIndex, eval(widget.text()), QtCore.Qt.EditRole)
 
       def setOrModelData(self, widget, model, modelIndex):
          s = widget.text()
@@ -858,6 +884,7 @@ if not NoUI:
          elif role == QtCore.Qt.EditRole:
             if index.column() == 0:
                # except for Dict keys!
+               print("Set key value!")
                return False
 
             structureChanged = self._setRawData(index, value)
