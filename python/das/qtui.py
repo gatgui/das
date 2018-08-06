@@ -2,6 +2,7 @@ import das
 import math
 
 NoUI = False
+Debug = True
 
 try:
    import Qt
@@ -39,7 +40,7 @@ if not NoUI:
          k = ""
          item = self
          while item:
-            suffix = ("" if k is None else (".%s" % k))
+            suffix = ("" if not k else (".%s" % k))
             k = item.name + suffix
             item = item.parent
          return k
@@ -100,77 +101,76 @@ if not NoUI:
          self.multi = False
          self.data = data
          self.type = type
-         self.invalid = True
+         self.invalid = False
+         self.errmsg = ""
 
-         if self.data is not None:
+         if self.type is None and self.data is not None:
+            self.type = self.data._get_schema_type()
             if self.type is None:
-               self.type = self.data._get_schema_type()
-               if self.type is None:
-                  raise Exception("No schema type for model item")
+               raise Exception("No schema type for model item")
 
-            self.invalid = False
+         self.optional = isinstance(self.type, das.schematypes.Optional)
 
-            self.optional = isinstance(self.type, das.schematypes.Optional)
+         self.type = self.real_type(self.type)
 
-            self.type = self.real_type(self.type)
+         self.multi = isinstance(self.type, das.schematypes.Or)
 
-            self.multi = isinstance(self.type, das.schematypes.Or)
+         self.editable = self.is_editable(self.type)
 
-            self.editable = self.is_editable(self.type)
+         self.compound = self.is_compound(self.type)
 
-            self.compound = self.is_compound(self.type)
+         if self.compound:
+            if isinstance(self.type, das.schematypes.Sequence):
+               self.resizable = True
+               for i in xrange(len(self.data)):
+                  itemname = "%s[%d]" % (self.name, i)
+                  itemdata = self.data[i]
+                  self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i))
 
-            if self.compound:
-               if isinstance(self.type, das.schematypes.Sequence):
-                  self.resizable = True
-                  for i in xrange(len(self.data)):
-                     itemname = "%s[%d]" % (self.name, i)
-                     itemdata = self.data[i]
-                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i))
+            elif isinstance(self.type, das.schematypes.Tuple):
+               self.resizable = False
+               for i in xrange(len(self.data)):
+                  itemname = "%s[%d]" % (self.name, i)
+                  itemdata = self.data[i]
+                  self.children.append(ModelItem(itemname, itemdata, type=self.type.types[i], parent=self, row=i))
 
-               elif isinstance(self.type, das.schematypes.Tuple):
-                  self.resizable = False
-                  for i in xrange(len(self.data)):
-                     itemname = "%s[%d]" % (self.name, i)
-                     itemdata = self.data[i]
-                     self.children.append(ModelItem(itemname, itemdata, type=self.type.types[i], parent=self, row=i))
+            elif isinstance(self.type, das.schematypes.Set):
+               self.resizable = True
+               i = 0
+               for itemdata in self.data:
+                  itemname = "%s[%d]" % (self.name, i)
+                  self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i))
+                  i += 1
 
-               elif isinstance(self.type, das.schematypes.Set):
-                  self.resizable = True
-                  i = 0
-                  for itemdata in self.data:
-                     itemname = "%s[%d]" % (self.name, i)
-                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i))
-                     i += 1
+            elif isinstance(self.type, (das.schematypes.Struct, das.schematypes.StaticDict)):
+               self.resizable = False
+               self.mapping = True
+               self.mappingkeys = {}
+               for k, t in self.type.iteritems():
+                  if isinstance(t, das.schematypes.Alias):
+                     continue
+                  optional = isinstance(t, das.schematypes.Optional)
+                  self.mappingkeys[k] = optional
+                  if optional:
+                     self.resizable = True
+               i = 0
+               for k in sorted([x for x in self.data.iterkeys()]):
+                  v = self.data[k]
+                  self.children.append(ModelItem(k, v, type=self.type[k], parent=self, row=i, key=k))
+                  i += 1
 
-               elif isinstance(self.type, (das.schematypes.Struct, das.schematypes.StaticDict)):
-                  self.resizable = False
-                  self.mapping = True
-                  self.mappingkeys = {}
-                  for k, t in self.type.iteritems():
-                     if isinstance(t, das.schematypes.Alias):
-                        continue
-                     optional = isinstance(t, das.schematypes.Optional)
-                     self.mappingkeys[k] = optional
-                     if optional:
-                        self.resizable = True
-                  i = 0
-                  for k in sorted([x for x in self.data.iterkeys()]):
-                     v = self.data[k]
-                     self.children.append(ModelItem(k, v, type=self.type[k], parent=self, row=i, key=k))
-                     i += 1
-
-               elif isinstance(self.type, (das.schematypes.Dict, das.schematypes.DynamicDict)):
-                  self.resizable = True
-                  self.mapping = True
-                  self.mappingkeytype = self.type.ktype
-                  i = 0
-                  for k in sorted([x for x in self.data.iterkeys()]):
-                     v = self.data[k]
-                     ks = str(k)
-                     vtype = self.type.vtypeOverrides.get(k, self.type.vtype)
-                     self.children.append(ModelItem(ks, v, type=vtype, parent=self, row=i, key=k))
-                     i += 1
+            elif isinstance(self.type, (das.schematypes.Dict, das.schematypes.DynamicDict)):
+               self.resizable = True
+               self.mapping = True
+               self.mappingkeytype = self.type.ktype
+               i = 0
+               dkeys = [x for x in self.data.iterkeys()]
+               for k in sorted(dkeys):
+                  v = self.data[k]
+                  ks = str(k)
+                  vtype = self.type.vtypeOverrides.get(k, self.type.vtype)
+                  self.children.append(ModelItem(ks, v, type=vtype, parent=self, row=i, key=k))
+                  i += 1
 
 
    class OrTypeChoiceDialog(QtWidgets.QDialog):
@@ -179,9 +179,9 @@ if not NoUI:
          self.typename = None
          self.buttons = []
          layout = QtWidgets.QVBoxLayout()
-         label = QtWidgets.QLabel("There are several eligible types for the inputed data.\nPlease select desired one from the list:", self)
+         label = QtWidgets.QLabel("Inputed value matches several types.\nPlease specify the one you want:", self)
          layout.addWidget(label, 0)
-         group = QtWidgets.QGroupBox("Eligible types", self)
+         group = QtWidgets.QGroupBox(self)
          groupl = QtWidgets.QVBoxLayout()
          for choice in choices:
             rbtn = QtWidgets.QRadioButton(choice, group)
@@ -202,7 +202,6 @@ if not NoUI:
          cancelbtn.clicked.connect(self.reject)
 
       def accept(self):
-         print("OrTypeChoiceDialog.accept")
          self.typename = None
          for b in self.buttons:
             if b.isChecked():
@@ -211,20 +210,51 @@ if not NoUI:
          super(OrTypeChoiceDialog, self).accept()
 
       def reject(self):
-         print("OrTypeChoiceDialog.reject")
          self.typename = None
          super(OrTypeChoiceDialog, self).reject()
-
-      # def done(self, r):
-      #    if r == QtWidgets.QDialog.Rejected:
-      #       self.reject()
-      #    else:
-      #       self.accept()
 
 
    class ModelItemDelegate(QtWidgets.QItemDelegate):
       def __init__(self, parent=None):
          super(ModelItemDelegate, self).__init__(parent)
+
+      def _getValidOrValues(self, s, item):
+         values = []
+
+         for t in item.type.types:
+            if isinstance(t, das.schematypes.Empty):
+               if s.lower() == "none":
+                  values.append(("empty", None))
+            elif isinstance(t, das.schematypes.Boolean):
+               if s.lower() in ("on", "yes", "true", "off", "no", "false"):
+                  v = (s.lower() in ("on", "yes", "true"))
+                  values.append(("boolean", v))
+            elif isinstance(t, das.schematypes.Integer):
+               try:
+                  v = long(s)
+                  values.append(("integer", v))
+               except:
+                  pass
+            elif isinstance(t, das.schematypes.Real):
+               try:
+                  v = float(s)
+                  values.append(("real", v))
+               except:
+                  pass
+            elif isinstance(t, das.schematypes.String):
+               try:
+                  values.append(("string", s))
+               except:
+                  pass
+            elif isinstance(t, das.schematypes.Class):
+               try:
+                  v = item.data.copy()
+                  v.string_to_value(s)
+                  values.append(("class", v))
+               except:
+                  pass
+
+         return values
 
       def createEditor(self, parent, viewOptions, modelIndex):
          item = modelIndex.internalPointer()
@@ -249,8 +279,9 @@ if not NoUI:
       def createOrEditor(self, parent, item):
          rv = QtWidgets.QLineEdit(parent)
          def textChanged(txt):
-            # Check if it matches any of the Or types
-            item.invalid = False
+            item.invalid = (len(self._getValidOrValues(txt, item)) == 0)
+            if item.invalid:
+               item.errmsg = "Invalid value for item '%s': Doesn't match any of the eligible types" % (item.fullname(), e)
          rv.textChanged.connect(textChanged)
          rv.setProperty("setEditorData", self.setOrEditorData)
          rv.setProperty("setModelData", self.setOrModelData)
@@ -285,6 +316,14 @@ if not NoUI:
             def textChanged(txt):
                try:
                   val = int(txt)
+               except Exception, e:
+                  item.invalid = True
+                  item.errmsg = "Invalid value for item '%s': %s" % (item.fullname(), e)
+                  # if text is not empty, reset to slider value
+                  if txt:
+                     fld.setText(str(sld.value()))
+               else:
+                  item.invalid = False
                   if val < item.type.min:
                      val = item.type.min
                      fld.blockSignals(True)
@@ -298,24 +337,26 @@ if not NoUI:
                   sld.blockSignals(True)
                   sld.setValue(val)
                   sld.blockSignals(False)
-                  item.invalid = False
-               except:
-                  item.invalid = True
             def sliderChanged(val):
+               item.invalid = False
                fld.blockSignals(True)
                fld.setText(str(val))
                fld.blockSignals(False)
-               item.invalid = False
             sld.valueChanged.connect(sliderChanged)
             fld.textChanged.connect(textChanged)
          else:
             rv = QtWidgets.QLineEdit(parent)
             def textChanged(txt):
                try:
-                  val = int(txt)
-                  item.invalid = False
-               except:
+                  int(txt)
+               except Exception, e:
                   item.invalid = True
+                  item.errmsg = "Invalid value for item '%s': %s" % (item.fullname(), e)
+                  # if text is not empty, reset to original value
+                  if txt:
+                     rv.setText(str(item.data))
+               else:
+                  item.invalid = False
             rv.textChanged.connect(textChanged)
          rv.setProperty("setEditorData", self.setIntEditorData)
          rv.setProperty("setModelData", self.setIntModelData)
@@ -343,6 +384,14 @@ if not NoUI:
             def textChanged(txt):
                try:
                   val = float(txt)
+               except Exception, e:
+                  item.invalid = True
+                  item.errmsg = "Invalid value for item '%s': %s" % (item.fullname(), e)
+                  # if text is not empty, reset to slider value
+                  if txt:
+                     fld.setText(str(sld.value() / self.sldscl))
+               else:
+                  item.invalid = False
                   if val < item.type.min:
                      val = item.type.min
                      fld.blockSignals(True)
@@ -356,9 +405,6 @@ if not NoUI:
                   sld.blockSignals(True)
                   sld.setValue(int(math.floor(0.5 + val * self.sldscl)))
                   sld.blockSignals(False)
-                  item.invalid = False
-               except:
-                  item.invalid = True
             def sliderChanged(val):
                # as we round down slider min value and round up slider max value
                # we may need to adjust here
@@ -377,10 +423,15 @@ if not NoUI:
             rv = QtWidgets.QLineEdit(parent)
             def textChanged(txt):
                try:
-                  val = float(txt)
-                  item.invalid = False
-               except:
+                  float(txt)
+               except Exception, e:
                   item.invalid = True
+                  item.errmsg = "Invalid value for item '%s': %s" % (item.fullname(), e)
+                  # if text is not empty, reset to original value
+                  if txt:
+                     rv.setText(str(item.data))
+               else:
+                  item.invalid = False
             rv.textChanged.connect(textChanged)
          rv.setProperty("setEditorData", self.setFltEditorData)
          rv.setProperty("setModelData", self.setFltModelData)
@@ -395,7 +446,9 @@ if not NoUI:
             rv = QtWidgets.QLineEdit(parent)
             def textChanged(txt):
                if item.type.matches is not None:
-                  item.invalid = (not item.type.matches(txt))
+                  item.invalid = (not item.type.matches.match(txt))
+                  if item.invalid:
+                     item.errmsg = "Invalid value for item '%s': Does't match '%s'" % (item.fullname(), item.type.matches.pattern)
                else:
                   item.invalid = False
             rv.textChanged.connect(textChanged)
@@ -406,11 +459,13 @@ if not NoUI:
       def createClassEditor(self, parent, item):
          rv = QtWidgets.QLineEdit(parent)
          def textChanged(txt):
-            # try:
-            #    item.data.string_to_value()
-            # except:
-            #    pass
-            pass
+            try:
+               item.data.copy().string_to_value(txt)
+            except Exception, e:
+               item.invalid = True
+               item.errmsg = "Invalid class value for item %s: %s" % (item.fullname(), e)
+            else:
+               item.invalid = False
          rv.textChanged.connect(textChanged)
          rv.setProperty("setEditorData", self.setClassEditorData)
          rv.setProperty("setModelData", self.setClassModelData)
@@ -478,45 +533,15 @@ if not NoUI:
             func = widget.property("setModelData")
             if func:
                func(widget, model, modelIndex)
+         else:
+            # Maybe emit a message?
+            pass
 
       def setOrModelData(self, widget, model, modelIndex):
          s = widget.text()
 
          item = modelIndex.internalPointer()
-         values = []
-
-         for t in item.type.types:
-            if isinstance(t, das.schematypes.Empty):
-               if s.lower() == "none":
-                  values.append(("empty", None))
-            elif isinstance(t, das.schematypes.Boolean):
-               if s.lower() in ("on", "yes", "true", "off", "no", "false"):
-                  v = (s.lower() in ("on", "yes", "true"))
-                  values.append(("boolean", v))
-            elif isinstance(t, das.schematypes.Integer):
-               try:
-                  v = long(s)
-                  values.append(("integer", v))
-               except:
-                  pass
-            elif isinstance(t, das.schematypes.Real):
-               try:
-                  v = float(s)
-                  values.append(("real", v))
-               except:
-                  pass
-            elif isinstance(t, das.schematypes.String):
-               try:
-                  values.append(("string", s))
-               except:
-                  pass
-            elif isinstance(t, das.schematypes.Class):
-               try:
-                  v = item.data.copy()
-                  v.string_to_value(s)
-                  values.append(("class", v))
-               except:
-                  pass
+         values = self._getValidOrValues(s, item)
 
          if len(values) > 1:
             idx = -1
@@ -670,7 +695,8 @@ if not NoUI:
             if item.parent is None:
                return QtCore.QModelIndex()
             else:
-               return self.createIndex(item.parent.row, index.column(), item.parent)
+               #return self.createIndex(item.parent.row, index.column(), item.parent)
+               return self.createIndex(item.parent.row, 0, item.parent)
 
       def index(self, row, col, parentIndex):
          if not parentIndex.isValid():
@@ -734,6 +760,38 @@ if not NoUI:
 
          return rv
 
+      def _setRawData(self, index, value):
+         structureChanged = False
+         item = index.internalPointer()
+
+         oldvalue = item.data
+         try:
+            item.data = value
+         except Exception, e:
+            print("Try to set invalid value to '%s'" % item.fullname())
+         else:
+            # Check whether we need to replace data reference in parent item, if any
+            # (note: tuple are immutable)
+            if item.parent is not None and (not item.compound or isinstance(item.type, das.schematypes.Tuple)):
+               if item.parent.mapping:
+                  item.parent.data[item.key] = item.data
+               elif item.parent.resizable:
+                  if isinstance(item.parent.type, das.schematypes.Sequence):
+                     item.parent.data[item.row] = item.data
+                  else:
+                     item.parent.data.remove(oldvalue)
+                     item.parent.data.add(item.data)
+               else:
+                  seq = list(item.parent.data)
+                  seq[item.row] = item.data
+                  #self.setData(self.parent(index), das.types.Tuple(seq), role)
+                  self._setRawData(self.parent(index), das.types.Tuple(seq))
+               # Force rebuild
+               # (note: not necessary all the time, but to simplify logic)
+               structureChanged = True
+
+         return structureChanged
+
       def setData(self, index, value, role):
          if not index.isValid():
             return False
@@ -750,33 +808,10 @@ if not NoUI:
                # except for Dict keys!
                return False
 
-            structureChanged = False
-            item = index.internalPointer()
+            structureChanged = self._setRawData(index, value)
 
-            oldvalue = item.data
-            try:
-               item.data = value
-            except Exception, e:
-               print("Try to set invalid value to '%s'" % item.fullname())
-            else:
-               # Check whether we need to replace data reference in parent item, if any
-               # (note: tuple are immutable)
-               if item.parent is not None and (not item.compound or isinstance(item.type, das.schematypes.Tuple)):
-                  if item.parent.mapping:
-                     item.parent.data[item.key] = item.data
-                  elif item.parent.resizable:
-                     if isinstance(item.parent.type, das.schematypes.Sequence):
-                        item.parent.data[item.row] = item.data
-                     else:
-                        item.parent.data.remove(oldvalue)
-                        item.parent.data.add(item.data)
-                  else:
-                     seq = list(item.parent.data)
-                     seq[item.row] = item.data
-                     self.setData(self.parent(index), das.types.Tuple(seq), role)
-                  # Force rebuild
-                  # (note: not necessary all the time, but to simplify logic)
-                  structureChanged = True
+            if Debug:
+               das.pprint(self._data)
 
             self.dataChanged.emit(index, index)
 
@@ -865,7 +900,7 @@ if not NoUI:
 
          nr = self.model.rowCount(index)
          for r in xrange(nr):
-            self.restoreExpandedState(index=self.model.index(r, 0, index))
+            self.resetExpandedState(index=self.model.index(r, 0, index))
 
       def restoreExpandedState(self, index=None):
          if index is None:
