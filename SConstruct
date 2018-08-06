@@ -17,6 +17,7 @@ prjs = [
    {  "name": "das",
       "type": "install",
       "install": {
+         "bin": excons.glob("bin/dasedit*"),
          "python/das": excons.glob("python/das/*.py"),
          "python/das/importlib-1.0.4": excons.glob("python/das/importlib-1.0.4/*")
       }
@@ -25,8 +26,10 @@ prjs = [
 
 excons.DeclareTargets(env, prjs)
 
-targets = {"das": Glob(excons.OutputBaseDirectory() + "/python/*")}
-ecodirs = {"das": "/python"}
+targets = {"das": Glob(excons.OutputBaseDirectory() + "/python/*"),
+           "bin": Glob(excons.OutputBaseDirectory() + "/bin/*")}
+ecodirs = {"das": "/python",
+           "bin": "/bin"}
 excons.EcosystemDist(env, "das.env", ecodirs, version=version, targets=targets)
 
 Default(["das"])
