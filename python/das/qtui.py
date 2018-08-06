@@ -296,7 +296,8 @@ if not NoUI:
       def createIntEditor(self, parent, item):
          if item.type.enum is not None:
             rv = QtWidgets.QComboBox(parent)
-            for k, v in item.type.enum.iteritems():
+            for k in sorted(item.type.enum.keys()):
+               v = item.type.enum[k]
                rv.addItem(k, userData=v)
          elif item.type.min is not None and item.type.max is not None:
             rv = QtWidgets.QFrame(parent)
@@ -440,7 +441,7 @@ if not NoUI:
       def createStrEditor(self, parent, item):
          if item.type.choices is not None:
             rv = QtWidgets.QComboBox(parent)
-            rv.addItems(item.type.choices)
+            rv.addItems(sorted(item.type.choices))
             rv.setEditable(not item.type.strict)
          else:
             rv = QtWidgets.QLineEdit(parent)
@@ -747,9 +748,18 @@ if not NoUI:
                   elif hasattr(item.data, "value_to_string"):
                      rv = item.data.value_to_string()
                   else:
-                     rv = str(item.data)
-                     if isinstance(item.data, (bool, type(None))):
-                        rv = rv.lower()
+                     if isinstance(item.type, das.schematypes.Integer) and item.type.enum is not None:
+                        for k, v in item.type.enum.iteritems():
+                           if v == item.data:
+                              rv = k
+                              break
+                        # just for safety
+                        if rv is None:
+                           rv = str(item.data)
+                     else:
+                        rv = str(item.data)
+                        if isinstance(item.data, (bool, type(None))):
+                           rv = rv.lower()
                else:
                   rv = item.data
             else:
