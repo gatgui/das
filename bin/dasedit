@@ -80,8 +80,6 @@ if __name__ == "__main__":
       echo_only = True
 
    if not echo_only:
-      from Qt import QtCore
-      from Qt import QtGui
       from Qt import QtWidgets
       import das.qtui
 
@@ -142,7 +140,7 @@ if __name__ == "__main__":
          def onAbout(self):
             pass
 
-      app = QtGui.QApplication([sys.argv[0]])
+      app = QtWidgets.QApplication([sys.argv[0]])
       win = Window(data=data, path=file_path)
       win.show()
       app.exec_()

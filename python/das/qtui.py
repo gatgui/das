@@ -375,6 +375,7 @@ if not NoUI:
                fld.blockSignals(False)
             sld.valueChanged.connect(sliderChanged)
             fld.textChanged.connect(textChanged)
+            #fld.setFocus(QtCore.Qt.OtherFocusReason)
          else:
             rv = QtWidgets.QLineEdit(parent)
             def textChanged(txt):
@@ -450,6 +451,7 @@ if not NoUI:
                item.invalid = False
             sld.valueChanged.connect(sliderChanged)
             fld.textChanged.connect(textChanged)
+            #fld.setFocus(QtCore.Qt.OtherFocusReason)
          else:
             rv = QtWidgets.QLineEdit(parent)
             def textChanged(txt):
@@ -535,7 +537,8 @@ if not NoUI:
             else:
                fld = widget
             fld.setText(str(item.data))
-            # set focus and selection on field
+            fld.selectAll()
+            #fld.setFocus(QtCore.Qt.OtherFocusReason)
 
       def setFltEditorData(self, widget, item):
          if item.type.min is not None and item.type.max is not None:
@@ -545,7 +548,8 @@ if not NoUI:
          else:
             fld = widget
          fld.setText(str(item.data))
-         # set focus and selection on field
+         fld.selectAll()
+         #fld.setFocus(QtCore.Qt.OtherFocusReason)
 
       def setStrEditorData(self, widget, item):
          if item.type.choices is not None:
@@ -958,14 +962,14 @@ if not NoUI:
                seq = tgtitem.data
                if not tgtitem.resizable:
                   seq = list(seq)
-               tgtitem.data = tgtitem.data[:srcitem.row] + tgtitem.data[srcitem.row+1:] + [srcitem.data]
+               tgtitem.data = seq[:srcitem.row] + seq[srcitem.row+1:] + [srcitem.data]
                self.rebuild()
                self.internallyRebuilt.emit()
             elif tgtitem.parent == srcitem.parent:
                # Copy element data
+               index = self.index(tgtindex.row(), 1, self.parent(tgtindex))
                data = das.copy(srcitem.data)
-               das.pprint(data)
-               self.setData(tgtindex, data, QtCore.Qt.EditRole)
+               self.setData(index, data, QtCore.Qt.EditRole)
             else:
                return False
 
@@ -1023,7 +1027,7 @@ if not NoUI:
          if event.button() == QtCore.Qt.RightButton:
             event.accept()
             menu = QtWidgets.QMenu(self)
-            gpos = QtWidgets.QCursor.pos()
+            gpos = QtGui.QCursor.pos()
             pos = self.viewport().mapFromGlobal(gpos)
             modelIndex = self.indexAt(pos)
             item = (None if (modelIndex is None or not modelIndex.isValid()) else modelIndex.internalPointer())
