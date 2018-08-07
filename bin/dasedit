@@ -124,9 +124,13 @@ if __name__ == "__main__":
             layout.setContentsMargins(10, 10, 10, 10)
             layout.setSpacing(5)
             self.editWidget = das.qtui.Editor(data, parent=centralWidget)
-            layout.addWidget(self.editWidget)
+            self.infoLabel = QtWidgets.QLabel("", parent=centralWidget)
+            layout.addWidget(self.editWidget, 1)
+            layout.addWidget(self.infoLabel)
             centralWidget.setLayout(layout)
             self.setCentralWidget(centralWidget)
+            self.editWidget.messageChanged.connect(self.onMessageChanged)
+            self.editWidget.modelUpdated.connect(self.onModelUpdated)
 
          def onOpen(self):
             pass
@@ -139,6 +143,16 @@ if __name__ == "__main__":
 
          def onAbout(self):
             pass
+
+         def onMessageChanged(self, msg):
+            self.infoLabel.setText(msg)
+
+         def onModelUpdated(self, model):
+            if verbose:
+               print("Model changed? %s" % model.hasDataChanged())
+               if model.hasDataChanged():
+                  das.pprint(model.getData())
+
 
       app = QtWidgets.QApplication([sys.argv[0]])
       win = Window(data=data, path=file_path)

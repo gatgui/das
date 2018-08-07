@@ -2,7 +2,6 @@ import das
 import math
 
 NoUI = False
-Debug = True
 
 try:
    import Qt
@@ -429,7 +428,7 @@ if not NoUI:
       def createIntEditor(self, parent, item):
          if item.type.enum is not None:
             rv = QtWidgets.QComboBox(parent)
-            for k in sorted(item.type.enum.keys()):
+            for k in sorted(item.type.enum.keys(), key=lambda x: item.type.enum[x]):
                v = item.type.enum[k]
                rv.addItem(k, userData=v)
          elif item.type.min is not None and item.type.max is not None:
@@ -486,7 +485,7 @@ if not NoUI:
       def createStrEditor(self, parent, item):
          if item.type.choices is not None:
             rv = QtWidgets.QComboBox(parent)
-            rv.addItems(sorted(item.type.choices))
+            rv.addItems(item.type.choices)
             rv.setEditable(not item.type.strict)
          else:
             rv = QtWidgets.QLineEdit(parent)
@@ -576,9 +575,10 @@ if not NoUI:
             func = widget.property("setModelData")
             if func:
                func(widget, model, modelIndex)
+            else:
+               model.setMessage("Cannot set model data")
          else:
-            # Maybe emit a message?
-            pass
+            model.setMessage(item.errmsg)
 
       def setMappingKeyModelData(self, widget, model, modelIndex):
          model.setData(modelIndex, eval(widget.text()), QtCore.Qt.EditRole)
@@ -588,6 +588,7 @@ if not NoUI:
 
          item = modelIndex.internalPointer()
          values = self._getValidOrValues(s, item)
+         msg = ""
 
          if len(values) > 1:
             idx = -1
@@ -597,12 +598,20 @@ if not NoUI:
                   if dlg.typename == values[i][0]:
                      idx = i
                      break
-            if idx != -1:
-               values = [values[idx]]
+               if idx != -1:
+                  values = [values[idx]]
+               else:
+                  msg = "No type selected"
+                  values = []
+            else:
+               msg = "No type selected"
+               values = []
 
          if len(values) == 1:
             _, v = values[0]
             model.setData(modelIndex, v, QtCore.Qt.EditRole)
+         else:
+            model.setMessage(msg)
 
       def setBoolModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
@@ -639,11 +648,8 @@ if not NoUI:
       def setClassModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
          data = item.data.copy()
-         try:
-            data.string_to_value(widget.text())
-            model.setData(modelIndex, data, QtCore.Qt.EditRole)
-         except:
-            pass
+         data.string_to_value(widget.text())
+         model.setData(modelIndex, data, QtCore.Qt.EditRole)
 
       def updateEditorGeometry(self, widget, viewOptions, modelIndex):
          widget.setGeometry(viewOptions.rect)
@@ -652,6 +658,7 @@ if not NoUI:
    class Model(QtCore.QAbstractItemModel):
       internallyRebuilt = QtCore.Signal()
       dataChanged2Args = QtCore.Signal(QtCore.QModelIndex, QtCore.QModelIndex)
+      messageChanged = QtCore.Signal(str)
 
       def __init__(self, data, parent=None):
          super(Model, self).__init__(parent)
@@ -663,6 +670,7 @@ if not NoUI:
          self._headers = ["Name", "Value"]
          self._rootItem = None
          self._orgData = None
+         self._message = ""
          self._buildItemsTree(data)
 
       def __emitDataChanged(self, index1, index2):
@@ -676,12 +684,29 @@ if not NoUI:
          elif data is not None:
             self._rootItem = ModelItem("<root>", data)
 
+      def getData(self):
+         return (None if self._rootItem is None else self._rootItem.data)
+
       def getIndexData(self, index):
          if index.isValid():
             item = index.internalPointer()
             return item.data
          else:
             return None
+
+      def message(self):
+         return self._message
+
+      def setMessage(self, msg):
+         self._message = msg
+         self.messageChanged.emit(msg)
+
+      def hasDataChanged(self):
+         return (False if self._rootItem is None else (self._rootItem.data != self._orgData))
+
+      def resetOrgData(self):
+         if self._rootItem:
+            self._orgData = das.copy(self._rootItem.data)
 
       def findIndex(self, s):
          spl = s.split(".")
@@ -754,13 +779,6 @@ if not NoUI:
             item = index.internalPointer()
             rv = (len(item.children) > 0)
          return rv
-
-      def getChildren(self, index):
-         if not index.isValid():
-            return ([] if self._rootItem is None else [self._rootItem])
-         else:
-            item = index.internalPointer()
-            return item.children
 
       def parent(self, index):
          if not index.isValid():
@@ -853,8 +871,9 @@ if not NoUI:
          try:
             item.data = value
          except Exception, e:
-            print("Try to set invalid value to '%s'" % item.fullname())
+            self.setMessage("Failed to set value on item '%s'" % item.fullname())
          else:
+            self.setMessage("")
             # Check whether we need to replace data reference in parent item, if any
             if item.parent is not None:
                if item.parent.mapping:
@@ -885,6 +904,7 @@ if not NoUI:
             # self.dataChanged.emit(index, index)
             # self.layoutChanged.emit()
             # return True
+            self.setMessage("")
             return False
 
          elif role == QtCore.Qt.EditRole:
@@ -893,9 +913,10 @@ if not NoUI:
                item = index.internalPointer()
                newkey = das.copy(item.key)
                newkey = value
+               self.setMessage("")
                if newkey != item.key:
                   if newkey in item.parent.data:
-                     print("Key %s already exists in item '%s'" % (value, item.parent.fullname()))
+                     self.setMessage("Key %s already exists in item '%s'" % (value, item.parent.fullname()))
                      return False
                   else:
                      item.parent.data[newkey] = item.data
@@ -905,9 +926,6 @@ if not NoUI:
                   return True
             else:
                structureChanged = self._setRawData(index, value)
-
-            if Debug:
-               das.pprint(self._rootItem.data)
 
             self.dataChanged.emit(index, index)
 
@@ -978,8 +996,7 @@ if not NoUI:
                # Build re-ordered sequence
                seq = seq[:srcitem.row] + seq[srcitem.row+1:] + [srcitem.data]
                self._setRawData(tgtindex, seq)
-               if Debug:
-                  das.pprint(self._rootItem.data)
+               self.dataChanged.emit(self.index(0, 1, tgtindex), self.index(self.rowCount(tgtindex)-1, 1, tgtindex))
                self.rebuild()
                self.internallyRebuilt.emit()
             elif tgtitem.parent == srcitem.parent:
@@ -996,6 +1013,7 @@ if not NoUI:
             tgtitem = tgtindex.internalPointer()
             if tgtitem.parent == srcitem.parent:
                # Move element before tgtindex
+               pindex = self.parent(tgtindex)
                pitem = srcitem.parent
                seq = pitem.data
                if not pitem.resizable:
@@ -1006,9 +1024,8 @@ if not NoUI:
                if tgtitem.row > srcitem.row:
                   idx -= 1
                seq.insert(idx, srcitem.data)
-               self._setRawData(self.parent(tgtindex), seq)
-               if Debug:
-                  das.pprint(self._rootItem.data)
+               self._setRawData(pindex, seq)
+               self.dataChanged.emit(tgtindex if (tgtitem.row < srcitem.row) else srcindex, self.index(self.rowCount(pindex)-1, 1, pindex))
                self.rebuild()
                self.internallyRebuilt.emit()
             else:
@@ -1018,6 +1035,9 @@ if not NoUI:
 
 
    class Editor(QtWidgets.QTreeView):
+      modelUpdated = QtCore.Signal(Model)
+      messageChanged = QtCore.Signal(str)
+
       def __init__(self, data, parent=None):
          super(Editor, self).__init__(parent)
          self.model = Model(data, parent=self)
@@ -1039,8 +1059,12 @@ if not NoUI:
          self.setDropIndicatorShown(True)
          self.model.internallyRebuilt.connect(self.restoreExpandedState)
          self.model.dataChanged.connect(self.onContentChanged)
+         self.model.messageChanged.connect(self.onMessageChanged)
          self.collapsed.connect(self.onItemCollapsed)
          self.expanded.connect(self.onItemExpanded)
+         index = QtCore.QModelIndex()
+         if self.model.rowCount(index) > 0:
+            self.setExpanded(self.model.index(0, 0, index), True)
 
       def mousePressEvent(self, event):
          if event.button() == QtCore.Qt.RightButton:
@@ -1168,4 +1192,10 @@ if not NoUI:
 
       def onContentChanged(self, topLeft, bottomRight):
          self.resetCheckedState()
+         # Forward signal
+         self.modelUpdated.emit(self.model)
+
+      def onMessageChanged(self, msg):
+         # Forward signal
+         self.messageChanged.emit(msg)
 
