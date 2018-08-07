@@ -183,7 +183,8 @@ if not NoUI:
 
    class OrTypeChoiceDialog(QtWidgets.QDialog):
       def __init__(self, choices, parent=None):
-         super(OrTypeChoiceDialog, self).__init__(parent)
+         super(OrTypeChoiceDialog, self).__init__(parent, QtCore.Qt.WindowTitleHint|QtCore.Qt.WindowSystemMenuHint)
+         self.setWindowTitle("Choose value type")
          self.typename = None
          self.buttons = []
          layout = QtWidgets.QVBoxLayout()
@@ -220,6 +221,42 @@ if not NoUI:
       def reject(self):
          self.typename = None
          super(OrTypeChoiceDialog, self).reject()
+
+
+   class NewValueDialog(QtWidgets.QDialog):
+      def __init__(self, vtype, excludes=None, name=None, parent=None):
+         super(NewValueDialog, self).__init__(parent, QtCore.Qt.WindowTitleHint|QtCore.Qt.WindowSystemMenuHint)
+         self.setWindowTitle("Create new value")
+         self.excludes = excludes
+         self.data = vtype.make_default()
+         self.editor = Editor(self.data, type=vtype, name=name, parent=self)
+         layout = QtWidgets.QVBoxLayout()
+         self.okbtn = QtWidgets.QPushButton("Ok", self)
+         self.okbtn.setEnabled(True if excludes is None else (self.data not in self.excludes))
+         cancelbtn = QtWidgets.QPushButton("Cancel", self)
+         btnl = QtWidgets.QHBoxLayout()
+         btnl.addWidget(self.okbtn, 1)
+         btnl.addWidget(cancelbtn, 1)
+         layout.addWidget(self.editor, 1)
+         layout.addLayout(btnl, 0)
+         self.setLayout(layout)
+         # Wire callbacks
+         self.editor.modelUpdated.connect(self.onDataChanged)
+         self.okbtn.clicked.connect(self.accept)
+         cancelbtn.clicked.connect(self.reject)
+
+      def onDataChanged(self, model):
+         self.data = model.getData()
+         if self.excludes is not None and self.data in self.excludes:
+            self.data = None
+         self.okbtn.setEnabled(self.data is not None)
+
+      def accept(self):
+         super(NewValueDialog, self).accept()
+
+      def reject(self):
+         self.data = None
+         super(NewValueDialog, self).reject()
 
 
    class FieldSlider(QtWidgets.QFrame):
@@ -660,7 +697,7 @@ if not NoUI:
       dataChanged2Args = QtCore.Signal(QtCore.QModelIndex, QtCore.QModelIndex)
       messageChanged = QtCore.Signal(str)
 
-      def __init__(self, data, parent=None):
+      def __init__(self, data, type=None, name=None, parent=None):
          super(Model, self).__init__(parent)
          # A little hacky but how else?
          if IsPySide2():
@@ -671,18 +708,23 @@ if not NoUI:
          self._rootItem = None
          self._orgData = None
          self._message = ""
-         self._buildItemsTree(data)
+         self._buildItemsTree(data=data, type=type, name=name)
 
       def __emitDataChanged(self, index1, index2):
          self._org_data_changed.emit(index1, index2, [])
 
-      def _buildItemsTree(self, data=None):
+      def _buildItemsTree(self, data=None, type=None, name=None):
          if data is not None:
             self._orgData = das.copy(data)
+         else:
+            type = None
          if self._rootItem:
-            self._rootItem.update(self._rootItem.data if data is None else data)
+            if data is None:
+               data = self._rootItem.data
+               type = self._rootItem.type
+            self._rootItem.update(data, type=type)
          elif data is not None:
-            self._rootItem = ModelItem("<root>", data)
+            self._rootItem = ModelItem("<root>" if name is None else name, data, type=type)
 
       def getData(self):
          return (None if self._rootItem is None else self._rootItem.data)
@@ -1038,9 +1080,9 @@ if not NoUI:
       modelUpdated = QtCore.Signal(Model)
       messageChanged = QtCore.Signal(str)
 
-      def __init__(self, data, parent=None):
+      def __init__(self, data, type=None, name=None, parent=None):
          super(Editor, self).__init__(parent)
-         self.model = Model(data, parent=self)
+         self.model = Model(data, type=type, name=name, parent=self)
          self.delegate = ModelItemDelegate(parent=self)
          self.setModel(self.model)
          self.expandedState = {}
@@ -1074,9 +1116,46 @@ if not NoUI:
             pos = self.viewport().mapFromGlobal(gpos)
             modelIndex = self.indexAt(pos)
             item = (None if (modelIndex is None or not modelIndex.isValid()) else modelIndex.internalPointer())
-            # Maybe more:
-            # Container > Add
-            #           > Remove
+            actionAddItem = None
+            actionClearItems = None
+            if item and item.compound:
+               if item.mapping:
+                  if item.mappingkeytype is not None:
+                     actionAddItem = menu.addAction("Add Item...")
+                     actionAddItem.triggered.connect(self.makeOnAddDictItem(modelIndex))
+                     actionClearItems = menu.addAction("Clear Items")
+                     actionClearItems.triggered.connect(self.makeOnClearDictItems(modelIndex))
+               else:
+                  if item.orderable:
+                     if item.resizable:
+                        actionAddItem = menu.addAction("Add Item")
+                        actionAddItem.triggered.connect(self.makeOnAddSeqItem(modelIndex))
+                        actionClearItems = menu.addAction("Clear Items")
+                        actionClearItems.triggered.connect(self.makeOnClearSeqItems(modelIndex))
+                  else:
+                     actionAddItem = menu.addAction("Add Item...")
+                     actionAddItem.triggered.connect(self.makeOnAddSetItem(modelIndex))
+                     actionClearItems = menu.addAction("Clear Items")
+                     actionClearItems.triggered.connect(self.makeOnClearSetItems(modelIndex))
+            if actionAddItem:
+               menu.addSeparator()
+            actionRemItem = None
+            if item and item.parent:
+               # parent is necessarily a compound
+               if item.parent.mapping:
+                  if item.parent.mappingkeytype is not None:
+                     actionRemItem = menu.addAction("Remove Item")
+                     actionRemItem.triggered.connect(self.makeOnRemDictItem(modelIndex))
+               else:
+                  if item.parent.orderable:
+                     if item.parent.resizable:
+                        actionRemItem = menu.addAction("Remove Item")
+                        actionRemItem.triggered.connect(self.makeOnRemSeqItem(modelIndex))
+                  else:
+                     actionRemItem = menu.addAction("Remove Item")
+                     actionRemItem.triggered.connect(self.makeOnRemSetItem(modelIndex))
+            if actionRemItem:
+               menu.addSeparator()
             actionExpandUnder = menu.addAction("Expand Under")
             actionExpandUnder.setEnabled(True if item and item.compound else False)
             actionExpandUnder.triggered.connect(self.makeOnExpandUnder(modelIndex))
@@ -1164,38 +1243,125 @@ if not NoUI:
             for r in xrange(nr):
                self.collapseUnder(self.model.index(r, 0, index))
 
-      def resetCheckedState(self, index=None):
-         if index is None:
-            index = QtCore.QModelIndex()
-            self.checkedState = {}
-         else:
-            k = self.getItemKey(index)
-            if k is not None:
-               self.checkedState[k] = (self.model.data(index, QtCore.Qt.CheckStateRole) == QtCore.Qt.Checked)
-
-         nr = self.model.rowCount(index)
-         for r in xrange(nr):
-            self.restoreCheckedState(index=self.model.index(r, 0, index))
-
-      def restoreCheckedState(self, index=None):
-         if index is None:
-            index = QtCore.QModelIndex()
-         else:
-            k = self.getItemKey(index)
-            if k is not None:
-               checked = (QtCore.Qt.Checked if self.checkedState.get(k, False) else QtCore.Qt.Unchecked)
-               self.model.setData(index, checked, QtCore.Qt.CheckStateRole)
-
-         nr = self.model.rowCount(index)
-         for r in xrange(nr):
-            self.restoreCheckedState(index=self.model.index(r, 0, index))
-
       def onContentChanged(self, topLeft, bottomRight):
-         self.resetCheckedState()
          # Forward signal
          self.modelUpdated.emit(self.model)
 
       def onMessageChanged(self, msg):
          # Forward signal
          self.messageChanged.emit(msg)
+
+      def makeOnAddDictItem(self, index):
+         def _callback(*args):
+            self.addDictItem(index)
+         return _callback
+
+      def makeOnAddSeqItem(self, index):
+         def _callback(*args):
+            self.addSeqItem(index)
+         return _callback
+
+      def makeOnAddSetItem(self, index):
+         def _callback(*args):
+            self.addSetItem(index)
+         return _callback
+
+      def makeOnClearDictItems(self, index):
+         def _callback(*args):
+            self.clearDictItems(index)
+         return _callback
+
+      def makeOnClearSeqItems(self, index):
+         def _callback(*args):
+            self.clearSeqItems(index)
+         return _callback
+
+      def makeOnClearSetItems(self, index):
+         def _callback(*args):
+            self.clearSetItems(index)
+         return _callback
+
+      def makeOnRemDictItem(self, index):
+         def _callback(*args):
+            self.remDictItem(index)
+         return _callback
+
+      def makeOnRemSeqItem(self, index):
+         def _callback(*args):
+            self.remSeqItem(index)
+         return _callback
+
+      def makeOnRemSetItem(self, index):
+         def _callback(*args):
+            self.remSetItem(index)
+         return _callback
+
+      def addDictItem(self, index):
+         # Show a dialog with another Editor for just the key type
+         item = index.internalPointer()
+         dlg = NewValueDialog(item.type.ktype, excludes=item.data, name="<new key>", parent=self)
+         def _addDictItem():
+            try:
+               item.data[dlg.data] = item.type.vtype.make_default()
+            except:
+               self.model.setMessage("Failed to add key %s to item '%s'" % (dlg.data, item.fullname()))
+            else:
+               self.model.rebuild()
+               self.restoreExpandedState()
+               self.modelUpdated.emit(self.model)
+         dlg.accepted.connect(_addDictItem)
+         dlg.show()
+
+      def addSeqItem(self, index):
+         item = index.internalPointer()
+         item.data.append(item.type.type.make_default())
+         self.model.rebuild()
+         self.restoreExpandedState()
+         self.modelUpdated.emit(self.model)
+
+      def addSetItem(self, index):
+         # Show a dialog with another Editor for just the value type
+         item = index.internalPointer()
+         dlg = NewValueDialog(item.type.type, excludes=item.data, name="<new value>", parent=self)
+         def _addSetItem():
+            try:
+               item.data.add(dlg.data)
+            except:
+               self.model.setMessage("Failed to add value %s to item '%s'" % (dlg.data, item.fullname()))
+            else:
+               self.model.rebuild()
+               self.restoreExpandedState()
+               self.modelUpdated.emit(self.model)
+         dlg.accepted.connect(_addSetItem)
+         dlg.show()
+
+      def clearDictItems(self, index):
+         self.model.setData(index.sibling(index.row(), 1), {}, QtCore.Qt.EditRole)
+
+      def clearSeqItems(self, index):
+         self.model.setData(index.sibling(index.row(), 1), [], QtCore.Qt.EditRole)
+
+      def clearSetItems(self, index):
+         self.model.setData(index.sibling(index.row(), 1), set(), QtCore.Qt.EditRole)
+
+      def remDictItem(self, index):
+         item = index.internalPointer()
+         del(item.parent.data[item.key])
+         self.model.rebuild()
+         self.restoreExpandedState()
+         self.modelUpdated.emit(self.model)
+
+      def remSeqItem(self, index):
+         parentIndex = self.model.parent(index)
+         item = index.internalPointer()
+         seq = item.parent.data
+         seq = seq[:item.row] + seq[item.row+1:]
+         self.model.setData(parentIndex.sibling(parentIndex.row(), 1), seq, QtCore.Qt.EditRole)
+
+      def remSetItem(self, index):
+         item = index.internalPointer()
+         item.parent.data.remove(item.data)
+         self.model.rebuild()
+         self.restoreExpandedState()
+         self.modelUpdated.emit(self.model)
 

@@ -123,7 +123,7 @@ if __name__ == "__main__":
             layout = QtWidgets.QVBoxLayout()
             layout.setContentsMargins(10, 10, 10, 10)
             layout.setSpacing(5)
-            self.editWidget = das.qtui.Editor(data, parent=centralWidget)
+            self.editWidget = das.qtui.Editor(data, name="<test data>", parent=centralWidget)
             self.infoLabel = QtWidgets.QLabel("", parent=centralWidget)
             layout.addWidget(self.editWidget, 1)
             layout.addWidget(self.infoLabel)
