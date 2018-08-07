@@ -660,18 +660,20 @@ if not NoUI:
             self.dataChanged = self.dataChanged2Args
             self.dataChanged.connect(self.__emitDataChanged)
          self._headers = ["Name", "Value"]
-         self._data = data
          self._rootItem = None
-         self._buildItemsTree()
+         self._orgData = None
+         self._buildItemsTree(data)
 
       def __emitDataChanged(self, index1, index2):
          self._org_data_changed.emit(index1, index2, [])
 
-      def _buildItemsTree(self):
+      def _buildItemsTree(self, data=None):
+         if data is not None:
+            self._orgData = das.copy(data)
          if self._rootItem:
-            self._rootItem.update(self._data)
-         else:
-            self._rootItem = ModelItem("<root>", self._data)
+            self._rootItem.update(self._rootItem.data if data is None else data)
+         elif data is not None:
+            self._rootItem = ModelItem("<root>", data)
 
       def getIndexData(self, index):
          if index.isValid():
@@ -853,8 +855,7 @@ if not NoUI:
             print("Try to set invalid value to '%s'" % item.fullname())
          else:
             # Check whether we need to replace data reference in parent item, if any
-            # (note: tuple are immutable)
-            if item.parent is not None and (not item.compound or isinstance(item.type, das.schematypes.Tuple)):
+            if item.parent is not None:
                if item.parent.mapping:
                   item.parent.data[item.key] = item.data
                elif item.parent.resizable:
@@ -894,7 +895,7 @@ if not NoUI:
             structureChanged = self._setRawData(index, value)
 
             if Debug:
-               das.pprint(self._data)
+               das.pprint(self._rootItem.data)
 
             self.dataChanged.emit(index, index)
 
@@ -962,7 +963,11 @@ if not NoUI:
                seq = tgtitem.data
                if not tgtitem.resizable:
                   seq = list(seq)
-               tgtitem.data = seq[:srcitem.row] + seq[srcitem.row+1:] + [srcitem.data]
+               # Build re-ordered sequence
+               seq = seq[:srcitem.row] + seq[srcitem.row+1:] + [srcitem.data]
+               self._setRawData(tgtindex, seq)
+               if Debug:
+                  das.pprint(self._rootItem.data)
                self.rebuild()
                self.internallyRebuilt.emit()
             elif tgtitem.parent == srcitem.parent:
@@ -983,13 +988,15 @@ if not NoUI:
                seq = pitem.data
                if not pitem.resizable:
                   seq = list(seq)
-               # remove source element from sequence
-               seq = seq[:srcitem:row] + seq[srcitem.row+1:]
+               # Build re-ordererd sequence
+               seq = seq[:srcitem.row] + seq[srcitem.row+1:]
                idx = tgtitem.row
                if tgtitem.row > srcitem.row:
                   idx -= 1
                seq.insert(idx, srcitem.data)
-               pitem.data = seq
+               self._setRawData(self.parent(tgtindex), seq)
+               if Debug:
+                  das.pprint(self._rootItem.data)
                self.rebuild()
                self.internallyRebuilt.emit()
             else:
