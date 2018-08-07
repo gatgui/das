@@ -889,11 +889,22 @@ if not NoUI:
 
          elif role == QtCore.Qt.EditRole:
             if index.column() == 0:
-               # except for Dict keys!
-               print("Set key value!")
-               return False
-
-            structureChanged = self._setRawData(index, value)
+               # Dict/DynamicDict keys
+               item = index.internalPointer()
+               newkey = das.copy(item.key)
+               newkey = value
+               if newkey != item.key:
+                  if newkey in item.parent.data:
+                     print("Key %s already exists in item '%s'" % (value, item.parent.fullname()))
+                     return False
+                  else:
+                     item.parent.data[newkey] = item.data
+                     del(item.parent.data[item.key])
+                     structureChanged = True
+               else:
+                  return True
+            else:
+               structureChanged = self._setRawData(index, value)
 
             if Debug:
                das.pprint(self._rootItem.data)
