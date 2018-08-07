@@ -90,8 +90,10 @@ class TypeBase(object):
 
 class Tuple(TypeBase, tuple):
    def __init__(self, *args):
-      TypeBase.__init__(self)
-      tuple.__init__(self, *args)
+      # Funny, we need to declare *args here, but at the time we reach
+      # the core of the method, tuple is already created
+      # Maybe because tuple is immutable?
+      super(Tuple, self).__init__()
 
    def __add__(self, y):
       n = len(self)
@@ -173,6 +175,14 @@ class Set(TypeBase, set):
       rv = super(Set, self).__ixor__(set([self._adapt_value(x, index=i) for i, x in enumerate(y)]))
       self._gvalidate()
       return self._wrap(rv)
+
+   def __cmp__(self, oth):
+      if len(self.symmetric_difference(oth)) == 0:
+         return 0
+      elif len(self) <= len(oth):
+         return -1
+      else:
+         return 1
 
    def add(self, e):
       super(Set, self).add(self._adapt_value(e, index=len(self)))

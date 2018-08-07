@@ -1,6 +1,14 @@
+import os
+import sys
 import das
 import inspect
-import importlib
+try:
+   import importlib
+except:
+   # Python 2.6 doesn't come with import lib, use our own copy
+   importlibdir = os.path.join(os.path.dirname(das.__file__), "importlib-1.0.4")
+   sys.path.append(importlibdir)
+   import importlib
 
 
 class BindError(Exception):

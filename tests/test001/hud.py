@@ -9,6 +9,12 @@ class Attribute(object):
    def copy(self):
       return Attribute(self.attr)
 
+   def value_to_string(self):
+      return self.attr
+
+   def string_to_value(self, s):
+      self.attr = s
+
    def __str__(self):
       return "Attribute('%s')" % self.attr
 
