@@ -185,37 +185,36 @@ if not NoUI:
       def __init__(self, choices, parent=None):
          super(OrTypeChoiceDialog, self).__init__(parent, QtCore.Qt.WindowTitleHint|QtCore.Qt.WindowSystemMenuHint)
          self.setWindowTitle("Choose value type")
+         self.choices = choices
          self.typename = None
-         self.buttons = []
-         layout = QtWidgets.QVBoxLayout()
+         
          label = QtWidgets.QLabel("Inputed value matches several types.\nPlease specify the one you want:", self)
-         layout.addWidget(label, 0)
-         group = QtWidgets.QGroupBox(self)
-         groupl = QtWidgets.QVBoxLayout()
+         label.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter)
+
+         blayout = QtWidgets.QHBoxLayout()
          for choice in choices:
-            rbtn = QtWidgets.QRadioButton(choice, group)
-            groupl.addWidget(rbtn, 0)
-            self.buttons.append(rbtn)
-         group.setLayout(groupl)
-         layout.addWidget(group, 0)
-         layout.addStretch(1)
-         okbtn = QtWidgets.QPushButton("Ok", self)
-         cancelbtn = QtWidgets.QPushButton("Cancel", self)
-         btnl = QtWidgets.QHBoxLayout()
-         btnl.addWidget(okbtn, 1)
-         btnl.addWidget(cancelbtn, 1)
-         layout.addLayout(btnl, 0)
+            btn = QtWidgets.QPushButton(choice, self)
+            btn.clicked.connect(self._makeCallback(choice))
+            blayout.addWidget(btn, 1)
+         btn = QtWidgets.QPushButton("Cancel", self)
+         btn.clicked.connect(self.reject)
+         blayout.addWidget(btn, 1)
+
+         layout = QtWidgets.QVBoxLayout()
+         layout.addWidget(label, 0)
+         layout.addLayout(blayout, 0)
          self.setLayout(layout)
-         # Wire callbacks
-         okbtn.clicked.connect(self.accept)
-         cancelbtn.clicked.connect(self.reject)
+
+      def _makeCallback(self, typename):
+         def _callback():
+            self.typename = typename
+            self.accept()
+
+         return _callback
 
       def accept(self):
-         self.typename = None
-         for b in self.buttons:
-            if b.isChecked():
-               self.typename = b.text()
-               break
+         if not self.typename in self.choices:
+            self.typename = None
          super(OrTypeChoiceDialog, self).accept()
 
       def reject(self):
