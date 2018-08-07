@@ -176,6 +176,14 @@ class Set(TypeBase, set):
       self._gvalidate()
       return self._wrap(rv)
 
+   def __cmp__(self, oth):
+      if len(self.symmetric_difference(oth)) == 0:
+         return 0
+      elif len(self) <= len(oth):
+         return -1
+      else:
+         return 1
+
    def add(self, e):
       super(Set, self).add(self._adapt_value(e, index=len(self)))
       self._gvalidate()
