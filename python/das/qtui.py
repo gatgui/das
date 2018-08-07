@@ -223,6 +223,109 @@ if not NoUI:
          super(OrTypeChoiceDialog, self).reject()
 
 
+   class FieldSlider(QtWidgets.QFrame):
+      # (value, invalid, errmsg)
+      realValueChanged = QtCore.Signal(float, bool, str)
+      intValueChanged = QtCore.Signal(int, bool, str)
+
+      def __init__(self, vmin, vmax, real=False, decimal=1, parent=None):
+         super(FieldSlider, self).__init__(parent)
+         self._value = None
+         self.real = real
+         self.scale = 1
+         self.min = vmin
+         self.max = vmax
+         sldmin = int(vmin)
+         sldmax = int(vmax)
+         if self.real:
+            self.scale = math.pow(10, decimal)
+            sldmin = int(math.ceil(self.min * self.scale))
+            sldmax = int(math.floor(self.max * self.scale))
+            if self.min < (sldmin / self.scale) or (sldmax / self.scale) < self.max:
+               print("[das] Not enough precision in slider (%d decimal(s)) for value range [%f, %f]" % (decimal, self.min, self.max))
+         self.fld = QtWidgets.QLineEdit(self)
+         self.fld.setObjectName("field")
+         self.sld = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+         self.sld.setObjectName("slider")
+         self.sld.setTracking(True)
+         self.sld.setMinimum(sldmin)
+         self.sld.setMaximum(sldmax)
+         lay = QtWidgets.QHBoxLayout()
+         lay.setContentsMargins(0, 0, 0, 0)
+         lay.setSpacing(2)
+         lay.addWidget(self.fld, 0)
+         lay.addWidget(self.sld, 1)
+         self.setLayout(lay)
+         self.sld.valueChanged.connect(self.sliderChanged)
+         self.fld.textChanged.connect(self.textChanged)
+         self.valueChanged = (self.realValueChanged if self.real else self.intValueChanged)
+
+      def focusInEvent(self, event):
+         if event.gotFocus():
+            self.fld.setFocus(event.reason())
+            self.fld.selectAll()
+            event.accept()
+
+      def _setValue(self, val, updateField=True, updateSlider=True):
+         self._value = (float(val) if self.real else int(val))
+         if self._value < self.min:
+            self._value = self.min
+            updateField = True
+            updateSlider = True
+         elif self._value > self.max:
+            self._value = self.max
+            updateField = True
+            updateSlider = True
+         if updateField:
+            self.fld.blockSignals(True)
+            self.fld.setText(str(self._value))
+            self.fld.blockSignals(False)
+         if updateSlider:
+            self.sld.blockSignals(True)
+            if self.real:
+               self.sld.setValue(int(math.floor(0.5 + self._value * self.scale)))
+            else:
+               self.sld.setValue(self._value)
+            self.sld.blockSignals(False)
+
+      def setValue(self, val):
+         self._setValue(val, updateField=True, updateSlider=True)
+
+      def value(self):
+         return self._value
+
+      def text(self):
+         return str(self._value)
+
+      def textChanged(self, txt):
+         invalid = False
+         errmsg = ""
+         try:
+            if self.real:
+               val = float(txt)
+            else:
+               val = int(txt)
+         except Exception, e:
+            invalid = True
+            errmsg = str(e)
+            # if text is not empty, reset field to real value
+            if txt:
+               self.fld.blockSignals(True)
+               self.fld.setText(str(self.value()))
+               self.fld.blockSignals(False)
+         else:
+            self._setValue(val, updateField=False)
+
+         self.valueChanged.emit(self.value(), invalid, errmsg)
+
+      def sliderChanged(self, val):
+         # as we round down slider min value and round up slider max value
+         # we may need to adjust here
+         self._setValue(val / self.scale, updateSlider=False)
+
+         self.valueChanged.emit(self.value(), False, "")
+
+
    class ModelItemDelegate(QtWidgets.QItemDelegate):
       def __init__(self, parent=None):
          super(ModelItemDelegate, self).__init__(parent)
@@ -330,52 +433,12 @@ if not NoUI:
                v = item.type.enum[k]
                rv.addItem(k, userData=v)
          elif item.type.min is not None and item.type.max is not None:
-            rv = QtWidgets.QFrame(parent)
-            fld = QtWidgets.QLineEdit(rv)
-            fld.setObjectName("field")
-            sld = QtWidgets.QSlider(QtCore.Qt.Horizontal, rv)
-            sld.setObjectName("slider")
-            sld.setTracking(True)
-            sld.setMinimum(item.type.min)
-            sld.setMaximum(item.type.max)
-            lay = QtWidgets.QHBoxLayout()
-            lay.setContentsMargins(0, 0, 0, 0)
-            lay.setSpacing(2)
-            lay.addWidget(fld, 0)
-            lay.addWidget(sld, 1)
-            rv.setLayout(lay)
-            def textChanged(txt):
-               try:
-                  val = int(txt)
-               except Exception, e:
-                  item.invalid = True
-                  item.errmsg = "Invalid value for item '%s': %s" % (item.fullname(), e)
-                  # if text is not empty, reset to slider value
-                  if txt:
-                     fld.setText(str(sld.value()))
-               else:
-                  item.invalid = False
-                  if val < item.type.min:
-                     val = item.type.min
-                     fld.blockSignals(True)
-                     fld.setText(str(val))
-                     fld.blockSignals(False)
-                  elif val > item.type.max:
-                     val = item.type.max
-                     fld.blockSignals(True)
-                     fld.setText(str(val))
-                     fld.blockSignals(False)
-                  sld.blockSignals(True)
-                  sld.setValue(val)
-                  sld.blockSignals(False)
-            def sliderChanged(val):
-               item.invalid = False
-               fld.blockSignals(True)
-               fld.setText(str(val))
-               fld.blockSignals(False)
-            sld.valueChanged.connect(sliderChanged)
-            fld.textChanged.connect(textChanged)
-            #fld.setFocus(QtCore.Qt.OtherFocusReason)
+            rv = FieldSlider(item.type.min, item.type.max, real=False, parent=parent)
+            def valueChanged(val, invalid, errmsg):
+               item.invalid = invalid
+               if invalid:
+                  item.errmsg = "Invalid value for item '%s': %s" % (item.fullname(), errmsg)
+            rv.intValueChanged.connect(valueChanged)
          else:
             rv = QtWidgets.QLineEdit(parent)
             def textChanged(txt):
@@ -396,62 +459,12 @@ if not NoUI:
 
       def createFltEditor(self, parent, item):
          if item.type.min is not None and item.type.max is not None:
-            rv = QtWidgets.QFrame(parent)
-            fld = QtWidgets.QLineEdit(rv)
-            fld.setObjectName("field")
-            sld = QtWidgets.QSlider(QtCore.Qt.Horizontal, rv)
-            sld.setObjectName("slider")
-            sld.setTracking(True)
-            self.sldscl = 10000.0
-            sldmin = int(math.floor(item.type.min * self.sldscl))
-            sldmax = int(math.ceil(item.type.max * self.sldscl))
-            sld.setMinimum(sldmin)
-            sld.setMaximum(sldmax)
-            lay = QtWidgets.QHBoxLayout()
-            lay.setContentsMargins(0, 0, 0, 0)
-            lay.setSpacing(2)
-            lay.addWidget(fld, 0)
-            lay.addWidget(sld, 1)
-            rv.setLayout(lay)
-            def textChanged(txt):
-               try:
-                  val = float(txt)
-               except Exception, e:
-                  item.invalid = True
-                  item.errmsg = "Invalid value for item '%s': %s" % (item.fullname(), e)
-                  # if text is not empty, reset to slider value
-                  if txt:
-                     fld.setText(str(sld.value() / self.sldscl))
-               else:
-                  item.invalid = False
-                  if val < item.type.min:
-                     val = item.type.min
-                     fld.blockSignals(True)
-                     fld.setText(str(val))
-                     fld.blockSignals(False)
-                  elif val > item.type.max:
-                     val = item.type.max
-                     fld.blockSignals(True)
-                     fld.setText(str(val))
-                     fld.blockSignals(False)
-                  sld.blockSignals(True)
-                  sld.setValue(int(math.floor(0.5 + val * self.sldscl)))
-                  sld.blockSignals(False)
-            def sliderChanged(val):
-               # as we round down slider min value and round up slider max value
-               # we may need to adjust here
-               val = val / self.sldscl
-               if val < item.type.min:
-                  val = item.type.min
-               elif val > item.type.max:
-                  val = item.type.max
-               fld.blockSignals(True)
-               fld.setText(str(val))
-               fld.blockSignals(False)
-               item.invalid = False
-            sld.valueChanged.connect(sliderChanged)
-            fld.textChanged.connect(textChanged)
-            #fld.setFocus(QtCore.Qt.OtherFocusReason)
+            rv = FieldSlider(item.type.min, item.type.max, real=True, decimal=4, parent=parent)
+            def valueChanged(val, invalid, errmsg):
+               item.invalid = invalid
+               if invalid:
+                  item.errmsg = "Invalid value for item '%s': %s" % (item.fullname(), errmsg)
+            rv.realValueChanged.connect(valueChanged)
          else:
             rv = QtWidgets.QLineEdit(parent)
             def textChanged(txt):
@@ -531,25 +544,15 @@ if not NoUI:
             widget.setCurrentIndex(widget.findData(item.data))
          else:
             if item.type.min is not None and item.type.max is not None:
-               fld = widget.findChild(QtWidgets.QLineEdit, "field")
-               sld = widget.findChild(QtWidgets.QSlider, "slider")
-               sld.setValue(item.data)
+               widget.setValue(item.data)
             else:
-               fld = widget
-            fld.setText(str(item.data))
-            fld.selectAll()
-            #fld.setFocus(QtCore.Qt.OtherFocusReason)
+               widget.setText(str(item.data))
 
       def setFltEditorData(self, widget, item):
          if item.type.min is not None and item.type.max is not None:
-            fld = widget.findChild(QtWidgets.QLineEdit, "field")
-            sld = widget.findChild(QtWidgets.QSlider, "slider")
-            sld.setValue(int(math.floor(0.5 + item.data * self.sldscl)))
+            widget.setValue(item.data)
          else:
-            fld = widget
-         fld.setText(str(item.data))
-         fld.selectAll()
-         #fld.setFocus(QtCore.Qt.OtherFocusReason)
+            widget.setText(str(item.data))
 
       def setStrEditorData(self, widget, item):
          if item.type.choices is not None:
@@ -612,19 +615,17 @@ if not NoUI:
             data = item.type.enum[widget.currentText()]
          else:
             if item.type.min is not None and item.type.max is not None:
-               fld = widget.findChild(QtWidgets.QLineEdit, "field")
+               data = widget.value()
             else:
-               fld = widget
-            data = long(fld.text())
+               data = long(widget.text())
          model.setData(modelIndex, data, QtCore.Qt.EditRole)
 
       def setFltModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
          if item.type.min is not None and item.type.max is not None:
-            fld = widget.findChild(QtWidgets.QLineEdit, "field")
+            data = widget.value()
          else:
-            fld = widget
-         data = float(fld.text())
+            data = float(widget.text())
          model.setData(modelIndex, data, QtCore.Qt.EditRole)
 
       def setStrModelData(self, widget, model, modelIndex):
