@@ -35,13 +35,15 @@ if not NoUI:
       def __str__(self):
          return "ModelItem(%s, compound=%s, resizable=%s, multi=%s, editable=%s, optional=%s, parent=%s, children=%d)" % (self.name, self.compound, self.resizable, self.multi, self.editable, self.optional, ("None" if not self.parent else self.parent.name), len(self.children))
 
-      def fullname(self):
+      def fullname(self, skipRoot=False):
          k = ""
          item = self
          while item:
             suffix = ("" if not k else (".%s" % k))
             k = item.name + suffix
             item = item.parent
+            if skipRoot and item and not item.parent:
+               break
          return k
 
       def real_type(self, typ):
@@ -728,6 +730,16 @@ if not NoUI:
       def getData(self):
          return (None if self._rootItem is None else self._rootItem.data)
 
+      def replaceData(self, data, type=None, name=None):
+         self._orgData = None
+         self._rootItem = None
+         self.beginResetModel()
+         self._buildItemsTree(data=data, type=type, name=name)
+         self.endResetModel()
+         rootIndex = self.index(0, 0, QtCore.QModelIndex())
+         self.dataChanged.emit(rootIndex, rootIndex)
+         self.internallyRebuilt.emit()
+
       def getIndexData(self, index):
          if index.isValid():
             item = index.internalPointer()
@@ -745,7 +757,7 @@ if not NoUI:
       def hasDataChanged(self):
          return (False if self._rootItem is None else (self._rootItem.data != self._orgData))
 
-      def resetOrgData(self):
+      def cleanData(self):
          if self._rootItem:
             self._orgData = das.copy(self._rootItem.data)
 
@@ -1174,6 +1186,24 @@ if not NoUI:
          k = None
          item = modelIndex.internalPointer()
          return item.fullname()
+
+      def getData(self):
+         return self.model.getData()
+
+      def setData(self, data, type=None, name=None):
+         self.expandedState = {}
+         self.model.replaceData(data, type=type, name=name)
+         self.modelUpdated.emit(self.model)
+         index = QtCore.QModelIndex()
+         if self.model.rowCount(index) > 0:
+            self.setExpanded(self.model.index(0, 0, index), True)
+
+      def cleanData(self):
+         self.model.cleanData()
+         self.modelUpdated.emit(self.model)
+
+      def hasDataChanged(self):
+         return self.model.hasDataChanged()
 
       def resetExpandedState(self, index=None):
          if index is None:
