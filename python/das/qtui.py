@@ -634,7 +634,11 @@ if not NoUI:
             model.setItemErrorMessage(item, widget.property("message"))
 
       def setMappingKeyModelData(self, widget, model, modelIndex):
-         model.setData(modelIndex, eval(widget.text()), QtCore.Qt.EditRole)
+         try:
+            key = eval(widget.text())
+         except:
+            key = widget.text()
+         model.setData(modelIndex, key, QtCore.Qt.EditRole)
 
       def setOrModelData(self, widget, model, modelIndex):
          s = widget.text()
