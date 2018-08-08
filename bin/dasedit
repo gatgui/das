@@ -86,7 +86,6 @@ if __name__ == "__main__":
       class Window(QtWidgets.QMainWindow):
          def __init__(self, data=None, path=None, parent=None):
             super(Window, self).__init__(parent)
-            self.data = data
             self.path = path
             self.setWindowTitle("DaS Simple Editor")
             menuBar = self.menuBar()
@@ -97,10 +96,12 @@ if __name__ == "__main__":
             actionSave = QtWidgets.QAction(self)
             actionSave.setText("Save")
             actionSave.setShortcut("Ctrl+S")
+            actionSave.setEnabled(False)
             actionSave.triggered.connect(self.onSave)
             actionSaveAs = QtWidgets.QAction(self)
             actionSaveAs.setText("Save As...")
             actionSaveAs.setShortcut("Ctrl+A")
+            actionSaveAs.setEnabled(data is not None)
             actionSaveAs.triggered.connect(self.onSaveAs)
             actionQuit = QtWidgets.QAction(self)
             actionQuit.setText("Quit")
@@ -131,15 +132,39 @@ if __name__ == "__main__":
             self.setCentralWidget(centralWidget)
             self.editWidget.messageChanged.connect(self.onMessageChanged)
             self.editWidget.modelUpdated.connect(self.onModelUpdated)
+            self.actionSave = actionSave
+            self.actionSaveAs = actionSaveAs
 
          def onOpen(self):
-            pass
+            if self.editWidget.hasDataChanged():
+               rv = QtWidgets.QMessageBox.question(self, "Save Current Data", "Data has changed since it has been loaded.\nWould you like to save the changes?", buttons=QtWidgets.QMessageBox.Yes|QtWidgets.QMessageBox.No, defaultButton=QtWidgets.QMessageBox.No)
+               if rv == QtWidgets.QMessageBox.Yes:
+                  self.onSave()
+            rv = QtWidgets.QFileDialog.getOpenFileName(self, "Open File", "", "All Files (*.*)")
+            path = rv[0]
+            if path and os.path.isfile(path):
+               try:
+                  data = das.read(path)
+                  self.editWidget.setData(data)
+                  self.path = path
+                  self.actionSaveAs.setEnabled(True)
+                  self.actionSave.setEnabled(False)
+               except Exception, e:
+                  QtWidgets.QMessageBox.critical(self, "Error", "Couldn't read file '%s'\n%s" % (path, e), QtWidgets.QMessageBox.Close)
 
          def onSave(self):
-            pass
+            try:
+               das.write(self.editWidget.getData(), self.path)
+               self.editWidget.cleanData()
+            except Exception, e:
+               QtWidgets.QMessageBox.critical(self, "Error", "Couldn't save data to '%s'\n%s" % (path, e), QtWidgets.QMessageBox.Close)
 
          def onSaveAs(self):
-            pass
+            rv = QtWidgets.QFileDialog.getSaveFileName(self, "Save File", "", "All Files (*.*)")
+            path = rv[0]
+            if path:
+               self.path = path
+               self.onSave()
 
          def onAbout(self):
             pass
@@ -148,10 +173,9 @@ if __name__ == "__main__":
             self.infoLabel.setText(msg)
 
          def onModelUpdated(self, model):
-            if verbose:
-               print("Model changed? %s" % model.hasDataChanged())
-               if model.hasDataChanged():
-                  das.pprint(model.getData())
+            self.actionSave.setEnabled(model.hasDataChanged())
+            if verbose and model.hasDataChanged():
+               das.pprint(model.getData())
 
 
       app = QtWidgets.QApplication([sys.argv[0]])
