@@ -370,7 +370,7 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
                k.decode("ascii")
             except:
                raise Exception("Non-ascii keys are not supported!")
-         stream.write("%s%s'%s': " % (tindent, indent, k))
+         stream.write("%s%s%s: " % (tindent, indent, repr(k)))
          v = d[k]
          pprint(v, stream, indent=indent, depth=depth+1, inline=True, eof=False, encoding=encoding)
          i += 1
