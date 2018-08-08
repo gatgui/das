@@ -104,8 +104,6 @@ if not NoUI:
          self.multi = False
          self.data = data
          self.type = type
-         self.invalid = False
-         self.errmsg = ""
 
          if self.type is None and self.data is not None:
             self.type = self.data._get_schema_type()
@@ -432,15 +430,29 @@ if not NoUI:
       def createMappingKeyEditor(self, parent, item):
          rv = QtWidgets.QLineEdit(parent)
          def textChanged(txt):
+            # Convert text to a python value
             try:
                val = eval(txt)
-               newkey = das.copy(item.key)
+            except:
+               val = txt
+            # Create a new key
+            newkey = das.copy(item.key)
+            try:
                newkey = val
             except Exception, e:
-               item.invalid = True
-               item.errmsg = "Invalid value for item key '%s': %s" % (item.fullname(), e)
+               rv.setProperty("invalidState", True)
+               rv.setProperty("message", "Invalid key (%s)" % e)
             else:
-               item.invalid = False
+               # Set the new key
+               tmpdict = item.parent.type.make_default()
+               tmpval = item.parent.type.vtype.make_default()
+               try:
+                  tmpdict[newkey] = tmpval
+               except Exception, e:
+                  rv.setProperty("invalidState", True)
+                  rv.setProperty("message", "Invalid key (%s)" % e)
+               else:
+                  rv.setProperty("invalidState", False)
          rv.textChanged.connect(textChanged)
          rv.setProperty("setEditorData", self.setMappingKeyEditorData)
          rv.setProperty("setModelData", self.setMappingKeyModelData)
@@ -449,9 +461,10 @@ if not NoUI:
       def createOrEditor(self, parent, item):
          rv = QtWidgets.QLineEdit(parent)
          def textChanged(txt):
-            item.invalid = (len(self._getValidOrValues(txt, item)) == 0)
-            if item.invalid:
-               item.errmsg = "Invalid value for item '%s': Doesn't match any of the eligible types" % item.fullname()
+            invalid = (len(self._getValidOrValues(txt, item)) == 0)
+            rv.setProperty("invalidState", invalid)
+            if invalid:
+               rv.setProperty("message", str(e))
          rv.textChanged.connect(textChanged)
          rv.setProperty("setEditorData", self.setOrEditorData)
          rv.setProperty("setModelData", self.setOrModelData)
@@ -472,9 +485,9 @@ if not NoUI:
          elif item.type.min is not None and item.type.max is not None:
             rv = FieldSlider(item.type.min, item.type.max, real=False, parent=parent)
             def valueChanged(val, invalid, errmsg):
-               item.invalid = invalid
+               rv.setProperty("invalidState", invalid)
                if invalid:
-                  item.errmsg = "Invalid value for item '%s': %s" % (item.fullname(), errmsg)
+                  rv.setProperty("message", errmsg)
             rv.intValueChanged.connect(valueChanged)
          else:
             rv = QtWidgets.QLineEdit(parent)
@@ -482,13 +495,13 @@ if not NoUI:
                try:
                   int(txt)
                except Exception, e:
-                  item.invalid = True
-                  item.errmsg = "Invalid value for item '%s': %s" % (item.fullname(), e)
+                  rv.setProperty("invalidState", True)
+                  rv.setProperty("message", str(e))
                   # if text is not empty, reset to original value
                   if txt:
                      rv.setText(str(item.data))
                else:
-                  item.invalid = False
+                  rv.setProperty("invalidState", False)
             rv.textChanged.connect(textChanged)
          rv.setProperty("setEditorData", self.setIntEditorData)
          rv.setProperty("setModelData", self.setIntModelData)
@@ -498,9 +511,9 @@ if not NoUI:
          if item.type.min is not None and item.type.max is not None:
             rv = FieldSlider(item.type.min, item.type.max, real=True, decimal=4, parent=parent)
             def valueChanged(val, invalid, errmsg):
-               item.invalid = invalid
+               rv.setProperty("invalidState", invalid)
                if invalid:
-                  item.errmsg = "Invalid value for item '%s': %s" % (item.fullname(), errmsg)
+                  rv.setProperty("message", errmsg)
             rv.realValueChanged.connect(valueChanged)
          else:
             rv = QtWidgets.QLineEdit(parent)
@@ -508,13 +521,13 @@ if not NoUI:
                try:
                   float(txt)
                except Exception, e:
-                  item.invalid = True
-                  item.errmsg = "Invalid value for item '%s': %s" % (item.fullname(), e)
+                  rv.setProperty("invalidState", True)
+                  rv.setProperty("message", str(e))
                   # if text is not empty, reset to original value
                   if txt:
                      rv.setText(str(item.data))
                else:
-                  item.invalid = False
+                  rv.setProperty("invalidState", False)
             rv.textChanged.connect(textChanged)
          rv.setProperty("setEditorData", self.setFltEditorData)
          rv.setProperty("setModelData", self.setFltModelData)
@@ -529,11 +542,12 @@ if not NoUI:
             rv = QtWidgets.QLineEdit(parent)
             def textChanged(txt):
                if item.type.matches is not None:
-                  item.invalid = (not item.type.matches.match(txt))
-                  if item.invalid:
-                     item.errmsg = "Invalid value for item '%s': Does't match '%s'" % (item.fullname(), item.type.matches.pattern)
+                  invalid = (not item.type.matches.match(txt))
+                  rv.setProperty("invalidState", invalid)
+                  if invalid:
+                     rv.setProperty("message", "'%s' doesn't match '%s'" % (txt, item.type.matches.pattern))
                else:
-                  item.invalid = False
+                  rv.setProperty("invalidState", False)
             rv.textChanged.connect(textChanged)
          rv.setProperty("setEditorData", self.setStrEditorData)
          rv.setProperty("setModelData", self.setStrModelData)
@@ -545,10 +559,10 @@ if not NoUI:
             try:
                item.data.copy().string_to_value(txt)
             except Exception, e:
-               item.invalid = True
-               item.errmsg = "Invalid class value for item %s: %s" % (item.fullname(), e)
+               rv.setProperty("invalidState", True)
+               rv.setProperty("message", str(e))
             else:
-               item.invalid = False
+               rv.setProperty("invalidState", False)
          rv.textChanged.connect(textChanged)
          rv.setProperty("setEditorData", self.setClassEditorData)
          rv.setProperty("setModelData", self.setClassModelData)
@@ -609,14 +623,15 @@ if not NoUI:
 
       def setModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
-         if not item.invalid:
+         invalid = widget.property("invalidState")
+         if not invalid:
             func = widget.property("setModelData")
             if func:
                func(widget, model, modelIndex)
             else:
-               model.setMessage("Cannot set model data")
+               model.setItemErrorMessage(item, "No 'setModelData' property set on editor widget")
          else:
-            model.setMessage(item.errmsg)
+            model.setItemErrorMessage(item, widget.property("message"))
 
       def setMappingKeyModelData(self, widget, model, modelIndex):
          model.setData(modelIndex, eval(widget.text()), QtCore.Qt.EditRole)
@@ -630,7 +645,7 @@ if not NoUI:
 
          if len(values) > 1:
             idx = -1
-            dlg = OrTypeChoiceDialog([v[0] for v in values])
+            dlg = OrTypeChoiceDialog([v[0] for v in values], parent=widget)
             if dlg.exec_() == QtWidgets.QDialog.Accepted:
                for i in xrange(len(values)):
                   if dlg.typename == values[i][0]:
@@ -639,17 +654,15 @@ if not NoUI:
                if idx != -1:
                   values = [values[idx]]
                else:
-                  msg = "No type selected"
                   values = []
             else:
-               msg = "No type selected"
                values = []
 
          if len(values) == 1:
             _, v = values[0]
             model.setData(modelIndex, v, QtCore.Qt.EditRole)
          else:
-            model.setMessage(msg)
+            model.setItemErrorMessage(item, "No type selected")
 
       def setBoolModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
@@ -753,6 +766,15 @@ if not NoUI:
       def setMessage(self, msg):
          self._message = msg
          self.messageChanged.emit(msg)
+
+      def setItemErrorMessage(self, item, msg):
+         if msg:
+            n = item.fullname(skipRoot=True)
+            if not n:
+               n = item.fullname()
+            self.setMessage("Failed to update '%s'.\n%s" % (n, msg))
+         else:
+            self.setMessage("")
 
       def hasDataChanged(self):
          return (False if self._rootItem is None else (self._rootItem.data != self._orgData))
@@ -924,7 +946,7 @@ if not NoUI:
          try:
             item.data = value
          except Exception, e:
-            self.setMessage("Failed to set value on item '%s'" % item.fullname())
+            self.setItemErrorMessage(item, str(e))
          else:
             self.setMessage("")
             # Check whether we need to replace data reference in parent item, if any
@@ -969,7 +991,7 @@ if not NoUI:
                self.setMessage("")
                if newkey != item.key:
                   if newkey in item.parent.data:
-                     self.setMessage("Key %s already exists in item '%s'" % (value, item.parent.fullname()))
+                     self.setItemErrorMessage(item.parent, "Key %s already exists" % value)
                      return False
                   else:
                      item.parent.data[newkey] = item.data
@@ -1332,8 +1354,8 @@ if not NoUI:
          def _addDictItem():
             try:
                item.data[dlg.data] = item.type.vtype.make_default()
-            except:
-               self.model.setMessage("Failed to add key %s to item '%s'" % (dlg.data, item.fullname()))
+            except Exception, e:
+               self.model.setItemErrorMessage(item, "Failed to add key %s\n(%s)" % (dlg.data, e))
             else:
                self.model.rebuild()
                self.restoreExpandedState()
@@ -1355,8 +1377,8 @@ if not NoUI:
          def _addSetItem():
             try:
                item.data.add(dlg.data)
-            except:
-               self.model.setMessage("Failed to add value %s to item '%s'" % (dlg.data, item.fullname()))
+            except Exception, e:
+               self.model.setItemErrorMessage(item, "Failed to add value %s\n(%s)" % (dlg.data, e))
             else:
                self.model.rebuild()
                self.restoreExpandedState()
