@@ -24,6 +24,8 @@ if not NoUI:
 
 
    class ModelItem(object):
+      ReservedTypeNames = ["empty", "boolean", "integer", "real", "string", "list", "tuple", "set", "dict", "struct"]
+
       def __init__(self, name, data, type=None, parent=None, row=0, key=None):
          super(ModelItem, self).__init__()
          self.row = row
@@ -90,6 +92,79 @@ if not NoUI:
                return (hasattr(rt.klass, "string_to_value") and hasattr(rt.klass, "value_to_string"))
             return True
 
+      def class_name(self, klass):
+         cn = self.data.__class__.__name__
+         mn = self.data.__class__.__module__
+         if mn not in ("__builtin__", "__main__"):
+            cn = mn + "." + cn
+         if cn in self.ReservedTypeNames:
+            cn += " (user)"
+         return cn
+
+      def update_multi_type_string(self):
+         if self.multi:
+            if self.data is None:
+               self.typestr = "empty"
+            elif isinstance(self.data, bool):
+               self.typestr = "boolean"
+            elif isinstance(self.data, (int, long)):
+               self.typestr = "integer"
+            elif isinstance(self.data, float):
+               self.typestr = "real"
+            elif isinstance(self.data, basestring):
+               self.typestr = "string"
+            else:
+               self.typestr = self.class_name(self.data.__class__)
+
+      def multi_string(self):
+         if self.data is None or isinstance(self.data, bool):
+            return str(self.data).lower()
+         else:
+            return str(self.data)
+
+      def get_valid_types(self, **kwargs):
+         values = []
+
+         if not self.multi:
+            return values
+
+         s = kwargs.get("string", self.multi_string())
+
+         for t in self.type.types:
+            if isinstance(t, das.schematypes.Empty):
+               if s.lower() == "none":
+                  values.append(("empty", None))
+            elif isinstance(t, das.schematypes.Boolean):
+               if s.lower() in ("on", "yes", "true", "off", "no", "false"):
+                  v = (s.lower() in ("on", "yes", "true"))
+                  values.append(("boolean", v))
+            elif isinstance(t, das.schematypes.Integer):
+               try:
+                  v = long(s)
+                  values.append(("integer", v))
+               except:
+                  pass
+            elif isinstance(t, das.schematypes.Real):
+               try:
+                  v = float(s)
+                  values.append(("real", v))
+               except:
+                  pass
+            elif isinstance(t, das.schematypes.String):
+               try:
+                  values.append(("string", s))
+               except:
+                  pass
+            elif isinstance(t, das.schematypes.Class):
+               try:
+                  v = t.make_default()
+                  v.string_to_value(s)
+                  values.append((self.class_name(t.klass), v))
+               except:
+                  pass
+
+         return values
+
       def update(self, data, type=None):
          self.children = []
          self.compound = False
@@ -104,6 +179,7 @@ if not NoUI:
          self.multi = False
          self.data = data
          self.type = type
+         self.typestr = ""
 
          if self.type is None and self.data is not None:
             self.type = self.data._get_schema_type()
@@ -122,6 +198,7 @@ if not NoUI:
 
          if self.compound:
             if isinstance(self.type, das.schematypes.Sequence):
+               self.typestr = "list"
                self.resizable = True
                self.orderable = True
                for i in xrange(len(self.data)):
@@ -130,6 +207,7 @@ if not NoUI:
                   self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i))
 
             elif isinstance(self.type, das.schematypes.Tuple):
+               self.typestr = "tuple"
                self.resizable = False
                self.orderable = True
                for i in xrange(len(self.data)):
@@ -138,6 +216,7 @@ if not NoUI:
                   self.children.append(ModelItem(itemname, itemdata, type=self.type.types[i], parent=self, row=i))
 
             elif isinstance(self.type, das.schematypes.Set):
+               self.typestr = "set"
                self.resizable = True
                self.orderable = False
                i = 0
@@ -147,6 +226,7 @@ if not NoUI:
                   i += 1
 
             elif isinstance(self.type, (das.schematypes.Struct, das.schematypes.StaticDict)):
+               self.typestr = "struct"
                self.resizable = False
                self.orderable = False
                self.mapping = True
@@ -166,6 +246,7 @@ if not NoUI:
                   i += 1
 
             elif isinstance(self.type, (das.schematypes.Dict, das.schematypes.DynamicDict)):
+               self.typestr = "dict"
                self.resizable = True
                self.orderable = False
                self.mapping = True
@@ -180,46 +261,22 @@ if not NoUI:
                   self.children.append(ModelItem(ks, v, type=vtype, parent=self, row=i, key=k))
                   i += 1
 
-
-   class OrTypeChoiceDialog(QtWidgets.QDialog):
-      def __init__(self, choices, parent=None):
-         super(OrTypeChoiceDialog, self).__init__(parent, QtCore.Qt.WindowTitleHint|QtCore.Qt.WindowSystemMenuHint)
-         self.setWindowTitle("Choose value type")
-         self.choices = choices
-         self.typename = None
-         
-         label = QtWidgets.QLabel("Inputed value matches several types.\nPlease specify the one you want:", self)
-         label.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter)
-
-         blayout = QtWidgets.QHBoxLayout()
-         for choice in choices:
-            btn = QtWidgets.QPushButton(choice, self)
-            btn.clicked.connect(self._makeCallback(choice))
-            blayout.addWidget(btn, 1)
-         btn = QtWidgets.QPushButton("Cancel", self)
-         btn.clicked.connect(self.reject)
-         blayout.addWidget(btn, 1)
-
-         layout = QtWidgets.QVBoxLayout()
-         layout.addWidget(label, 0)
-         layout.addLayout(blayout, 0)
-         self.setLayout(layout)
-
-      def _makeCallback(self, typename):
-         def _callback():
-            self.typename = typename
-            self.accept()
-
-         return _callback
-
-      def accept(self):
-         if not self.typename in self.choices:
-            self.typename = None
-         super(OrTypeChoiceDialog, self).accept()
-
-      def reject(self):
-         self.typename = None
-         super(OrTypeChoiceDialog, self).reject()
+         else:
+            if self.multi:
+               self.update_multi_type_string()
+            else:
+               if isinstance(self.type, das.schematypes.Boolean):
+                  self.typestr = "boolean"
+               elif isinstance(self.type, das.schematypes.Integer):
+                  self.typestr = "integer"
+               elif isinstance(self.type, das.schematypes.Real):
+                  self.typestr = "real"
+               elif isinstance(self.type, das.schematypes.String):
+                  self.typestr = "string"
+               elif isinstance(self.type, das.schematypes.Empty):
+                  self.typestr = "empty"
+               elif isinstance(self.type, das.schematypes.Class):
+                  self.typestr = self.class_name(self.type.klass)
 
 
    class NewValueDialog(QtWidgets.QDialog):
@@ -365,44 +422,6 @@ if not NoUI:
       def __init__(self, parent=None):
          super(ModelItemDelegate, self).__init__(parent)
 
-      def _getValidOrValues(self, s, item):
-         values = []
-
-         for t in item.type.types:
-            if isinstance(t, das.schematypes.Empty):
-               if s.lower() == "none":
-                  values.append(("empty", None))
-            elif isinstance(t, das.schematypes.Boolean):
-               if s.lower() in ("on", "yes", "true", "off", "no", "false"):
-                  v = (s.lower() in ("on", "yes", "true"))
-                  values.append(("boolean", v))
-            elif isinstance(t, das.schematypes.Integer):
-               try:
-                  v = long(s)
-                  values.append(("integer", v))
-               except:
-                  pass
-            elif isinstance(t, das.schematypes.Real):
-               try:
-                  v = float(s)
-                  values.append(("real", v))
-               except:
-                  pass
-            elif isinstance(t, das.schematypes.String):
-               try:
-                  values.append(("string", s))
-               except:
-                  pass
-            elif isinstance(t, das.schematypes.Class):
-               try:
-                  v = item.data.copy()
-                  v.string_to_value(s)
-                  values.append(("class", v))
-               except:
-                  pass
-
-         return values
-
       def createEditor(self, parent, viewOptions, modelIndex):
          item = modelIndex.internalPointer()
          rv = None
@@ -425,6 +444,18 @@ if not NoUI:
                   elif isinstance(item.type, das.schematypes.Class):
                      rv = self.createClassEditor(parent, item)
                   # Ignore 'Empty' and 'Alias'
+         elif modelIndex.column() == 2:
+            rv = self.createTypeEditor(parent, item)
+         return rv
+
+      def createTypeEditor(self, parent, item):
+         tv = item.get_valid_types()
+         tv.sort(key=lambda x: x[0])
+         rv = QtWidgets.QComboBox(parent=parent)
+         for typ, val in tv:
+            rv.addItem(typ, userData=val)
+         rv.setProperty("setEditorData", self.setTypeEditorData)
+         rv.setProperty("setModelData", self.setTypeModelData)
          return rv
 
       def createMappingKeyEditor(self, parent, item):
@@ -461,7 +492,7 @@ if not NoUI:
       def createOrEditor(self, parent, item):
          rv = QtWidgets.QLineEdit(parent)
          def textChanged(txt):
-            invalid = (len(self._getValidOrValues(txt, item)) == 0)
+            invalid = (len(item.get_valid_types(string=txt)) == 0)
             rv.setProperty("invalidState", invalid)
             if invalid:
                rv.setProperty("message", str(e))
@@ -574,15 +605,15 @@ if not NoUI:
          if func:
             func(widget, item)
 
+      def setTypeEditorData(self, widget, item):
+         widget.setCurrentIndex(widget.findText(item.typestr))
+
       def setMappingKeyEditorData(self, widget, item):
          widget.setText(str(item.key))
 
       def setOrEditorData(self, widget, item):
-         if isinstance(item.data, bool):
-            s = ("true" if item.data else "false")
-         elif item.data is None:
-            # Can't this be a valid string value too?
-            s = "none"
+         if item.data is None or isinstance(item.data, bool):
+            s = str(item.data).lower()
          else:
             s = str(item.data)
          widget.setText(s)
@@ -633,6 +664,11 @@ if not NoUI:
          else:
             model.setItemErrorMessage(item, widget.property("message"))
 
+      def setTypeModelData(self, widget, model, modelIndex):
+         data = widget.itemData(widget.currentIndex())
+         index = model.index(modelIndex.row(), 1, modelIndex.parent())
+         model.setData(index, data, QtCore.Qt.EditRole)
+
       def setMappingKeyModelData(self, widget, model, modelIndex):
          try:
             key = eval(widget.text())
@@ -641,32 +677,15 @@ if not NoUI:
          model.setData(modelIndex, key, QtCore.Qt.EditRole)
 
       def setOrModelData(self, widget, model, modelIndex):
-         s = widget.text()
-
          item = modelIndex.internalPointer()
-         values = self._getValidOrValues(s, item)
-         msg = ""
 
-         if len(values) > 1:
-            idx = -1
-            dlg = OrTypeChoiceDialog([v[0] for v in values], parent=widget)
-            if dlg.exec_() == QtWidgets.QDialog.Accepted:
-               for i in xrange(len(values)):
-                  if dlg.typename == values[i][0]:
-                     idx = i
-                     break
-               if idx != -1:
-                  values = [values[idx]]
-               else:
-                  values = []
-            else:
-               values = []
+         values = item.get_valid_types(string=widget.text())
 
-         if len(values) == 1:
+         if len(values) >= 1:
             _, v = values[0]
             model.setData(modelIndex, v, QtCore.Qt.EditRole)
          else:
-            model.setItemErrorMessage(item, "No type selected")
+            model.setItemErrorMessage(item, "Input doesn't match any supported types")
 
       def setBoolModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
@@ -722,7 +741,7 @@ if not NoUI:
             self._org_data_changed = self.dataChanged
             self.dataChanged = self.dataChanged2Args
             self.dataChanged.connect(self.__emitDataChanged)
-         self._headers = ["Name", "Value"]
+         self._headers = ["Name", "Value", "Type"]
          self._rootItem = None
          self._orgData = None
          self._message = ""
@@ -842,7 +861,11 @@ if not NoUI:
                # any other cases?
                if item.editable:
                   flags = flags | QtCore.Qt.ItemIsEditable
-               
+
+            elif index.column() == 2:
+               if item.editable and item.multi and len(item.get_valid_types()) > 1:
+                  flags = flags | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
+
             return flags
 
       def headerData(self, index, orient, role):
@@ -937,6 +960,9 @@ if not NoUI:
             else:
                rv = "---"
 
+         elif index.column() == 2:
+            rv = item.typestr
+
          if role == QtCore.Qt.DisplayRole and index.column() == 1:
             rv = "    " + rv
 
@@ -949,6 +975,7 @@ if not NoUI:
          oldvalue = item.data
          try:
             item.data = value
+            item.update_multi_type_string()
          except Exception, e:
             self.setItemErrorMessage(item, str(e))
          else:
@@ -1003,8 +1030,13 @@ if not NoUI:
                      structureChanged = True
                else:
                   return True
-            else:
+
+            elif index.column() == 1:
                structureChanged = self._setRawData(index, value)
+
+            elif index.column() == 2:
+               # We actually never trigger this one... should we?
+               return False
 
             self.dataChanged.emit(index, index)
 
