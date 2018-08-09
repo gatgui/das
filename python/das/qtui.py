@@ -125,7 +125,7 @@ if not NoUI:
                self.resizable = True
                self.orderable = True
                for i in xrange(len(self.data)):
-                  itemname = "%s[%d]" % (self.name, i)
+                  itemname = "[%d]" % i
                   itemdata = self.data[i]
                   self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i))
 
@@ -133,7 +133,7 @@ if not NoUI:
                self.resizable = False
                self.orderable = True
                for i in xrange(len(self.data)):
-                  itemname = "%s[%d]" % (self.name, i)
+                  itemname = "(%d)" % i
                   itemdata = self.data[i]
                   self.children.append(ModelItem(itemname, itemdata, type=self.type.types[i], parent=self, row=i))
 
@@ -142,7 +142,7 @@ if not NoUI:
                self.orderable = False
                i = 0
                for itemdata in self.data:
-                  itemname = "%s[%d]" % (self.name, i)
+                  itemname = "{%d}" % i
                   self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i))
                   i += 1
 
