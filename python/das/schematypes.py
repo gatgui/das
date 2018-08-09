@@ -406,7 +406,8 @@ class Struct(dict, TypeValidator):
                vtype = self[vtype.name]
             vv = vtype.validate(value)
             if vv is not None and isinstance(vtype, Deprecated):
-               das.print_once(vtype.message) 
+               message = ("[das] Field %s is deprecated" % repr(key) if not vtype.message else vtype.message)
+               das.print_once(message) 
             return vv
       else:
          self._validate_self(value)
@@ -419,7 +420,8 @@ class Struct(dict, TypeValidator):
             try:
                vv = v.validate(value[k])
                if vv is not None and isinstance(v, Deprecated):
-                  das.print_once(v.message)
+                  message = ("[das] Field %s is deprecated" % repr(key) if not v.message else v.message)
+                  das.print_once(message)
                rv[k] = vv
             except KeyError, e:
                if not isinstance(v, Optional):
@@ -627,7 +629,7 @@ class Optional(TypeValidator):
 
 
 class Deprecated(Optional):
-   def __init__(self, type, message="[das] Deprecated"):
+   def __init__(self, type, message=""):
       super(Deprecated, self).__init__(type)
       self.message = message
 

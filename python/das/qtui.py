@@ -24,7 +24,7 @@ if not NoUI:
 
 
    class ModelItem(object):
-      ReservedTypeNames = ["empty", "boolean", "integer", "real", "string", "list", "tuple", "set", "dict", "struct"]
+      ReservedTypeNames = set(["alias", "empty", "boolean", "integer", "real", "string", "list", "tuple", "set", "dict", "struct"])
 
       def __init__(self, name, data, type=None, parent=None, row=0, key=None):
          super(ModelItem, self).__init__()
@@ -90,6 +90,8 @@ if not NoUI:
                      return False
             elif isinstance(rt, das.schematypes.Class):
                return (hasattr(rt.klass, "string_to_value") and hasattr(rt.klass, "value_to_string"))
+            elif isinstance(rt, das.schematypes.Alias):
+               return False
             return True
 
       def class_name(self, klass):
@@ -165,6 +167,15 @@ if not NoUI:
 
          return values
 
+      def exists(self):
+         if self.typestr != "alias":
+            if self.parent and self.parent.mapping and self.parent.mappingkeytype is None:
+               return (True if not self.optional else (self.key in self.parent.data))
+            else:
+               return True
+         else:
+            return False
+
       def update(self, data, type=None):
          self.children = []
          self.compound = False
@@ -175,9 +186,9 @@ if not NoUI:
          self.resizable = False
          self.orderable = False # orderable compound
          self.optional = False
-         self.editable = False
+         self.editable = False # will be false for aliases
          self.multi = False
-         self.data = data
+         self.data = data # for alias, it is the same data as the original
          self.type = type
          self.typestr = ""
 
@@ -185,6 +196,12 @@ if not NoUI:
             self.type = self.data._get_schema_type()
             if self.type is None:
                raise Exception("No schema type for model item")
+
+         if isinstance(self.type, das.schematypes.Alias):
+            # Shortcut
+            self.typestr = "alias"
+            self.data = None
+            return
 
          self.optional = isinstance(self.type, das.schematypes.Optional)
 
@@ -201,29 +218,32 @@ if not NoUI:
                self.typestr = "list"
                self.resizable = True
                self.orderable = True
-               for i in xrange(len(self.data)):
-                  itemname = "[%d]" % i
-                  itemdata = self.data[i]
-                  self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i))
+               if self.exists():
+                  for i in xrange(len(self.data)):
+                     itemname = "[%d]" % i
+                     itemdata = self.data[i]
+                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i))
 
             elif isinstance(self.type, das.schematypes.Tuple):
                self.typestr = "tuple"
                self.resizable = False
                self.orderable = True
-               for i in xrange(len(self.data)):
-                  itemname = "(%d)" % i
-                  itemdata = self.data[i]
-                  self.children.append(ModelItem(itemname, itemdata, type=self.type.types[i], parent=self, row=i))
+               if self.exists():
+                  for i in xrange(len(self.data)):
+                     itemname = "(%d)" % i
+                     itemdata = self.data[i]
+                     self.children.append(ModelItem(itemname, itemdata, type=self.type.types[i], parent=self, row=i))
 
             elif isinstance(self.type, das.schematypes.Set):
                self.typestr = "set"
                self.resizable = True
                self.orderable = False
-               i = 0
-               for itemdata in self.data:
-                  itemname = "{%d}" % i
-                  self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i))
-                  i += 1
+               if self.exists():
+                  i = 0
+                  for itemdata in self.data:
+                     itemname = "{%d}" % i
+                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i))
+                     i += 1
 
             elif isinstance(self.type, (das.schematypes.Struct, das.schematypes.StaticDict)):
                self.typestr = "struct"
@@ -232,17 +252,20 @@ if not NoUI:
                self.mapping = True
                self.mappingkeys = {}
                self.uniformmapping = False
+               i = 0
                for k, t in self.type.iteritems():
-                  if isinstance(t, das.schematypes.Alias):
-                     continue
                   optional = isinstance(t, das.schematypes.Optional)
                   self.mappingkeys[k] = optional
                   if optional:
                      self.resizable = True
-               i = 0
-               for k in sorted([x for x in self.data.iterkeys()]):
-                  v = self.data[k]
-                  self.children.append(ModelItem(k, v, type=self.type[k], parent=self, row=i, key=k))
+                  if self.exists():
+                     if isinstance(t, das.schematypes.Alias):
+                        v = None
+                     elif not k in self.data:
+                        v = t.make_default()
+                     else:
+                        v = self.data[k]
+                     self.children.append(ModelItem(k, v, type=t, parent=self, row=i, key=k))
                   i += 1
 
             elif isinstance(self.type, (das.schematypes.Dict, das.schematypes.DynamicDict)):
@@ -252,14 +275,15 @@ if not NoUI:
                self.mapping = True
                self.mappingkeytype = self.type.ktype
                self.uniformmapping = (len(self.type.vtypeOverrides) == 0)
-               i = 0
-               dkeys = [x for x in self.data.iterkeys()]
-               for k in sorted(dkeys):
-                  v = self.data[k]
-                  ks = str(k)
-                  vtype = self.type.vtypeOverrides.get(k, self.type.vtype)
-                  self.children.append(ModelItem(ks, v, type=vtype, parent=self, row=i, key=k))
-                  i += 1
+               if self.exists():
+                  i = 0
+                  dkeys = [x for x in self.data.iterkeys()]
+                  for k in sorted(dkeys):
+                     v = self.data[k]
+                     ks = str(k)
+                     vtype = self.type.vtypeOverrides.get(k, self.type.vtype)
+                     self.children.append(ModelItem(ks, v, type=vtype, parent=self, row=i, key=k))
+                     i += 1
 
          else:
             if self.multi:
@@ -277,6 +301,8 @@ if not NoUI:
                   self.typestr = "empty"
                elif isinstance(self.type, das.schematypes.Class):
                   self.typestr = self.class_name(self.type.klass)
+               elif isinstance(self.type, das.schematypes.Alias):
+                  self.typestr = "alias"
 
 
    class NewValueDialog(QtWidgets.QDialog):
@@ -734,7 +760,7 @@ if not NoUI:
       dataChanged2Args = QtCore.Signal(QtCore.QModelIndex, QtCore.QModelIndex)
       messageChanged = QtCore.Signal(str)
 
-      def __init__(self, data, type=None, name=None, parent=None):
+      def __init__(self, data, type=None, name=None, readonly=False, parent=None):
          super(Model, self).__init__(parent)
          # A little hacky but how else?
          if IsPySide2():
@@ -745,6 +771,7 @@ if not NoUI:
          self._rootItem = None
          self._orgData = None
          self._message = ""
+         self._readonly = readonly
          self._buildItemsTree(data=data, type=type, name=name)
 
       def __emitDataChanged(self, index1, index2):
@@ -823,6 +850,7 @@ if not NoUI:
                      parentIndex = index
                      curKey = ""
                      break
+            # may want to strip root name?
             idx += 1
          if curKey:
             print("Can't find index for '%s'" % s)
@@ -842,29 +870,34 @@ if not NoUI:
             flags = QtCore.Qt.ItemIsSelectable
             item = index.internalPointer()
 
-            if item.parent and not item.parent.mapping and item.parent.orderable:
-               flags = flags | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsDropEnabled
+            if not self._readonly:
+               if item.parent and not item.parent.mapping and item.parent.orderable:
+                  flags = flags | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsDropEnabled
 
-            if item.compound  and not item.mapping and item.orderable:
-               flags = flags | QtCore.Qt.ItemIsDropEnabled
+               if item.compound  and not item.mapping and item.orderable:
+                  flags = flags | QtCore.Qt.ItemIsDropEnabled
 
             if index.column() == 0:
-               flags = flags | QtCore.Qt.ItemIsEnabled
+               if item.exists():
+                  flags = flags | QtCore.Qt.ItemIsEnabled
                # flags = flags | QtCore.Qt.ItemIsUserCheckable
-               if item.parent:
-                  if item.parent.mapping and item.parent.mappingkeytype is not None:
-                     flags = flags | QtCore.Qt.ItemIsEditable
+               if not self._readonly:
+                  if item.parent:
+                     if item.parent.mapping and item.parent.mappingkeytype is not None:
+                        flags = flags | QtCore.Qt.ItemIsEditable
 
             elif index.column() == 1:
-               if not item.compound:
-                  flags = flags | QtCore.Qt.ItemIsEnabled
-               # any other cases?
-               if item.editable:
-                  flags = flags | QtCore.Qt.ItemIsEditable
+               if not self._readonly:
+                  if item.exists() and not item.compound:
+                     flags = flags | QtCore.Qt.ItemIsEnabled
+                  # any other cases?
+                  if item.editable:
+                     flags = flags | QtCore.Qt.ItemIsEditable
 
             elif index.column() == 2:
-               if item.editable and item.multi and len(item.get_valid_types()) > 1:
-                  flags = flags | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
+               if not self._readonly:
+                  if item.editable and item.multi and len(item.get_valid_types()) > 1:
+                     flags = flags | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
 
             return flags
 
@@ -935,7 +968,10 @@ if not NoUI:
             rv = item.name
 
          elif index.column() == 1:
-            if not item.compound:
+            if item.typestr == "alias":
+               rv = "= " + item.type.name
+
+            elif not item.compound:
                if role == QtCore.Qt.DisplayRole:
                   if not item.editable:
                      rv = "---"
@@ -1149,15 +1185,19 @@ if not NoUI:
       modelUpdated = QtCore.Signal(Model)
       messageChanged = QtCore.Signal(str)
 
-      def __init__(self, data, type=None, name=None, parent=None):
+      def __init__(self, data, type=None, name=None, readonly=False, parent=None):
          super(Editor, self).__init__(parent)
-         self.model = Model(data, type=type, name=name, parent=self)
+         self.model = Model(data, type=type, name=name, readonly=readonly, parent=self)
          self.delegate = ModelItemDelegate(parent=self)
          self.setModel(self.model)
          self.expandedState = {}
          self.checkedState = {}
          self.setItemDelegate(self.delegate)
-         QtCompat.setSectionResizeMode(self.header(), QtWidgets.QHeaderView.ResizeToContents)
+         #QtCompat.setSectionResizeMode(self.header(), QtWidgets.QHeaderView.ResizeToContents)
+         QtCompat.setSectionResizeMode(self.header(), QtWidgets.QHeaderView.Interactive)
+         self.header().setStretchLastSection(True)
+         self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+         #self.header().setMinimumSectionSize(200)
          self.setAnimated(True)
          self.setHeaderHidden(False)
          self.setItemsExpandable(True)
@@ -1185,58 +1225,75 @@ if not NoUI:
             pos = self.viewport().mapFromGlobal(gpos)
             modelIndex = self.indexAt(pos)
             item = (None if (modelIndex is None or not modelIndex.isValid()) else modelIndex.internalPointer())
-            actionAddItem = None
-            actionClearItems = None
-            if item and item.compound:
-               if item.mapping:
-                  if item.mappingkeytype is not None:
-                     actionAddItem = menu.addAction("Add Item...")
-                     actionAddItem.triggered.connect(self.makeOnAddDictItem(modelIndex))
-                     actionClearItems = menu.addAction("Clear Items")
-                     actionClearItems.triggered.connect(self.makeOnClearDictItems(modelIndex))
+            
+            if item:
+               if item.exists():
+                  actionAddItem = None
+                  actionClearItems = None
+                  if item.compound:
+                     if item.mapping:
+                        if item.mappingkeytype is not None:
+                           actionAddItem = menu.addAction("Add Item...")
+                           actionAddItem.triggered.connect(self.makeOnAddDictItem(modelIndex))
+                           actionClearItems = menu.addAction("Clear Items")
+                           actionClearItems.triggered.connect(self.makeOnClearDictItems(modelIndex))
+                     else:
+                        if item.orderable:
+                           if item.resizable:
+                              actionAddItem = menu.addAction("Add Item")
+                              actionAddItem.triggered.connect(self.makeOnAddSeqItem(modelIndex))
+                              actionClearItems = menu.addAction("Clear Items")
+                              actionClearItems.triggered.connect(self.makeOnClearSeqItems(modelIndex))
+                        else:
+                           actionAddItem = menu.addAction("Add Item...")
+                           actionAddItem.triggered.connect(self.makeOnAddSetItem(modelIndex))
+                           actionClearItems = menu.addAction("Clear Items")
+                           actionClearItems.triggered.connect(self.makeOnClearSetItems(modelIndex))
+                  if actionAddItem:
+                     menu.addSeparator()
+
+                  actionRemItem = None
+                  if item.parent:
+                     # parent is necessarily a compound
+                     if item.parent.mapping:
+                        if item.parent.mappingkeytype is not None:
+                           actionRemItem = menu.addAction("Remove Item")
+                           actionRemItem.triggered.connect(self.makeOnRemDictItem(modelIndex))
+                        elif item.optional:
+                           actionRemItem = menu.addAction("Remove Item")
+                           actionRemItem.triggered.connect(self.makeOnRemOptionalItem(modelIndex))
+                     else:
+                        if item.parent.orderable:
+                           if item.parent.resizable:
+                              actionRemItem = menu.addAction("Remove Item")
+                              actionRemItem.triggered.connect(self.makeOnRemSeqItem(modelIndex))
+                        else:
+                           actionRemItem = menu.addAction("Remove Item")
+                           actionRemItem.triggered.connect(self.makeOnRemSetItem(modelIndex))
+                  if actionRemItem:
+                     menu.addSeparator()
+
                else:
-                  if item.orderable:
-                     if item.resizable:
-                        actionAddItem = menu.addAction("Add Item")
-                        actionAddItem.triggered.connect(self.makeOnAddSeqItem(modelIndex))
-                        actionClearItems = menu.addAction("Clear Items")
-                        actionClearItems.triggered.connect(self.makeOnClearSeqItems(modelIndex))
-                  else:
-                     actionAddItem = menu.addAction("Add Item...")
-                     actionAddItem.triggered.connect(self.makeOnAddSetItem(modelIndex))
-                     actionClearItems = menu.addAction("Clear Items")
-                     actionClearItems.triggered.connect(self.makeOnClearSetItems(modelIndex))
-            if actionAddItem:
-               menu.addSeparator()
-            actionRemItem = None
-            if item and item.parent:
-               # parent is necessarily a compound
-               if item.parent.mapping:
-                  if item.parent.mappingkeytype is not None:
-                     actionRemItem = menu.addAction("Remove Item")
-                     actionRemItem.triggered.connect(self.makeOnRemDictItem(modelIndex))
-               else:
-                  if item.parent.orderable:
-                     if item.parent.resizable:
-                        actionRemItem = menu.addAction("Remove Item")
-                        actionRemItem.triggered.connect(self.makeOnRemSeqItem(modelIndex))
-                  else:
-                     actionRemItem = menu.addAction("Remove Item")
-                     actionRemItem.triggered.connect(self.makeOnRemSetItem(modelIndex))
-            if actionRemItem:
-               menu.addSeparator()
+                  if item.typestr != "alias":
+                     actionAddItem = menu.addAction("Add Item")
+                     actionAddItem.triggered.connect(self.makeOnAddOptionalItem(modelIndex))
+                     menu.addSeparator()
+
             actionExpandUnder = menu.addAction("Expand Under")
-            actionExpandUnder.setEnabled(True if item and item.compound else False)
+            actionExpandUnder.setEnabled(True if item and item.exists() and item.compound else False)
             actionExpandUnder.triggered.connect(self.makeOnExpandUnder(modelIndex))
             actionCollapseUnder = menu.addAction("Collapse Under")
-            actionCollapseUnder.setEnabled(True if item and item.compound else False)
+            actionCollapseUnder.setEnabled(True if item and item.exists() and item.compound else False)
             actionCollapseUnder.triggered.connect(self.makeOnCollapseUnder(modelIndex))
             menu.addSeparator()
+
             actionExpandAll = menu.addAction("Expand All")
             actionExpandAll.triggered.connect(self.onExpandAll)
             actionCollapseAll = menu.addAction("Collapse All")
             actionCollapseAll.triggered.connect(self.onCollapseAll)
+
             menu.popup(event.globalPos())
+
          else:
             super(Editor, self).mousePressEvent(event)
 
@@ -1276,6 +1333,8 @@ if not NoUI:
          for r in xrange(nr):
             self.resetExpandedState(index=self.model.index(r, 0, index))
 
+         self.model.layoutChanged.emit()
+
       def restoreExpandedState(self, index=None):
          if index is None:
             index = QtCore.QModelIndex()
@@ -1287,6 +1346,8 @@ if not NoUI:
          nr = self.model.rowCount(index)
          for r in xrange(nr):
             self.restoreExpandedState(index=self.model.index(r, 0, index))
+
+         self.model.layoutChanged.emit()
 
       def onItemCollapsed(self, modelIndex):
          k = self.getItemKey(modelIndex)
@@ -1353,6 +1414,11 @@ if not NoUI:
             self.addSetItem(index)
          return _callback
 
+      def makeOnAddOptionalItem(self, index):
+         def _callback(*args):
+            self.addOptionalItem(index)
+         return _callback
+
       def makeOnClearDictItems(self, index):
          def _callback(*args):
             self.clearDictItems(index)
@@ -1381,6 +1447,11 @@ if not NoUI:
       def makeOnRemSetItem(self, index):
          def _callback(*args):
             self.remSetItem(index)
+         return _callback
+
+      def makeOnRemOptionalItem(self, index):
+         def _callback(*args):
+            self.remOptionalItem(index)
          return _callback
 
       def addDictItem(self, index):
@@ -1422,6 +1493,14 @@ if not NoUI:
          dlg.accepted.connect(_addSetItem)
          dlg.show()
 
+      def addOptionalItem(self, index):
+         item = index.internalPointer()
+         v = item.type.make_default()
+         item.parent.data[item.key] = v
+         self.model.rebuild()
+         self.restoreExpandedState()
+         self.modelUpdated.emit(self.model)
+
       def clearDictItems(self, index):
          self.model.setData(index.sibling(index.row(), 1), {}, QtCore.Qt.EditRole)
 
@@ -1448,6 +1527,13 @@ if not NoUI:
       def remSetItem(self, index):
          item = index.internalPointer()
          item.parent.data.remove(item.data)
+         self.model.rebuild()
+         self.restoreExpandedState()
+         self.modelUpdated.emit(self.model)
+
+      def remOptionalItem(self, index):
+         item = index.internalPointer()
+         del(item.parent.data[item.key])
          self.model.rebuild()
          self.restoreExpandedState()
          self.modelUpdated.emit(self.model)

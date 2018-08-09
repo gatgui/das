@@ -10,6 +10,7 @@ if __name__ == "__main__":
    verbose = False
    file_path = None
    data = None
+   readonly = False
 
    args = sys.argv[1:]
    n = len(args)
@@ -38,6 +39,9 @@ if __name__ == "__main__":
             print("Invalid value '%s' for -ss/--strict-schema flag")
             sys.exit(1)
 
+      elif arg in ("-ro", "--read-only"):
+         readonly = True
+
       elif arg in ("-v", "--verbose"):
          verbose = True
 
@@ -48,6 +52,7 @@ if __name__ == "__main__":
          print("SYNOPSIS")
          print("  -st/--schema-type <s>                     : Explicitely set file schema type")
          print("  -ss/--strict-schema 0|1|on|off|true|false : Toggle strict schema check on/off")
+         print("  -ro/--read-only                           : Read only mode")
          print("  -v/--verbose                              : Enable verbose mode")
          print("  -h/--help                                 : Show this help")
          print("")
@@ -101,7 +106,7 @@ if __name__ == "__main__":
             actionSaveAs = QtWidgets.QAction(self)
             actionSaveAs.setText("Save As...")
             actionSaveAs.setShortcut("Ctrl+A")
-            actionSaveAs.setEnabled(data is not None)
+            actionSaveAs.setEnabled(not readonly and data is not None)
             actionSaveAs.triggered.connect(self.onSaveAs)
             actionQuit = QtWidgets.QAction(self)
             actionQuit.setText("Quit")
@@ -125,7 +130,7 @@ if __name__ == "__main__":
             layout.setContentsMargins(10, 10, 10, 10)
             layout.setSpacing(5)
             name = "<%s>" % ("data" if not self.path else os.path.basename(self.path))
-            self.editWidget = das.qtui.Editor(data, name=name, parent=centralWidget)
+            self.editWidget = das.qtui.Editor(data, name=name, readonly=readonly, parent=centralWidget)
             self.infoLabel = QtWidgets.QLabel("", parent=centralWidget)
             layout.addWidget(self.editWidget, 1)
             layout.addWidget(self.infoLabel)
@@ -137,7 +142,7 @@ if __name__ == "__main__":
             self.actionSaveAs = actionSaveAs
 
          def onOpen(self):
-            if self.editWidget.hasDataChanged():
+            if not readonly and self.editWidget.hasDataChanged():
                rv = QtWidgets.QMessageBox.question(self, "Save Current Data", "Data has changed since it has been loaded.\nWould you like to save the changes?", buttons=QtWidgets.QMessageBox.Yes|QtWidgets.QMessageBox.No, defaultButton=QtWidgets.QMessageBox.No)
                if rv == QtWidgets.QMessageBox.Yes:
                   self.onSave()
@@ -148,7 +153,7 @@ if __name__ == "__main__":
                   data = das.read(path)
                   self.editWidget.setData(data)
                   self.path = path
-                  self.actionSaveAs.setEnabled(True)
+                  self.actionSaveAs.setEnabled(not readonly)
                   self.actionSave.setEnabled(False)
                except Exception, e:
                   QtWidgets.QMessageBox.critical(self, "Error", "Couldn't read file '%s'\n%s" % (path, e), QtWidgets.QMessageBox.Close)
@@ -158,7 +163,7 @@ if __name__ == "__main__":
                das.write(self.editWidget.getData(), self.path)
                self.editWidget.cleanData()
             except Exception, e:
-               QtWidgets.QMessageBox.critical(self, "Error", "Couldn't save data to '%s'\n%s" % (path, e), QtWidgets.QMessageBox.Close)
+               QtWidgets.QMessageBox.critical(self, "Error", "Couldn't save data to '%s'\n%s" % (self.path, e), QtWidgets.QMessageBox.Close)
 
          def onSaveAs(self):
             rv = QtWidgets.QFileDialog.getSaveFileName(self, "Save File", "", "All Files (*.*)")
@@ -174,7 +179,8 @@ if __name__ == "__main__":
             self.infoLabel.setText(msg)
 
          def onModelUpdated(self, model):
-            self.actionSave.setEnabled(model.hasDataChanged())
+            if not readonly:
+               self.actionSave.setEnabled(model.hasDataChanged())
             if verbose and model.hasDataChanged():
                das.pprint(model.getData())
 
