@@ -1050,6 +1050,9 @@ if not NoUI:
             return False
 
          elif role == QtCore.Qt.EditRole:
+            if self._readonly:
+               return False
+
             if index.column() == 0:
                # Dict/DynamicDict keys
                item = index.internalPointer()
@@ -1114,6 +1117,9 @@ if not NoUI:
          return data
 
       def dropMimeData(self, data, action, row, column, parentIndex):
+         if self._readonly:
+            return False
+
          if not data.hasFormat("text/plain"):
             return False
          elif action == QtCore.Qt.IgnoreAction:
@@ -1193,18 +1199,15 @@ if not NoUI:
          self.expandedState = {}
          self.checkedState = {}
          self.setItemDelegate(self.delegate)
-         #QtCompat.setSectionResizeMode(self.header(), QtWidgets.QHeaderView.ResizeToContents)
          QtCompat.setSectionResizeMode(self.header(), QtWidgets.QHeaderView.Interactive)
          self.header().setStretchLastSection(True)
          self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-         #self.header().setMinimumSectionSize(200)
          self.setAnimated(True)
          self.setHeaderHidden(False)
          self.setItemsExpandable(True)
          self.setAllColumnsShowFocus(True)
          self.setRootIsDecorated(True)
          self.setSortingEnabled(False)
-         # self.setUniformRowHeights(True)
          self.setDragEnabled(True)
          self.setAcceptDrops(True)
          self.setDropIndicatorShown(True)
@@ -1216,6 +1219,7 @@ if not NoUI:
          index = QtCore.QModelIndex()
          if self.model.rowCount(index) > 0:
             self.setExpanded(self.model.index(0, 0, index), True)
+         self._readonly = readonly
 
       def mousePressEvent(self, event):
          if event.button() == QtCore.Qt.RightButton:
@@ -1223,15 +1227,16 @@ if not NoUI:
             menu = QtWidgets.QMenu(self)
 
             # Selected items
-            keys = set()
             iipairs = []
-            sel = self.selectionModel().selectedIndexes()
-            for index in sel:
-               item = index.internalPointer()
-               key = item.fullname()
-               if not key in keys:
-                  keys.add(key)
-                  iipairs.append((index, item))
+            if not self._readonly:
+               keys = set()
+               sel = self.selectionModel().selectedIndexes()
+               for index in sel:
+                  item = index.internalPointer()
+                  key = item.fullname()
+                  if not key in keys:
+                     keys.add(key)
+                     iipairs.append((index, item))
 
             if len(set(map(lambda x: "" if x[1].parent is None else x[1].parent.fullname(), iipairs))) == 1:
                # All items have same parent
@@ -1287,7 +1292,7 @@ if not NoUI:
             item = (None if (modelIndex is None or not modelIndex.isValid()) else modelIndex.internalPointer())
             validitem = (item and item.exists())
 
-            if item:
+            if not self._readonly and item:
                if item.exists():
                   if item.parent and item.parent.mapping and item.parent.mappingkeytype is None and item.optional:
                      actionRemItem = menu.addAction("Remove '%s'" % item.name)
