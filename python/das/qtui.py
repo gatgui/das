@@ -1221,71 +1221,82 @@ if not NoUI:
          if event.button() == QtCore.Qt.RightButton:
             event.accept()
             menu = QtWidgets.QMenu(self)
-            gpos = QtGui.QCursor.pos()
-            pos = self.viewport().mapFromGlobal(gpos)
-            modelIndex = self.indexAt(pos)
-            item = (None if (modelIndex is None or not modelIndex.isValid()) else modelIndex.internalPointer())
-            
-            if item:
-               if item.exists():
+
+            # Selected items
+            keys = set()
+            iipairs = []
+            sel = self.selectionModel().selectedIndexes()
+            for index in sel:
+               item = index.internalPointer()
+               key = item.fullname()
+               if not key in keys:
+                  keys.add(key)
+                  iipairs.append((index, item))
+
+            if len(set(map(lambda x: "" if x[1].parent is None else x[1].parent.fullname(), iipairs))) == 1:
+               # All items have same parent
+               index, item = iipairs[0]
+
+               if len(iipairs) == 1 and item.exists():
                   actionAddItem = None
                   actionClearItems = None
                   if item.compound:
                      if item.mapping:
                         if item.mappingkeytype is not None:
-                           actionAddItem = menu.addAction("Add Item...")
-                           actionAddItem.triggered.connect(self.makeOnAddDictItem(modelIndex))
-                           actionClearItems = menu.addAction("Clear Items")
-                           actionClearItems.triggered.connect(self.makeOnClearDictItems(modelIndex))
+                           actionAddItem = menu.addAction("Add Key...")
+                           actionAddItem.triggered.connect(self.makeOnAddDictItem(index))
+                           actionClearItems = menu.addAction("Clear Keys")
+                           actionClearItems.triggered.connect(self.makeOnClearDictItems(index))
                      else:
                         if item.orderable:
                            if item.resizable:
-                              actionAddItem = menu.addAction("Add Item")
-                              actionAddItem.triggered.connect(self.makeOnAddSeqItem(modelIndex))
-                              actionClearItems = menu.addAction("Clear Items")
-                              actionClearItems.triggered.connect(self.makeOnClearSeqItems(modelIndex))
+                              actionAddItem = menu.addAction("Append Element")
+                              actionAddItem.triggered.connect(self.makeOnAddSeqItem(index))
+                              actionClearItems = menu.addAction("Clear List")
+                              actionClearItems.triggered.connect(self.makeOnClearSeqItems(index))
                         else:
-                           actionAddItem = menu.addAction("Add Item...")
-                           actionAddItem.triggered.connect(self.makeOnAddSetItem(modelIndex))
-                           actionClearItems = menu.addAction("Clear Items")
-                           actionClearItems.triggered.connect(self.makeOnClearSetItems(modelIndex))
+                           actionAddItem = menu.addAction("Add Element...")
+                           actionAddItem.triggered.connect(self.makeOnAddSetItem(index))
+                           actionClearItems = menu.addAction("Clear Set")
+                           actionClearItems.triggered.connect(self.makeOnClearSetItems(index))
                   if actionAddItem:
                      menu.addSeparator()
 
+               if item.parent:
                   actionRemItem = None
-                  if item.parent:
-                     # parent is necessarily a compound
-                     if item.parent.mapping:
-                        if item.parent.mappingkeytype is not None:
-                           actionRemItem = menu.addAction("Remove Item")
-                           actionRemItem.triggered.connect(self.makeOnRemDictItem(modelIndex))
-                        elif item.optional:
-                           actionRemItem = menu.addAction("Remove Item")
-                           actionRemItem.triggered.connect(self.makeOnRemOptionalItem(modelIndex))
+                  indices = [x[0] for x in iipairs]
+                  if item.parent.mapping:
+                     if item.parent.mappingkeytype is not None:
+                        actionRemItem = menu.addAction("Remove Key%s" % ("s" if len(iipairs) > 1 else ""))
+                        actionRemItem.triggered.connect(self.makeOnRemDictItems(indices))
+                  else:
+                     if item.parent.orderable:
+                        if item.parent.resizable:
+                           actionRemItem = menu.addAction("Remove Element%s" % ("s" if len(iipairs) > 1 else ""))
+                           actionRemItem.triggered.connect(self.makeOnRemSeqItems(indices))
                      else:
-                        if item.parent.orderable:
-                           if item.parent.resizable:
-                              actionRemItem = menu.addAction("Remove Item")
-                              actionRemItem.triggered.connect(self.makeOnRemSeqItem(modelIndex))
-                        else:
-                           actionRemItem = menu.addAction("Remove Item")
-                           actionRemItem.triggered.connect(self.makeOnRemSetItem(modelIndex))
+                        actionRemItem = menu.addAction("Remove Element%s" % ("s" if len(iipairs) > 1 else ""))
+                        actionRemItem.triggered.connect(self.makeOnRemSetItems(indices))
                   if actionRemItem:
                      menu.addSeparator()
 
-               else:
-                  if item.typestr != "alias":
-                     actionAddItem = menu.addAction("Add Item")
-                     actionAddItem.triggered.connect(self.makeOnAddOptionalItem(modelIndex))
-                     menu.addSeparator()
+            # Clicked item
+            gpos = QtGui.QCursor.pos()
+            pos = self.viewport().mapFromGlobal(gpos)
+            modelIndex = self.indexAt(pos)
+            item = (None if (modelIndex is None or not modelIndex.isValid()) else modelIndex.internalPointer())
+            validitem = (item and item.exists())
 
-            actionExpandUnder = menu.addAction("Expand Under")
-            actionExpandUnder.setEnabled(True if item and item.exists() and item.compound else False)
-            actionExpandUnder.triggered.connect(self.makeOnExpandUnder(modelIndex))
-            actionCollapseUnder = menu.addAction("Collapse Under")
-            actionCollapseUnder.setEnabled(True if item and item.exists() and item.compound else False)
-            actionCollapseUnder.triggered.connect(self.makeOnCollapseUnder(modelIndex))
-            menu.addSeparator()
+            if item:
+               if item.exists():
+                  if item.parent and item.parent.mapping and item.parent.mappingkeytype is None and item.optional:
+                     actionRemItem = menu.addAction("Remove '%s'" % item.name)
+                     actionRemItem.triggered.connect(self.makeOnRemOptionalItem(modelIndex))
+                     menu.addSeparator()
+               elif item.typestr != "alias":
+                  actionAddItem = menu.addAction("Add '%s'" % item.name)
+                  actionAddItem.triggered.connect(self.makeOnAddOptionalItem(modelIndex))
+                  menu.addSeparator()
 
             actionExpandAll = menu.addAction("Expand All")
             actionExpandAll.triggered.connect(self.onExpandAll)
@@ -1363,33 +1374,9 @@ if not NoUI:
          self.expandAll()
          self.resetExpandedState()
 
-      def makeOnExpandUnder(self, index):
-         def _callback(*args):
-            self.expandUnder(index)
-         return _callback
-
-      def expandUnder(self, index):
-         if index.isValid():
-            self.setExpanded(index, True)
-            nr = self.model.rowCount(index)
-            for r in xrange(nr):
-               self.expandUnder(self.model.index(r, 0, index))
-
       def onCollapseAll(self):
          self.collapseAll()
          self.resetExpandedState()
-
-      def makeOnCollapseUnder(self, index):
-         def _callback(*args):
-            self.collapseUnder(index)
-         return _callback
-
-      def collapseUnder(self, index):
-         if index.isValid():
-            self.setExpanded(index, False)
-            nr = self.model.rowCount(index)
-            for r in xrange(nr):
-               self.collapseUnder(self.model.index(r, 0, index))
 
       def onContentChanged(self, topLeft, bottomRight):
          # Forward signal
@@ -1434,19 +1421,19 @@ if not NoUI:
             self.clearSetItems(index)
          return _callback
 
-      def makeOnRemDictItem(self, index):
+      def makeOnRemDictItems(self, indices):
          def _callback(*args):
-            self.remDictItem(index)
+            self.remDictItems(indices)
          return _callback
 
-      def makeOnRemSeqItem(self, index):
+      def makeOnRemSeqItems(self, indices):
          def _callback(*args):
-            self.remSeqItem(index)
+            self.remSeqItems(indices)
          return _callback
 
-      def makeOnRemSetItem(self, index):
+      def makeOnRemSetItems(self, indices):
          def _callback(*args):
-            self.remSetItem(index)
+            self.remSetItems(indices)
          return _callback
 
       def makeOnRemOptionalItem(self, index):
@@ -1510,23 +1497,42 @@ if not NoUI:
       def clearSetItems(self, index):
          self.model.setData(index.sibling(index.row(), 1), set(), QtCore.Qt.EditRole)
 
-      def remDictItem(self, index):
-         item = index.internalPointer()
-         del(item.parent.data[item.key])
+      def remDictItems(self, indices):
+         for index in indices:
+            item = index.internalPointer()
+            del(item.parent.data[item.key])
          self.model.rebuild()
          self.restoreExpandedState()
          self.modelUpdated.emit(self.model)
 
-      def remSeqItem(self, index):
-         parentIndex = self.model.parent(index)
-         item = index.internalPointer()
-         seq = item.parent.data
-         seq = seq[:item.row] + seq[item.row+1:]
-         self.model.setData(parentIndex.sibling(parentIndex.row(), 1), seq, QtCore.Qt.EditRole)
+      def remSeqItems(self, indices):
+         # Not really
+         if len(indices) > 0:
+            parents = set(map(lambda x: "" if x.parent is None else x.parent.fullname(), [y.internalPointer() for y in indices]))
+            if len(parents) != 1:
+               return
 
-      def remSetItem(self, index):
-         item = index.internalPointer()
-         item.parent.data.remove(item.data)
+            parentIndex = self.model.parent(indices[0])
+            curseq = parentIndex.internalPointer().data
+            newseq = []
+            remrows = set([index.row() for index in indices])
+            for row in xrange(len(curseq)):
+               if not row in remrows:
+                  newseq.append(curseq[row])
+
+            self.model.setData(parentIndex.sibling(parentIndex.row(), 1), newseq, QtCore.Qt.EditRole)
+
+         for index in indices:
+            
+            item = index.internalPointer()
+            seq = item.parent.data
+            seq = seq[:item.row] + seq[item.row+1:]
+         
+
+      def remSetItems(self, indices):
+         for index in indices:
+            item = index.internalPointer()
+            item.parent.data.remove(item.data)
          self.model.rebuild()
          self.restoreExpandedState()
          self.modelUpdated.emit(self.model)
