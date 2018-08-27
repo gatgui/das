@@ -2,7 +2,7 @@
 # version: 1.0.0
 # das_minimum_version: 0.5
 {
-   "pod_value": Or(Boolean(default=False), Integer(default=0), Real(default=0.0), String(default=""), Empty()),
+   "pod_value": Or(Boolean(default=False), Integer(default=0), Real(default=0.0), String(default=""), Empty(), description="POD Value"),
    "struct_value": Struct(boolean_value=Boolean(default=False),
                           integer_value=Integer(default=0),
                           bounded_integer_value=Integer(default=5, min=0, max=10),
@@ -17,13 +17,15 @@
                           empty_value=Empty(),
                           optional_value=Optional(SchemaType("dict_value")),
                           deprecated_value=Deprecated(String(default="deprecated")),
-                          alias_value=Alias("real_value")),
-   "tuple_value": Tuple(Real(default=0.0, min=0.0, max=1.0), Real(default=0.0, min=0.0, max=1.0)),
+                          alias_value=Alias("real_value"),
+                          __description__="A structure"),
+   "tuple_value": Tuple(Real(default=0.0, min=0.0, max=1.0), Real(default=0.0, min=0.0, max=1.0), description="Pair of 2 normalized [0,1] real value"),
    "sequence_value": Sequence(SchemaType("tuple_value")),
-   "dict_value": Dict(ktype=SchemaType("tuple_value"), vtype=SchemaType("pod_value")),
+   "dict_value": Dict(ktype=SchemaType("tuple_value"), vtype=SchemaType("pod_value"), __description__="A dynamic dictionary"),
    "set_value": Set(type=SchemaType("pod_value")),
    "everything": Struct(set_value=SchemaType("set_value"),
                         dict_value=SchemaType("dict_value"),
                         sequence_value=SchemaType("sequence_value"),
-                        struct_value=SchemaType("struct_value"))
+                        struct_value=SchemaType("struct_value"),
+                        __description__="Everything")
 }
