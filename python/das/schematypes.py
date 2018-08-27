@@ -9,8 +9,8 @@ class ValidationError(Exception):
 
 
 class TypeValidator(object):
-   def __init__(self, default=None, description=None):
-      super(TypeValidator, self).__init__()
+   def __init__(self, default=None, description=None, **kwargs):
+      super(TypeValidator, self).__init__(**kwargs)
       self.default_validated = False
       self.default = default
       self.description = ("" if description is None else description)
@@ -46,6 +46,9 @@ class TypeValidator(object):
 
    def __str__(self):
       return self.__repr__()
+
+   def _decode(self, encoding):
+      return self.__class__(default=das.decode(self.default, encoding), description=das.decode(self.description, encoding))
 
 
 class Boolean(TypeValidator):
@@ -112,7 +115,7 @@ class Integer(TypeValidator):
       return self
 
    def __repr__(self):
-      s = "Integer(";
+      s = "Integer("
       sep = ""
       if self.default is not None and self.default != 0:
          s += "default=%s" % self.default
@@ -150,7 +153,7 @@ class Real(TypeValidator):
       return self._validate_self(value)
 
    def __repr__(self):
-      s = "Real(";
+      s = "Real("
       sep = ""
       if self.default is not None and self.default != 0.0:
          s += "default=%s" % self.default
@@ -210,7 +213,7 @@ class String(TypeValidator):
       return self
 
    def __repr__(self):
-      s = "String(";
+      s = "String("
       sep = ""
       if self.default is not None and self.default != "":
          s += "default=%s" % repr(self.default)
@@ -386,15 +389,15 @@ class Tuple(TypeValidator):
       return s + ")"
 
 
-class Struct(dict, TypeValidator):
+class Struct(TypeValidator, dict):
    UseDefaultForMissingFields = False
 
-   def __init__(self, **kwargs):
+   def __init__(self, __description__=None, **kwargs):
       hasdefault = ("default" in kwargs)
       default = None
       if hasdefault:
          default = kwargs["default"]
-         print("[das] 'default' treated as a standard field for Struct type. Use '__default__' to set type's default value")
+         print("[das] 'default' treated as a standard field for Struct type")
          del(kwargs["default"])
       
       hasdesc = ("description" in kwargs)
@@ -404,25 +407,16 @@ class Struct(dict, TypeValidator):
          print("[das] 'description' treated as standard field for Struct type. Use '__description__' to set type's description text")
          del(kwargs["description"])
 
-      tdef = None
-      if "__default__" in kwargs:
-         tdef = kwargs["__default__"]
-         del(kwargs["__default__"])
-
-      tdesc = None
-      if "__description__" in kwargs:
-         tdesc = kwargs["__description__"]
-         del(kwargs["__description__"])
-
-      TypeValidator.__init__(self, default=tdef, description=tdesc)
+      super(Struct, self).__init__(description=__description__, **kwargs)
 
       if hasdefault:
-         kwargs["default"] = default
+         self["default"] = default
 
       if hasdesc:
-         kwargs["description"] = desc
-
-      dict.__init__(self, **kwargs)
+         self["description"] = desc
+      # super(Struct, self).__init__(description=__description__)
+      # for k, v in kwargs.iteritems():
+      #    self[k] = v
 
    def _validate_self(self, value):
       if not isinstance(value, (dict, das.types.Struct)):
@@ -483,7 +477,7 @@ class Struct(dict, TypeValidator):
                continue
             self.default[k] = t.make_default()
          self.default._set_schema_type(self)
-      return super(Struct, self).make_default()
+      return TypeValidator.make_default(self)
 
    def make(self, *args, **kwargs):
       rv = self.make_default()
@@ -503,28 +497,24 @@ class Struct(dict, TypeValidator):
          v = self[k]
          s += "%s%s=%s" % (sep, k, v)
          sep = ", "
-      if self.default:
-         s += "%s__default__=%s" % (sep, self.default)
       if self.description:
-         s += "%s__description__%s" % (sep, repr(self.description))
+         s += "%s__description__=%s" % (sep, repr(self.description))
       return s + ")"
 
 
 class StaticDict(Struct):
-   def __init__(self, **kwargs):
-      super(StaticDict, self).__init__(**kwargs)
+   def __init__(self, __description__=None, **kwargs):
+      super(StaticDict, self).__init__(__description__=__description__, **kwargs)
       das.print_once("[das] Warning: Schema type 'StaticDict' is deprecated, use 'Struct' instead")
 
 
 class Dict(TypeValidator):
-   def __init__(self, ktype, vtype, **kwargs):
+   def __init__(self, ktype, vtype, __default__=None, __description__=None, **kwargs):
       if "default" in kwargs:
          print("[das] 'default' treated as a possible key name for Dict type overrides. Use '__default__' to set type's default value")
       if "description" in kwargs:
          print("[das] 'description' treated as a possible key name for Dict type overrides. Use '__description__' to set type's description text")
-      default = kwargs.get("__default__", None)
-      description = kwargs.get("__description__", None)
-      super(Dict, self).__init__(default=({} if default is None else default), description=description)
+      super(Dict, self).__init__(default=({} if __default__ is None else __default__), description=__description__)
       self.ktype = ktype
       self.vtype = vtype
       self.vtypeOverrides = {}
@@ -571,8 +561,8 @@ class Dict(TypeValidator):
 
 
 class DynamicDict(Dict):
-   def __init__(self, ktype, vtype, **kwargs):
-      super(DynamicDict, self).__init__(ktype, vtype, **kwargs)
+   def __init__(self, ktype, vtype, __default__=None, __description__=None, **kwargs):
+      super(DynamicDict, self).__init__(ktype, vtype, __default__=__default__, __description__=__description__, **kwargs)
       das.print_once("[das] Warning: Schema type 'DynamicDict' is deprecated, use 'Dict' instead")
 
 
