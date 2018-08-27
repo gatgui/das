@@ -503,6 +503,10 @@ class Struct(dict, TypeValidator):
          v = self[k]
          s += "%s%s=%s" % (sep, k, v)
          sep = ", "
+      if self.default:
+         s += "%s__default__=%s" % (sep, self.default)
+      if self.description:
+         s += "%s__description__%s" % (sep, repr(self.description))
       return s + ")"
 
 
@@ -557,10 +561,10 @@ class Dict(TypeValidator):
 
    def __repr__(self):
       s = "Dict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
-      if self.default is not None:
-         s += ", __default__=%s" % self.default
       for k, v in self.vtypeOverrides.iteritems():
          s += ", %s=%s" % (k, v)
+      if self.default is not None:
+         s += ", __default__=%s" % self.default
       if self.description:
          s += ", __description__=%s" % repr(self.description)
       return s + ")"
