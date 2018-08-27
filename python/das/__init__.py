@@ -186,7 +186,9 @@ def ascii_or_unicode(s, encoding=None):
 
 
 def decode(d, encoding):
-   if isinstance(d, basestring):
+   if hasattr(d, "_decode") and callable(getattr(d, "_decode")):
+      rv = d._decode(encoding)
+   elif isinstance(d, basestring):
       return ascii_or_unicode(d, encoding=encoding)
    elif isinstance(d, list):
       rv = d.__class__([decode(x, encoding) for x in d])
@@ -202,8 +204,6 @@ def decode(d, encoding):
       rv = d.__class__()
       for k, v in d._dict.iteritems():
          rv[k] = decode(v, encoding)
-   elif hasattr(d, "_decode") and callable(getattr(d, "_decode")):
-      rv = d._decode(encoding)
    else:
       rv = d
    return rv
