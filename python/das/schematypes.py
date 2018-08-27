@@ -9,10 +9,11 @@ class ValidationError(Exception):
 
 
 class TypeValidator(object):
-   def __init__(self, default=None):
+   def __init__(self, default=None, description=None):
       super(TypeValidator, self).__init__()
       self.default_validated = False
       self.default = default
+      self.description = ("" if description is None else description)
 
    def validate(self, value, key=None, index=None):
       mixins = (None if not das.has_bound_mixins(value) else das.get_bound_mixins(value))
@@ -48,8 +49,8 @@ class TypeValidator(object):
 
 
 class Boolean(TypeValidator):
-   def __init__(self, default=None):
-      super(Boolean, self).__init__(default=(False if default is None else default))
+   def __init__(self, default=None, description=None):
+      super(Boolean, self).__init__(default=(False if default is None else default), description=description)
 
    def _validate_self(self, value):
       if not isinstance(value, bool):
@@ -60,15 +61,19 @@ class Boolean(TypeValidator):
       return self._validate_self(value)
 
    def __repr__(self):
-      s = "Boolean(";
+      s = "Boolean("
+      sep = ""
       if self.default is not None:
          s += "default=%s" % self.default
+         sep = ", "
+      if self.description:
+         s += "%sdescription=%s" % (sep, repr(self.description))
       return s + ")"
 
 
 class Integer(TypeValidator):
-   def __init__(self, default=None, min=None, max=None, enum=None):
-      super(Integer, self).__init__(default=(0 if default is None else default))
+   def __init__(self, default=None, min=None, max=None, enum=None, description=None):
+      super(Integer, self).__init__(default=(0 if default is None else default), description=description)
       self.min = min
       self.max = max
       self.enum = enum
@@ -109,7 +114,7 @@ class Integer(TypeValidator):
    def __repr__(self):
       s = "Integer(";
       sep = ""
-      if self.default is not None:
+      if self.default is not None and self.default != 0:
          s += "default=%s" % self.default
          sep = ", "
       if self.min is not None:
@@ -120,12 +125,15 @@ class Integer(TypeValidator):
          sep = ", "
       if self.enum is not None:
          s += "%senum={%s}" % (sep, ", ".join(map(lambda x: "'%s': %s" % x, self.enum.items())))
+         sep = ", "
+      if self.description:
+         s += "%sdescription=%s" % (sep, repr(self.description))
       return s + ")"
 
 
 class Real(TypeValidator):
-   def __init__(self, default=None, min=None, max=None):
-      super(Real, self).__init__(default=(0.0 if default is None else default))
+   def __init__(self, default=None, min=None, max=None, description=None):
+      super(Real, self).__init__(default=(0.0 if default is None else default), description=description)
       self.min = min
       self.max = max
 
@@ -144,7 +152,7 @@ class Real(TypeValidator):
    def __repr__(self):
       s = "Real(";
       sep = ""
-      if self.default is not None:
+      if self.default is not None and self.default != 0.0:
          s += "default=%s" % self.default
          sep = ", "
       if self.min is not None:
@@ -152,12 +160,15 @@ class Real(TypeValidator):
          sep = ", "
       if self.max is not None:
          s += "%smax=%d" % (sep, self.max)
+         sep = ", "
+      if self.description:
+         s += "%sdescription=%s" % (sep, repr(self.description))
       return s + ")"
 
 
 class String(TypeValidator):
-   def __init__(self, default=None, choices=None, matches=None, strict=True):
-      super(String, self).__init__(default=("" if default is None else default))
+   def __init__(self, default=None, choices=None, matches=None, strict=True, description=None):
+      super(String, self).__init__(default=("" if default is None else default), description=description)
       self.choices = choices
       self.strict = strict
       self.matches = None
@@ -212,21 +223,24 @@ class String(TypeValidator):
                s += "%schoices=%s.%s" % (sep, self.choices.__module__, self.choices.__name__)
          else:
             s += "%schoices=[" % sep
-            sep = ""
+            isep = ""
             for c in self.choices:
-               s += "%s%s" % (sep, repr(c))
-               sep = ", "
+               s += "%s%s" % (isep, repr(c))
+               isep = ", "
             s += "]"
-         s += ", strict=%s" % self.strict
          sep = ", "
+         s += "%sstrict=%s" % (sep, self.strict)
       if self.matches is not None:
-         s += ", matches=%s" % (sep, repr(self.matches.pattern))
+         s += "%smatches=%s" % (sep, repr(self.matches.pattern))
+         sep = ", "
+      if self.description:
+         s += "%sdescription=%s" % (sep, repr(self.description))
       return s + ")"
 
 
 class Set(TypeValidator):
-   def __init__(self, type, default=None):
-      super(Set, self).__init__(default=(set() if default is None else default))
+   def __init__(self, type, default=None, description=None):
+      super(Set, self).__init__(default=(set() if default is None else default), description=description)
       self.type = type
 
    def _validate_self(self, value):
@@ -256,14 +270,16 @@ class Set(TypeValidator):
 
    def __repr__(self):
       s = "Set(type=%s" % self.type
-      if self.default is not None:
+      if self.default:
          s += ", default=%s" % self.default
+      if self.description:
+         s += ", description=%s" % repr(self.description)
       return s + ")"
 
 
 class Sequence(TypeValidator):
-   def __init__(self, type, default=None, size=None, min_size=None, max_size=None):
-      super(Sequence, self).__init__(default=([] if default is None else default))
+   def __init__(self, type, default=None, size=None, min_size=None, max_size=None, description=None):
+      super(Sequence, self).__init__(default=([] if default is None else default), description=description)
       self.size = size
       self.min_size = min_size
       self.max_size = max_size
@@ -305,7 +321,7 @@ class Sequence(TypeValidator):
    def __repr__(self):
       s = "Sequence(type=%s" % self.type
       sep = ", "
-      if self.default is not None:
+      if self.default:
          s += "%sdefault=%s" % (sep, self.default)
       if self.size is not None:
          s += "%ssize=%d" % (sep, self.size)
@@ -314,12 +330,14 @@ class Sequence(TypeValidator):
             s += "%smin_size=%d" % (sep, self.min_size)
          if self.max_size is not None:
             s += "%smax_size=%d" % (sep, self.max_size)
+      if self.description:
+         s += "%sdescription=%s" % (sep, repr(self.description))
       return s + ")"
 
 
 class Tuple(TypeValidator):
    def __init__(self, *args, **kwargs):
-      super(Tuple, self).__init__(default=kwargs.get("default", None))
+      super(Tuple, self).__init__(default=kwargs.get("default", None), description=kwargs.get("description", None))
       self.types = args
 
    def _validate_self(self, value):
@@ -362,6 +380,9 @@ class Tuple(TypeValidator):
          sep = ", "
       if self.default is not None:
          s += "%sdefault=%s" % (sep, self.default)
+         sep = ", "
+      if self.description:
+         s += "%sdescription=%s" % (sep, repr(self.description))
       return s + ")"
 
 
@@ -373,11 +394,34 @@ class Struct(dict, TypeValidator):
       default = None
       if hasdefault:
          default = kwargs["default"]
-         print("[das] 'default' treated as a standard field for Struct type")
+         print("[das] 'default' treated as a standard field for Struct type. Use '__default__' to set type's default value")
          del(kwargs["default"])
-      TypeValidator.__init__(self)
+      
+      hasdesc = ("description" in kwargs)
+      desc = None
+      if hasdesc:
+         desc = kwargs["description"]
+         print("[das] 'description' treated as standard field for Struct type. Use '__description__' to set type's description text")
+         del(kwargs["description"])
+
+      tdef = None
+      if "__default__" in kwargs:
+         tdef = kwargs["__default__"]
+         del(kwargs["__default__"])
+
+      tdesc = None
+      if "__description__" in kwargs:
+         tdesc = kwargs["__description__"]
+         del(kwargs["__description__"])
+
+      TypeValidator.__init__(self, default=tdef, description=tdesc)
+
       if hasdefault:
          kwargs["default"] = default
+
+      if hasdesc:
+         kwargs["description"] = desc
+
       dict.__init__(self, **kwargs)
 
    def _validate_self(self, value):
@@ -469,8 +513,14 @@ class StaticDict(Struct):
 
 
 class Dict(TypeValidator):
-   def __init__(self, ktype, vtype, default=None, **kwargs):
-      super(Dict, self).__init__(default=({} if default is None else default))
+   def __init__(self, ktype, vtype, **kwargs):
+      if "default" in kwargs:
+         print("[das] 'default' treated as a possible key name for Dict type overrides. Use '__default__' to set type's default value")
+      if "description" in kwargs:
+         print("[das] 'description' treated as a possible key name for Dict type overrides. Use '__description__' to set type's description text")
+      default = kwargs.get("__default__", None)
+      description = kwargs.get("__description__", None)
+      super(Dict, self).__init__(default=({} if default is None else default), description=description)
       self.ktype = ktype
       self.vtype = vtype
       self.vtypeOverrides = {}
@@ -508,25 +558,27 @@ class Dict(TypeValidator):
    def __repr__(self):
       s = "Dict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
       if self.default is not None:
-         s += ", default=%s" % self.default
+         s += ", __default__=%s" % self.default
       for k, v in self.vtypeOverrides.iteritems():
          s += ", %s=%s" % (k, v)
+      if self.description:
+         s += ", __description__=%s" % repr(self.description)
       return s + ")"
 
 
 class DynamicDict(Dict):
-   def __init__(self, ktype, vtype, default=None, **kwargs):
-      super(DynamicDict, self).__init__(ktype, vtype, default=default, **kwargs)
+   def __init__(self, ktype, vtype, **kwargs):
+      super(DynamicDict, self).__init__(ktype, vtype, **kwargs)
       das.print_once("[das] Warning: Schema type 'DynamicDict' is deprecated, use 'Dict' instead")
 
 
 class Class(TypeValidator):
-   def __init__(self, klass, default=None):
+   def __init__(self, klass, default=None, description=None):
       if not isinstance(klass, (str, unicode)):
          self.klass = self._validate_class(klass)
       else:
          self.klass = self._class(klass)
-      super(Class, self).__init__(default=(self.klass() if default is None else default))
+      super(Class, self).__init__(default=(self.klass() if default is None else default), description=description)
 
    def _validate_class(self, c):
       if not hasattr(c, "copy"):
@@ -564,12 +616,16 @@ class Class(TypeValidator):
          cmod += "."
       else:
          cmod = ""
-      return "Class(\"%s.%s\")" % (cmod, self.klass.__name__)
+      s = "Class(\"%s%s\"" % (cmod, self.klass.__name__)
+      if self.description:
+         s += ", description=%s" % repr(self.description)
+      s += ")"
+      return s
 
 
 class Or(TypeValidator):
    def __init__(self, *types, **kwargs):
-      super(Or, self).__init__(default=kwargs.get("default", None))
+      super(Or, self).__init__(default=kwargs.get("default", None), description=kwargs.get("description", None))
       if len(types) < 2:
          raise Exception("Schema type 'Or' requires at least two types") 
       self.types = types
@@ -604,6 +660,8 @@ class Or(TypeValidator):
       s = "Or(%s" % ", ".join(map(str, self.types))
       if self.default is not None:
          s += ", default=%s" % self.default
+      if self.description:
+         s += ", description=%s" % repr(self.description)
       return s + ")"
 
 
