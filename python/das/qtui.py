@@ -191,6 +191,7 @@ if not NoUI:
          self.data = data # for alias, it is the same data as the original
          self.type = type
          self.typestr = ""
+         self.desc = ""
 
          if self.type is None and self.data is not None:
             self.type = self.data._get_schema_type()
@@ -206,6 +207,8 @@ if not NoUI:
          self.optional = isinstance(self.type, das.schematypes.Optional)
 
          self.type = self.real_type(self.type)
+
+         self.desc = self.type.description
 
          self.multi = isinstance(self.type, das.schematypes.Or)
 
@@ -751,9 +754,6 @@ if not NoUI:
          data.string_to_value(widget.text())
          model.setData(modelIndex, data, QtCore.Qt.EditRole)
 
-      def updateEditorGeometry(self, widget, viewOptions, modelIndex):
-         widget.setGeometry(viewOptions.rect)
-
 
    class Model(QtCore.QAbstractItemModel):
       internallyRebuilt = QtCore.Signal()
@@ -767,7 +767,7 @@ if not NoUI:
             self._org_data_changed = self.dataChanged
             self.dataChanged = self.dataChanged2Args
             self.dataChanged.connect(self.__emitDataChanged)
-         self._headers = ["Name", "Value", "Type"]
+         self._headers = ["Name", "Value", "Type", "Description"]
          self._rootItem = None
          self._orgData = None
          self._message = ""
@@ -899,6 +899,11 @@ if not NoUI:
                   if item.editable and item.multi and len(item.get_valid_types()) > 1:
                      flags = flags | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
 
+            elif index.column() == 3:
+               if not self._readonly:
+                  if item.exists():
+                     flags = flags | QtCore.Qt.ItemIsEnabled
+
             return flags
 
       def headerData(self, index, orient, role):
@@ -999,6 +1004,9 @@ if not NoUI:
          elif index.column() == 2:
             rv = item.typestr
 
+         elif index.column() == 3:
+            rv = item.desc
+
          if role == QtCore.Qt.DisplayRole and index.column() == 1:
             rv = "    " + rv
 
@@ -1075,6 +1083,9 @@ if not NoUI:
 
             elif index.column() == 2:
                # We actually never trigger this one... should we?
+               return False
+
+            elif index.column() == 3:
                return False
 
             self.dataChanged.emit(index, index)
