@@ -1004,7 +1004,7 @@ if not NoUI:
             return None
 
          elif role == QtCore.Qt.FontRole:
-            if item.optional:
+            if item.optional and index.column() == 0:
                font = QtGui.QFont()
                font.setStyle(QtGui.QFont.StyleItalic)
                if item.exists():
