@@ -1288,9 +1288,42 @@ if not NoUI:
       def keyPressEvent(self, event):
          if (event.modifiers() & QtCore.Qt.ControlModifier) != 0:
             if event.key() == QtCore.Qt.Key_Y:
+               event.accept()
                self.redo()
+
             elif event.key() == QtCore.Qt.Key_Z:
+               event.accept()
                self.undo()
+
+         elif event.modifiers() == QtCore.Qt.NoModifier:
+            if event.key() == QtCore.Qt.Key_Delete:
+               event.accept()
+               # Check selected items
+               iipairs = []
+               if not self._readonly:
+                  keys = set()
+                  sel = self.selectionModel().selectedIndexes()
+                  for index in sel:
+                     item = index.internalPointer()
+                     key = item.fullname()
+                     if not key in keys:
+                        keys.add(key)
+                        iipairs.append((index, item))
+
+               if len(set(map(lambda x: "" if x[1].parent is None else x[1].parent.fullname(), iipairs))) == 1:
+                  # All items have same parent
+                  index, item = iipairs[0]
+                  if item.parent:
+                     indices = [x[0] for x in iipairs]
+                     if item.parent.mapping:
+                        self.remDictItems(indices)
+                     else:
+                        if item.parent.orderable:
+                           if item.parent.resizable:
+                              self.remSeqItems(indices)
+                        else:
+                           self.remSetItems(indices)
+
 
       def mousePressEvent(self, event):
          if event.button() == QtCore.Qt.RightButton:
