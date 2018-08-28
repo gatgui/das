@@ -1265,21 +1265,21 @@ if not NoUI:
                   if item.compound:
                      if item.mapping:
                         if item.mappingkeytype is not None:
-                           actionAddItem = menu.addAction("Add Key...")
+                           actionAddItem = menu.addAction("Add ...")
                            actionAddItem.triggered.connect(self.makeOnAddDictItem(index))
-                           actionClearItems = menu.addAction("Clear Keys")
+                           actionClearItems = menu.addAction("Clear")
                            actionClearItems.triggered.connect(self.makeOnClearDictItems(index))
                      else:
                         if item.orderable:
                            if item.resizable:
-                              actionAddItem = menu.addAction("Append Element")
+                              actionAddItem = menu.addAction("Add")
                               actionAddItem.triggered.connect(self.makeOnAddSeqItem(index))
-                              actionClearItems = menu.addAction("Clear List")
+                              actionClearItems = menu.addAction("Clear")
                               actionClearItems.triggered.connect(self.makeOnClearSeqItems(index))
                         else:
-                           actionAddItem = menu.addAction("Add Element...")
+                           actionAddItem = menu.addAction("Add ...")
                            actionAddItem.triggered.connect(self.makeOnAddSetItem(index))
-                           actionClearItems = menu.addAction("Clear Set")
+                           actionClearItems = menu.addAction("Clear")
                            actionClearItems.triggered.connect(self.makeOnClearSetItems(index))
                   if actionAddItem:
                      menu.addSeparator()
@@ -1289,15 +1289,16 @@ if not NoUI:
                   indices = [x[0] for x in iipairs]
                   if item.parent.mapping:
                      if item.parent.mappingkeytype is not None:
-                        actionRemItem = menu.addAction("Remove Key%s" % ("s" if len(iipairs) > 1 else ""))
+                        #actionRemItem = menu.addAction("Remove Key%s" % ("s" if len(iipairs) > 1 else ""))
+                        actionRemItem = menu.addAction("Remove")
                         actionRemItem.triggered.connect(self.makeOnRemDictItems(indices))
                   else:
                      if item.parent.orderable:
                         if item.parent.resizable:
-                           actionRemItem = menu.addAction("Remove Element%s" % ("s" if len(iipairs) > 1 else ""))
+                           actionRemItem = menu.addAction("Remove")
                            actionRemItem.triggered.connect(self.makeOnRemSeqItems(indices))
                      else:
-                        actionRemItem = menu.addAction("Remove Element%s" % ("s" if len(iipairs) > 1 else ""))
+                        actionRemItem = menu.addAction("Remove")
                         actionRemItem.triggered.connect(self.makeOnRemSetItems(indices))
                   if actionRemItem:
                      menu.addSeparator()
