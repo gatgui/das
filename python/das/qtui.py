@@ -872,6 +872,10 @@ if not NoUI:
                self._undos.append((undoData, curData))
                self._curundo = len(self._undos) - 1
 
+      def clearUndos(self):
+         self._undos = []
+         self._curundo = -1
+
       def findIndex(self, s):
          spl = s.split(".")
          cnt = len(spl)
@@ -1407,6 +1411,9 @@ if not NoUI:
       def canUndo(self):
          return self.model.canUndo()
 
+      def clearUndos(self):
+         self.model.clearUndos()
+
       def redo(self):
          if self.model.redo():
             self.modelUpdated.emit(self.model)
@@ -1534,11 +1541,13 @@ if not NoUI:
          item = index.internalPointer()
          dlg = NewValueDialog(item.type.ktype, excludes=item.data, name="<new key>", parent=self)
          def _addDictItem():
+            undoData = das.copy(self.model.getData())
             try:
                item.data[dlg.data] = item.type.vtype.make_default()
             except Exception, e:
                self.model.setItemErrorMessage(item, "Failed to add key %s\n(%s)" % (dlg.data, e))
             else:
+               self.model.pushUndo(undoData)
                self.model.rebuild()
                self.restoreExpandedState()
                self.modelUpdated.emit(self.model)
@@ -1547,7 +1556,9 @@ if not NoUI:
 
       def addSeqItem(self, index):
          item = index.internalPointer()
+         undoData = das.copy(self.model.getData())
          item.data.append(item.type.type.make_default())
+         self.model.pushUndo(undoData)
          self.model.rebuild()
          self.restoreExpandedState()
          self.modelUpdated.emit(self.model)
@@ -1557,11 +1568,13 @@ if not NoUI:
          item = index.internalPointer()
          dlg = NewValueDialog(item.type.type, excludes=item.data, name="<new value>", parent=self)
          def _addSetItem():
+            undoData = das.copy(self.model.getData())
             try:
                item.data.add(dlg.data)
             except Exception, e:
                self.model.setItemErrorMessage(item, "Failed to add value %s\n(%s)" % (dlg.data, e))
             else:
+               self.model.pushUndo(undoData)
                self.model.rebuild()
                self.restoreExpandedState()
                self.modelUpdated.emit(self.model)
@@ -1571,7 +1584,9 @@ if not NoUI:
       def addOptionalItem(self, index):
          item = index.internalPointer()
          v = item.type.make_default()
+         undoData = das.copy(self.model.getData())
          item.parent.data[item.key] = v
+         self.model.pushUndo(undoData)
          self.model.rebuild()
          self.restoreExpandedState()
          self.modelUpdated.emit(self.model)
@@ -1586,9 +1601,11 @@ if not NoUI:
          self.model.setData(index.sibling(index.row(), 1), set(), QtCore.Qt.EditRole)
 
       def remDictItems(self, indices):
+         undoData = das.copy(self.model.getData())
          for index in indices:
             item = index.internalPointer()
             del(item.parent.data[item.key])
+         self.model.pushUndo(undoData)
          self.model.rebuild()
          self.restoreExpandedState()
          self.modelUpdated.emit(self.model)
@@ -1608,26 +1625,24 @@ if not NoUI:
                if not row in remrows:
                   newseq.append(curseq[row])
 
+            # this will create an undo entry for the parent automatically
             self.model.setData(parentIndex.sibling(parentIndex.row(), 1), newseq, QtCore.Qt.EditRole)
 
-         for index in indices:
-            
-            item = index.internalPointer()
-            seq = item.parent.data
-            seq = seq[:item.row] + seq[item.row+1:]
-         
-
       def remSetItems(self, indices):
+         undoData = das.copy(self.model.getData())
          for index in indices:
             item = index.internalPointer()
             item.parent.data.remove(item.data)
+         self.model.pushUndo(undoData)
          self.model.rebuild()
          self.restoreExpandedState()
          self.modelUpdated.emit(self.model)
 
       def remOptionalItem(self, index):
          item = index.internalPointer()
+         undoData = das.copy(self.model.getData())
          del(item.parent.data[item.key])
+         self.model.pushUndo(undoData)
          self.model.rebuild()
          self.restoreExpandedState()
          self.modelUpdated.emit(self.model)
