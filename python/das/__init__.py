@@ -187,26 +187,29 @@ def ascii_or_unicode(s, encoding=None):
 
 def decode(d, encoding):
    if hasattr(d, "_decode") and callable(getattr(d, "_decode")):
-      rv = d._decode(encoding)
-   elif isinstance(d, basestring):
+      try:
+         return d._decode(encoding)
+      except Exception, e:
+         print_once("[das] '%s._decode' method call failed (%s)\n[das] Fallback to default decoding" % (d.__class__.__name__, e))
+
+   if isinstance(d, basestring):
       return ascii_or_unicode(d, encoding=encoding)
-   elif isinstance(d, list):
-      rv = d.__class__([decode(x, encoding) for x in d])
    elif isinstance(d, tuple):
-      rv = d.__class__([decode(x, encoding) for x in d])
+      return d.__class__([decode(x, encoding) for x in d])
    elif isinstance(d, set):
-      rv = d.__class__([decode(x, encoding) for x in d])
-   elif isinstance(d, dict):
-      rv = d.__class__()
-      for k, v in d.iteritems():
-         rv[k] = decode(v, encoding)
-   elif isinstance(d, Struct):
-      rv = d.__class__()
-      for k, v in d._dict.iteritems():
-         rv[k] = decode(v, encoding)
+      return d.__class__([decode(x, encoding) for x in d])
    else:
-      rv = d
-   return rv
+      # In-place
+      if isinstance(d, list):
+         for idx, val in enumerate(d):
+            d[idx] = decode(val, encoding)
+      elif isinstance(d, dict):
+         for k, v in d.iteritems():
+            d[k] = decode(v, encoding)
+      elif isinstance(d, Struct):
+         for k, v in d._dict.iteritems():
+            d[k] = decode(v, encoding)
+      return d
 
 
 def read_string(s, schema_type=None, encoding=None, strict_schema=True, **funcs):

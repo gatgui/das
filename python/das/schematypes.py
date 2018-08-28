@@ -15,6 +15,19 @@ class TypeValidator(object):
       self.default = default
       self.description = ("" if description is None else description)
 
+   def _validate_self(self, value):
+      raise ValidationError("'_validate_self' method is not implemented")
+
+   def _validate(self, value, key=None, index=None):
+      raise ValidationError("'_validate' method is not implemented")
+
+   def _decode(self, encoding):
+      if self.description is not None:
+         self.description = das.decode(self.description, encoding)
+      if self.default is not None:
+         self.default = das.decode(self.default, encoding)
+      return self
+
    def validate(self, value, key=None, index=None):
       mixins = (None if not das.has_bound_mixins(value) else das.get_bound_mixins(value))
       rv = self._validate(value, key=key, index=index)
@@ -29,12 +42,6 @@ class TypeValidator(object):
       # Try to call custom validation function
       return das.types.TypeBase.ValidateGlobally(rv)
 
-   def _validate_self(self, value):
-      raise ValidationError("'_validate_self' method is not implemented")
-
-   def _validate(self, value, key=None, index=None):
-      raise ValidationError("'_validate' method is not implemented")
-
    def make_default(self):
       if not self.default_validated:
          self.default = self.validate(self.default)
@@ -46,9 +53,6 @@ class TypeValidator(object):
 
    def __str__(self):
       return self.__repr__()
-
-   def _decode(self, encoding):
-      return self.__class__(default=das.decode(self.default, encoding), description=das.decode(self.description, encoding))
 
 
 class Boolean(TypeValidator):
@@ -107,11 +111,13 @@ class Integer(TypeValidator):
       return self._validate_self(value)
 
    def _decode(self, encoding):
+      super(Integer, self)._decode(encoding)
       if self.enum:
          e = {}
          for k, v in self.enum.iteritems():
             e[das.decode(k, encoding)] = v
          self.enum = e
+         self.enumvals = set(self.enum.values())
       return self
 
    def __repr__(self):
@@ -202,14 +208,12 @@ class String(TypeValidator):
       return self._validate_self(value)
 
    def _decode(self, encoding):
-      if self.default:
-         self.default = das.decode(self.default, encoding)
+      super(String, self)._decode(encoding)
       if self.choices:
          if not callable(self.choices):
             self.choices = map(lambda x: das.decode(x, encoding), self.choices)
       if self.matches:
-         if isinstance(self.matches, basestring):
-            self.matches = das.decode(self.matches, encoding)
+         self.matches = re.compile(das.decode(self.matches.pattern, encoding))
       return self
 
    def __repr__(self):
@@ -268,6 +272,11 @@ class Set(TypeValidator):
          rv._set_schema_type(self)
          return rv
 
+   def _decode(self, encoding):
+      super(Set, self)._decode(encoding)
+      self.type = das.decode(self.type, encoding)
+      return self
+
    def make(self, *args, **kwargs):
       return self._validate(args)
 
@@ -318,6 +327,11 @@ class Sequence(TypeValidator):
          rv._set_schema_type(self)
          return rv
 
+   def _decode(self, encoding):
+      super(Sequence, self)._decode(encoding)
+      self.type = das.decode(self.type, encoding)
+      return self
+
    def make(self, *args, **kwargs):
       return self._validate(args)
 
@@ -367,6 +381,11 @@ class Tuple(TypeValidator):
          rv._set_schema_type(self)
          return rv
 
+   def _decode(self, encoding):
+      super(Tuple, self)._decode(encoding)
+      self.types = tuple(map(lambda x: das.decode(x, encoding), self.types))
+      return self
+
    def make_default(self):
       if not self.default_validated and self.default is None:
          self.default = tuple([t.make_default() for t in self.types])
@@ -393,30 +412,31 @@ class Struct(TypeValidator, dict):
    UseDefaultForMissingFields = False
 
    def __init__(self, __description__=None, **kwargs):
-      hasdefault = ("default" in kwargs)
+      # MRO: TypeValidator, dict, object
       default = None
+      hasdefault = ("default" in kwargs)
       if hasdefault:
          default = kwargs["default"]
-         print("[das] 'default' treated as a standard field for Struct type")
+         das.print_once("[das] 'default' treated as a standard field for Struct type")
          del(kwargs["default"])
       
-      hasdesc = ("description" in kwargs)
-      desc = None
-      if hasdesc:
-         desc = kwargs["description"]
-         print("[das] 'description' treated as standard field for Struct type. Use '__description__' to set type's description text")
+      description = None
+      hasdescription = ("description" in kwargs)
+      if hasdescription:
+         description = kwargs["description"]
+         das.print_once("[das] 'description' treated as standard field for Struct type. Use '__description__' to set type's description text")
          del(kwargs["description"])
 
-      super(Struct, self).__init__(description=__description__, **kwargs)
+      super(Struct, self).__init__(default=None, description=__description__, **kwargs)
+
+      # as 'default' and 'description' were removed from kwargs to avoid conflict with
+      # TypeValidator.__init__ arguments, add them manually
 
       if hasdefault:
          self["default"] = default
 
-      if hasdesc:
-         self["description"] = desc
-      # super(Struct, self).__init__(description=__description__)
-      # for k, v in kwargs.iteritems():
-      #    self[k] = v
+      if hasdescription:
+         self["description"] = description
 
    def _validate_self(self, value):
       if not isinstance(value, (dict, das.types.Struct)):
@@ -427,7 +447,7 @@ class Struct(TypeValidator, dict):
             continue
          if not k in value and not isinstance(v, Optional):
             if self.UseDefaultForMissingFields:
-               # print("[das] Use default value for field '%s'" % k)
+               # das.print_once("[das] Use default value for field '%s'" % k)
                value[k] = v.make_default()
             else:
                raise ValidationError("Missing key '%s'" % k)
@@ -469,6 +489,12 @@ class Struct(TypeValidator, dict):
          rv._set_schema_type(self)
          return rv
 
+   def _decode(self, encoding):
+      super(Struct, self)._decode(encoding)
+      for k in self.keys():
+         self[k] = das.decode(self[k], encoding)
+      return self
+
    def make_default(self):
       if not self.default_validated and self.default is None:
          self.default = das.types.Struct()
@@ -477,7 +503,7 @@ class Struct(TypeValidator, dict):
                continue
             self.default[k] = t.make_default()
          self.default._set_schema_type(self)
-      return TypeValidator.make_default(self)
+      return super(Struct, self).make_default()
 
    def make(self, *args, **kwargs):
       rv = self.make_default()
@@ -511,9 +537,9 @@ class StaticDict(Struct):
 class Dict(TypeValidator):
    def __init__(self, ktype, vtype, __default__=None, __description__=None, **kwargs):
       if "default" in kwargs:
-         print("[das] 'default' treated as a possible key name for Dict type overrides. Use '__default__' to set type's default value")
+         das.print_once("[das] 'default' treated as a possible key name for Dict type overrides. Use '__default__' to set type's default value")
       if "description" in kwargs:
-         print("[das] 'description' treated as a possible key name for Dict type overrides. Use '__description__' to set type's description text")
+         das.print_once("[das] 'description' treated as a possible key name for Dict type overrides. Use '__description__' to set type's description text")
       super(Dict, self).__init__(default=({} if __default__ is None else __default__), description=__description__)
       self.ktype = ktype
       self.vtype = vtype
@@ -545,6 +571,16 @@ class Dict(TypeValidator):
                raise ValidationError("Invalid value for key '%s': %s" % (k, e))
          rv._set_schema_type(self)
          return rv
+
+   def _decode(self, encoding):
+      super(Dict, self)._decode(encoding)
+      self.ktype = das.decode(self.ktype, encoding)
+      self.vtype = das.decode(self.vtype, encoding)
+      vtypeOverrides = {}
+      for k, v in self.vtypeOverrides.iteritems():
+         vtypeOverrides[das.decode(k, encoding)] = das.decode(v, encoding)
+      self.vtypeOverrides = vtypeOverrides
+      return self
 
    def make(self, *args, **kwargs):
       return self._validate(kwargs)
@@ -604,6 +640,8 @@ class Class(TypeValidator):
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
 
+   # No _decode?
+
    def __repr__(self):
       cmod = self.klass.__module__
       if cmod != "__main__":
@@ -642,6 +680,11 @@ class Or(TypeValidator):
       raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(value).__name__)
       return None
 
+   def _decode(self, encoding):
+      super(Or, self)._decode(encoding)
+      self.types = tuple(map(lambda x: das.decode(x, encoding), self.types))
+      return self
+
    def make_default(self):
       if not self.default_validated and self.default is None:
          self.default = self.types[0].make_default()
@@ -670,6 +713,11 @@ class Optional(TypeValidator):
    def _validate(self, value, key=None, index=None):
       return self.type.validate(value, key=key, index=index)
 
+   def _decode(self, encoding):
+      super(Optional, self)._decode(encoding)
+      self.type = das.decode(self.type, encoding)
+      return self
+
    def make_default(self):
       return self.type.make_default()
 
@@ -696,6 +744,11 @@ class Deprecated(Optional):
          return True
       else:
          return super(Deprecated, self)._validate(value, key=key, index=index)
+
+   def _decode(self, encoding):
+      super(Deprecated, self)._decode(encoding)
+      self.message = das.decode(self.message, encoding)
+      return self
 
    def make_default(self):
       return None
