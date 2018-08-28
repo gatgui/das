@@ -252,8 +252,9 @@ if __name__ == "__main__":
       darkPal.setColor(QtGui.QPalette.Disabled, QtGui.QPalette.Link, QtGui.QColor(70,70,255))
       darkPal.setColor(QtGui.QPalette.Disabled, QtGui.QPalette.LinkVisited, QtGui.QColor(200,70,255))
 
+      app.setPalette(darkPal)
+
       win = Window(data=data, path=file_path)
-      win.setPalette(darkPal)
       win.show()
       app.exec_()
 

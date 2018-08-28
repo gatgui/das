@@ -960,9 +960,15 @@ if not NoUI:
             # If want some: return QtCore.Qt.Checked or QtCore.Qt.Unchecked
             return None
 
-         elif role == QtCore.Qt.ForegroundRole:
-            # No changes in color
-            return None
+         elif role == QtCore.Qt.FontRole:
+            if item.optional:
+               font = QtGui.QFont()
+               font.setStyle(QtGui.QFont.StyleItalic)
+               if item.exists():
+                  font.setWeight(90)
+               return font
+            else:
+               return None
 
          elif not role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole):
             return None
@@ -1389,6 +1395,7 @@ if not NoUI:
       def onExpandAll(self):
          self.expandAll()
          self.resetExpandedState()
+         self.header().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
       def onCollapseAll(self):
          self.collapseAll()
