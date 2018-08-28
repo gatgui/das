@@ -772,6 +772,8 @@ if not NoUI:
          self._orgData = None
          self._message = ""
          self._readonly = readonly
+         self._undos = []
+         self._curundo = -1
          self._buildItemsTree(data=data, type=type, name=name)
 
       def __emitDataChanged(self, index1, index2):
@@ -790,18 +792,23 @@ if not NoUI:
          elif data is not None:
             self._rootItem = ModelItem("<root>" if name is None else name, data, type=type)
 
-      def getData(self):
-         return (None if self._rootItem is None else self._rootItem.data)
-
-      def replaceData(self, data, type=None, name=None):
-         self._orgData = None
-         self._rootItem = None
+      def _updateData(self, data=None, type=None, name=None):
          self.beginResetModel()
          self._buildItemsTree(data=data, type=type, name=name)
          self.endResetModel()
          rootIndex = self.index(0, 0, QtCore.QModelIndex())
          self.dataChanged.emit(rootIndex, rootIndex)
          self.internallyRebuilt.emit()
+
+      def getData(self):
+         return (None if self._rootItem is None else self._rootItem.data)
+
+      def replaceData(self, data, type=None, name=None):
+         self._orgData = None
+         self._rootItem = None
+         self._undos.clear()
+         self._curundo = -1
+         self._updateData(data, type=type, name=name)
 
       def getIndexData(self, index):
          if index.isValid():
@@ -832,6 +839,38 @@ if not NoUI:
       def cleanData(self):
          if self._rootItem:
             self._orgData = das.copy(self._rootItem.data)
+
+      def canUndo(self):
+         return (len(self._undos) > 0 and self._curundo >= 0)
+
+      def canRedo(self):
+         return (len(self._undos) > 0 and self._curundo + 1 < len(self._undos))
+
+      def undo(self):
+         if not self.canUndo():
+            return False
+         else:
+            self._rootItem.data = das.copy(self._undos[self._curundo][0])
+            self._updateData()
+            self._curundo -= 1
+            return True
+
+      def redo(self):
+         if not self.canRedo():
+            return False
+         else:
+            self._curundo += 1
+            self._rootItem.data = das.copy(self._undos[self._curundo][1])
+            self._updateData()
+            return True
+
+      def pushUndo(self, undoData):
+         if self._rootItem and undoData is not None:
+            curData = das.copy(self.getData())
+            if curData != undoData:
+               self._undos = self._undos[:self._curundo + 1]
+               self._undos.append((undoData, curData))
+               self._curundo = len(self._undos) - 1
 
       def findIndex(self, s):
          spl = s.split(".")
@@ -1018,9 +1057,11 @@ if not NoUI:
 
          return rv
 
-      def _setRawData(self, index, value):
+      def _setRawData(self, index, value, pushUndo=True):
          structureChanged = False
          item = index.internalPointer()
+
+         undoData = (das.copy(self.getData()) if pushUndo else None)
 
          oldvalue = item.data
          try:
@@ -1044,10 +1085,12 @@ if not NoUI:
                   seq = list(item.parent.data)
                   seq[item.row] = item.data
                   #self.setData(self.parent(index), das.types.Tuple(seq), role)
-                  self._setRawData(self.parent(index), das.types.Tuple(seq))
+                  self._setRawData(self.parent(index), das.types.Tuple(seq), pushUndo=False)
                # Force rebuild
                # (note: not necessary all the time, but to simplify logic)
                structureChanged = True
+
+            self.pushUndo(undoData)
 
          return structureChanged
 
@@ -1238,6 +1281,13 @@ if not NoUI:
             self.setExpanded(self.model.index(0, 0, index), True)
          self._readonly = readonly
 
+      def keyPressEvent(self, event):
+         if (event.modifiers() & QtCore.Qt.ControlModifier) != 0:
+            if event.key() == QtCore.Qt.Key_Y:
+               self.redo()
+            elif event.key() == QtCore.Qt.Key_Z:
+               self.undo()
+
       def mousePressEvent(self, event):
          if event.button() == QtCore.Qt.RightButton:
             event.accept()
@@ -1350,6 +1400,20 @@ if not NoUI:
       def cleanData(self):
          self.model.cleanData()
          self.modelUpdated.emit(self.model)
+
+      def canRedo(self):
+         return self.model.canRedo()
+
+      def canUndo(self):
+         return self.model.canUndo()
+
+      def redo(self):
+         if self.model.redo():
+            self.modelUpdated.emit(self.model)
+
+      def undo(self):
+         if self.model.undo():
+            self.modelUpdated.emit(self.model)
 
       def hasDataChanged(self):
          return self.model.hasDataChanged()
