@@ -45,9 +45,8 @@ def has_schema():
 
 def get_schema(name_or_type):
    if not isinstance(name_or_type, basestring):
-      name = get_schema_type_name(name_or_type)
-   else:
-      name = name_or_type.split(".")[0]
+      name_or_type = get_schema_type_name(name_or_type)
+   name = name_or_type.split(".")[0]
    return SchemaTypesRegistry.instance.get_schema(name)
 
 
@@ -134,6 +133,14 @@ def adapt_value(value, schema_type=None, key=None, index=None):
 
 def validate(d, schema):
    return get_schema_type(schema).validate(d)
+
+
+def check(d, schema):
+   try:
+      get_schema_type(schema).validate(das.copy(d))
+      return True
+   except:
+      return False
 
 
 def _read_file(path, skip_content=False):
