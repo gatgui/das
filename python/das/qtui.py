@@ -26,13 +26,13 @@ if not NoUI:
    class ModelItem(object):
       ReservedTypeNames = set(["alias", "empty", "boolean", "integer", "real", "string", "list", "tuple", "set", "dict", "struct"])
 
-      def __init__(self, name, data, type=None, parent=None, row=0, key=None):
+      def __init__(self, name, data, type=None, parent=None, row=0, key=None, hideDeprecated=True):
          super(ModelItem, self).__init__()
          self.row = row
          self.key = key
          self.name = name
          self.parent = parent
-         self.update(data, type)
+         self.update(data, type, hideDeprecated=hideDeprecated)
 
       def __str__(self):
          return "ModelItem(%s, compound=%s, resizable=%s, multi=%s, editable=%s, optional=%s, parent=%s, children=%d)" % (self.name, self.compound, self.resizable, self.multi, self.editable, self.optional, ("None" if not self.parent else self.parent.name), len(self.children))
@@ -176,7 +176,7 @@ if not NoUI:
          else:
             return False
 
-      def update(self, data, type=None):
+      def update(self, data, type=None, hideDeprecated=True):
          self.children = []
          self.compound = False
          self.mapping = False
@@ -186,6 +186,7 @@ if not NoUI:
          self.resizable = False
          self.orderable = False # orderable compound
          self.optional = False
+         self.deprecated = False
          self.editable = False # will be false for aliases
          self.multi = False
          self.data = data # for alias, it is the same data as the original
@@ -205,6 +206,7 @@ if not NoUI:
             return
 
          self.optional = isinstance(self.type, das.schematypes.Optional)
+         self.deprecated = isinstance(self.type, das.schematypes.Deprecated)
 
          self.type = self.real_type(self.type)
 
@@ -225,7 +227,7 @@ if not NoUI:
                   for i in xrange(len(self.data)):
                      itemname = "[%d]" % i
                      itemdata = self.data[i]
-                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i))
+                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i, hideDeprecated=hideDeprecated))
 
             elif isinstance(self.type, das.schematypes.Tuple):
                self.typestr = "tuple"
@@ -235,7 +237,7 @@ if not NoUI:
                   for i in xrange(len(self.data)):
                      itemname = "(%d)" % i
                      itemdata = self.data[i]
-                     self.children.append(ModelItem(itemname, itemdata, type=self.type.types[i], parent=self, row=i))
+                     self.children.append(ModelItem(itemname, itemdata, type=self.type.types[i], parent=self, row=i, hideDeprecated=hideDeprecated))
 
             elif isinstance(self.type, das.schematypes.Set):
                self.typestr = "set"
@@ -245,7 +247,7 @@ if not NoUI:
                   i = 0
                   for itemdata in self.data:
                      itemname = "{%d}" % i
-                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i))
+                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i, hideDeprecated=hideDeprecated))
                      i += 1
 
             elif isinstance(self.type, (das.schematypes.Struct, das.schematypes.StaticDict)):
@@ -265,10 +267,12 @@ if not NoUI:
                      if isinstance(t, das.schematypes.Alias):
                         v = None
                      elif not k in self.data:
+                        if hideDeprecated and isinstance(t, das.schematypes.Deprecated):
+                           continue
                         v = t.make_default()
                      else:
                         v = self.data[k]
-                     self.children.append(ModelItem(k, v, type=t, parent=self, row=i, key=k))
+                     self.children.append(ModelItem(k, v, type=t, parent=self, row=i, key=k, hideDeprecated=hideDeprecated))
                   i += 1
 
             elif isinstance(self.type, (das.schematypes.Dict, das.schematypes.DynamicDict)):
@@ -285,7 +289,7 @@ if not NoUI:
                      v = self.data[k]
                      ks = str(k)
                      vtype = self.type.vtypeOverrides.get(k, self.type.vtype)
-                     self.children.append(ModelItem(ks, v, type=vtype, parent=self, row=i, key=k))
+                     self.children.append(ModelItem(ks, v, type=vtype, parent=self, row=i, key=k, hideDeprecated=hideDeprecated))
                      i += 1
 
          else:
@@ -774,6 +778,7 @@ if not NoUI:
          self._readonly = readonly
          self._undos = []
          self._curundo = -1
+         self._hideDeprecated = True
          self._buildItemsTree(data=data, type=type, name=name)
 
       def __emitDataChanged(self, index1, index2):
@@ -788,9 +793,17 @@ if not NoUI:
             if data is None:
                data = self._rootItem.data
                type = self._rootItem.type
-            self._rootItem.update(data, type=type)
+            self._rootItem.update(data, type=type, hideDeprecated=self._hideDeprecated)
          elif data is not None:
-            self._rootItem = ModelItem("<root>" if name is None else name, data, type=type)
+            self._rootItem = ModelItem("<root>" if name is None else name, data, type=type, hideDeprecated=self._hideDeprecated)
+
+      def hideDeprecated(self):
+         return self._hideDeprecated
+
+      def setHideDeprecated(self, on):
+         if on != self._hideDeprecated:
+            self._hideDeprecated = on
+            self._updateData()
 
       def _updateData(self, data=None, type=None, name=None):
          self.beginResetModel()
@@ -1414,6 +1427,10 @@ if not NoUI:
             actionExpandAll.triggered.connect(self.onExpandAll)
             actionCollapseAll = menu.addAction("Collapse All")
             actionCollapseAll.triggered.connect(self.onCollapseAll)
+            actionHideDeprecated = menu.addAction("Hide Deprecated Field(s)")
+            actionHideDeprecated.setCheckable(True)
+            actionHideDeprecated.setChecked(self.model.hideDeprecated())
+            actionHideDeprecated.toggled.connect(self.onToggleHideDeprecated)
 
             menu.popup(event.globalPos())
 
@@ -1501,6 +1518,9 @@ if not NoUI:
 
       def onResizeToContents(self):
          self.header().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
+
+      def onToggleHideDeprecated(self, toggled):
+         self.model.setHideDeprecated(toggled)
 
       def onExpandAll(self):
          self.expandAll()
