@@ -1408,6 +1408,8 @@ if not NoUI:
                   actionAddItem.triggered.connect(self.makeOnAddOptionalItem(modelIndex))
                   menu.addSeparator()
 
+            actionResize = menu.addAction("Resize to Contents")
+            actionResize.triggered.connect(self.onResizeToContents)
             actionExpandAll = menu.addAction("Expand All")
             actionExpandAll.triggered.connect(self.onExpandAll)
             actionCollapseAll = menu.addAction("Collapse All")
@@ -1496,6 +1498,9 @@ if not NoUI:
          k = self.getItemKey(modelIndex)
          if k is not None:
             self.expandedState[k] = True
+
+      def onResizeToContents(self):
+         self.header().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
       def onExpandAll(self):
          self.expandAll()
