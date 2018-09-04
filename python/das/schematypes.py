@@ -9,11 +9,14 @@ class ValidationError(Exception):
 
 
 class TypeValidator(object):
-   def __init__(self, default=None, description=None, **kwargs):
+   def __init__(self, default=None, description=None, editable=True, hidden=False, **kwargs):
       super(TypeValidator, self).__init__(**kwargs)
       self.default_validated = False
       self.default = default
+      # UI related info
       self.description = ("" if description is None else description)
+      self.editable = editable
+      self.hidden = hidden
 
    def _validate_self(self, value):
       raise ValidationError("'_validate_self' method is not implemented")
@@ -56,8 +59,8 @@ class TypeValidator(object):
 
 
 class Boolean(TypeValidator):
-   def __init__(self, default=None, description=None):
-      super(Boolean, self).__init__(default=(False if default is None else default), description=description)
+   def __init__(self, default=None, description=None, editable=True, hidden=False):
+      super(Boolean, self).__init__(default=(False if default is None else default), description=description, editable=editable, hidden=hidden)
 
    def _validate_self(self, value):
       if not isinstance(value, bool):
@@ -79,8 +82,8 @@ class Boolean(TypeValidator):
 
 
 class Integer(TypeValidator):
-   def __init__(self, default=None, min=None, max=None, enum=None, description=None):
-      super(Integer, self).__init__(default=(0 if default is None else default), description=description)
+   def __init__(self, default=None, min=None, max=None, enum=None, description=None, editable=True, hidden=False):
+      super(Integer, self).__init__(default=(0 if default is None else default), description=description, editable=editable, hidden=hidden)
       self.min = min
       self.max = max
       self.enum = enum
@@ -141,8 +144,8 @@ class Integer(TypeValidator):
 
 
 class Real(TypeValidator):
-   def __init__(self, default=None, min=None, max=None, description=None):
-      super(Real, self).__init__(default=(0.0 if default is None else default), description=description)
+   def __init__(self, default=None, min=None, max=None, description=None, editable=True, hidden=False):
+      super(Real, self).__init__(default=(0.0 if default is None else default), description=description, editable=editable, hidden=hidden)
       self.min = min
       self.max = max
 
@@ -176,8 +179,8 @@ class Real(TypeValidator):
 
 
 class String(TypeValidator):
-   def __init__(self, default=None, choices=None, matches=None, strict=True, description=None):
-      super(String, self).__init__(default=("" if default is None else default), description=description)
+   def __init__(self, default=None, choices=None, matches=None, strict=True, description=None, editable=True, hidden=False):
+      super(String, self).__init__(default=("" if default is None else default), description=description, editable=editable, hidden=hidden)
       self.choices = choices
       self.strict = strict
       self.matches = None
@@ -246,8 +249,8 @@ class String(TypeValidator):
 
 
 class Set(TypeValidator):
-   def __init__(self, type, default=None, description=None):
-      super(Set, self).__init__(default=(set() if default is None else default), description=description)
+   def __init__(self, type, default=None, description=None, editable=True, hidden=False):
+      super(Set, self).__init__(default=(set() if default is None else default), description=description, editable=editable, hidden=hidden)
       self.type = type
 
    def _validate_self(self, value):
@@ -290,8 +293,8 @@ class Set(TypeValidator):
 
 
 class Sequence(TypeValidator):
-   def __init__(self, type, default=None, size=None, min_size=None, max_size=None, description=None):
-      super(Sequence, self).__init__(default=([] if default is None else default), description=description)
+   def __init__(self, type, default=None, size=None, min_size=None, max_size=None, description=None, editable=True, hidden=False):
+      super(Sequence, self).__init__(default=([] if default is None else default), description=description, editable=editable, hidden=hidden)
       self.size = size
       self.min_size = min_size
       self.max_size = max_size
@@ -354,7 +357,7 @@ class Sequence(TypeValidator):
 
 class Tuple(TypeValidator):
    def __init__(self, *args, **kwargs):
-      super(Tuple, self).__init__(default=kwargs.get("default", None), description=kwargs.get("description", None))
+      super(Tuple, self).__init__(default=kwargs.get("default", None), description=kwargs.get("description", None), editable=kwargs.get("editable", True), hidden=kwargs.get("hidden", False))
       self.types = args
 
    def _validate_self(self, value):
@@ -411,32 +414,22 @@ class Tuple(TypeValidator):
 class Struct(TypeValidator, dict):
    UseDefaultForMissingFields = False
 
-   def __init__(self, __description__=None, **kwargs):
+   def __init__(self, __description__=None, __editable__=True, __hidden__=False, **kwargs):
       # MRO: TypeValidator, dict, object
-      default = None
-      hasdefault = ("default" in kwargs)
-      if hasdefault:
-         default = kwargs["default"]
-         das.print_once("[das] 'default' treated as a standard field for Struct type")
-         del(kwargs["default"])
-      
-      description = None
-      hasdescription = ("description" in kwargs)
-      if hasdescription:
-         description = kwargs["description"]
-         das.print_once("[das] 'description' treated as standard field for Struct type. Use '__description__' to set type's description text")
-         del(kwargs["description"])
+      removedValues = {}
+      for name in ("default", "description", "editable", "hidden"):
+         if name in kwargs:
+            removedValues[name] = kwargs[name]
+            das.print_once("[das] '%s' treated as a standard field for Struct type. Use '__%s__' to set schema type's attribute" % (name, name))
+            del(kwargs[name])
 
-      super(Struct, self).__init__(default=None, description=__description__, **kwargs)
+      super(Struct, self).__init__(default=None, description=__description__, editable=__editable__, hidden=__hidden__, **kwargs)
 
-      # as 'default' and 'description' were removed from kwargs to avoid conflict with
-      # TypeValidator.__init__ arguments, add them manually
+      # As some fields were removed from kwargs to avoid conflict with
+      #   TypeValidator class initializer, add them back
 
-      if hasdefault:
-         self["default"] = default
-
-      if hasdescription:
-         self["description"] = description
+      for name, value in removedValues.iteritems():
+         self[name] = value
 
    def _validate_self(self, value):
       if not isinstance(value, (dict, das.types.Struct)):
@@ -529,18 +522,17 @@ class Struct(TypeValidator, dict):
 
 
 class StaticDict(Struct):
-   def __init__(self, __description__=None, **kwargs):
-      super(StaticDict, self).__init__(__description__=__description__, **kwargs)
+   def __init__(self, __description__=None, __editable__=True, __hidden__=False, **kwargs):
+      super(StaticDict, self).__init__(__description__=__description__, __editable__=__editable__, __hidden__=__hidden__, **kwargs)
       das.print_once("[das] Warning: Schema type 'StaticDict' is deprecated, use 'Struct' instead")
 
 
 class Dict(TypeValidator):
-   def __init__(self, ktype, vtype, __default__=None, __description__=None, **kwargs):
-      if "default" in kwargs:
-         das.print_once("[das] 'default' treated as a possible key name for Dict type overrides. Use '__default__' to set type's default value")
-      if "description" in kwargs:
-         das.print_once("[das] 'description' treated as a possible key name for Dict type overrides. Use '__description__' to set type's description text")
-      super(Dict, self).__init__(default=({} if __default__ is None else __default__), description=__description__)
+   def __init__(self, ktype, vtype, __default__=None, __description__=None, __editable__=True, __hidden__=False, **kwargs):
+      for name in ("default", "description", "editable", "hidden"):
+         if name in kwargs:
+            das.print_once("[das] '%s' treated as a possible key name for Dict type overrides. Use '__%s__' to set schema type's attribute" % (name, name))
+      super(Dict, self).__init__(default=({} if __default__ is None else __default__), description=__description__, editable=__editable__, hidden=__hidden__)
       self.ktype = ktype
       self.vtype = vtype
       self.vtypeOverrides = {}
@@ -597,18 +589,18 @@ class Dict(TypeValidator):
 
 
 class DynamicDict(Dict):
-   def __init__(self, ktype, vtype, __default__=None, __description__=None, **kwargs):
-      super(DynamicDict, self).__init__(ktype, vtype, __default__=__default__, __description__=__description__, **kwargs)
+   def __init__(self, ktype, vtype, __default__=None, __description__=None, __editable__=True, __hidden__=False, **kwargs):
+      super(DynamicDict, self).__init__(ktype, vtype, __default__=__default__, __description__=__description__, __editable__=__editable__, __hidden__=__hidden__, **kwargs)
       das.print_once("[das] Warning: Schema type 'DynamicDict' is deprecated, use 'Dict' instead")
 
 
 class Class(TypeValidator):
-   def __init__(self, klass, default=None, description=None):
+   def __init__(self, klass, default=None, description=None, editable=True, hidden=False):
       if not isinstance(klass, (str, unicode)):
          self.klass = self._validate_class(klass)
       else:
          self.klass = self._class(klass)
-      super(Class, self).__init__(default=(self.klass() if default is None else default), description=description)
+      super(Class, self).__init__(default=(self.klass() if default is None else default), description=description, editable=editable, hidden=hidden)
 
    def _validate_class(self, c):
       if not hasattr(c, "copy"):
@@ -657,7 +649,7 @@ class Class(TypeValidator):
 
 class Or(TypeValidator):
    def __init__(self, *types, **kwargs):
-      super(Or, self).__init__(default=kwargs.get("default", None), description=kwargs.get("description", None))
+      super(Or, self).__init__(default=kwargs.get("default", None), description=kwargs.get("description", None), editable=kwargs.get("editable", True), hidden=kwargs.get("hidden", False))
       if len(types) < 2:
          raise Exception("Schema type 'Or' requires at least two types") 
       self.types = types
@@ -797,8 +789,8 @@ class Alias(TypeValidator):
 class SchemaType(TypeValidator):
    CurrentSchema = ""
 
-   def __init__(self, name, default=None):
-      super(SchemaType, self).__init__(default=default)
+   def __init__(self, name, default=None, description=None, editable=True, hidden=False):
+      super(SchemaType, self).__init__(default=default, description=description, editable=editable, hidden=hidden)
       if not "." in name:
          self.name = self.CurrentSchema + "." + name
       else:

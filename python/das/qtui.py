@@ -26,13 +26,13 @@ if not NoUI:
    class ModelItem(object):
       ReservedTypeNames = set(["alias", "empty", "boolean", "integer", "real", "string", "list", "tuple", "set", "dict", "struct"])
 
-      def __init__(self, name, data, type=None, parent=None, row=0, key=None, hideDeprecated=True):
+      def __init__(self, name, data, type=None, parent=None, row=0, key=None, hideDeprecated=True, hideAliases=True, showHidden=False):
          super(ModelItem, self).__init__()
          self.row = row
          self.key = key
          self.name = name
          self.parent = parent
-         self.update(data, type, hideDeprecated=hideDeprecated)
+         self.update(data, type, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden)
 
       def __str__(self):
          return "ModelItem(%s, compound=%s, resizable=%s, multi=%s, editable=%s, optional=%s, parent=%s, children=%d)" % (self.name, self.compound, self.resizable, self.multi, self.editable, self.optional, ("None" if not self.parent else self.parent.name), len(self.children))
@@ -176,7 +176,7 @@ if not NoUI:
          else:
             return False
 
-      def update(self, data, type=None, hideDeprecated=True):
+      def update(self, data, type=None, hideDeprecated=True, hideAliases=True, showHidden=False):
          self.children = []
          self.compound = False
          self.mapping = False
@@ -188,6 +188,8 @@ if not NoUI:
          self.optional = False
          self.deprecated = False
          self.editable = False # will be false for aliases
+         self.editableType = True
+         self.editableValue = True
          self.multi = False
          self.data = data # for alias, it is the same data as the original
          self.type = type
@@ -205,16 +207,24 @@ if not NoUI:
             self.data = None
             return
 
+         # initialize those two with original type
+         self.editableType = self.type.editable
+         self.desc = self.type.description
+
          self.optional = isinstance(self.type, das.schematypes.Optional)
          self.deprecated = isinstance(self.type, das.schematypes.Deprecated)
 
          self.type = self.real_type(self.type)
 
-         self.desc = self.type.description
+         # override description using used type
+         if not self.desc:
+            self.desc = self.type.description
 
          self.multi = isinstance(self.type, das.schematypes.Or)
 
-         self.editable = self.is_editable(self.type)
+         # if originally editable, check that type value can effectively be edited
+         self.editableValue = self.is_editable(self.type)
+         self.editable = (self.editableType and self.editableValue)
 
          self.compound = self.is_compound(self.type)
 
@@ -227,7 +237,7 @@ if not NoUI:
                   for i in xrange(len(self.data)):
                      itemname = "[%d]" % i
                      itemdata = self.data[i]
-                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i, hideDeprecated=hideDeprecated))
+                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden))
 
             elif isinstance(self.type, das.schematypes.Tuple):
                self.typestr = "tuple"
@@ -237,7 +247,7 @@ if not NoUI:
                   for i in xrange(len(self.data)):
                      itemname = "(%d)" % i
                      itemdata = self.data[i]
-                     self.children.append(ModelItem(itemname, itemdata, type=self.type.types[i], parent=self, row=i, hideDeprecated=hideDeprecated))
+                     self.children.append(ModelItem(itemname, itemdata, type=self.type.types[i], parent=self, row=i, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden))
 
             elif isinstance(self.type, das.schematypes.Set):
                self.typestr = "set"
@@ -247,7 +257,7 @@ if not NoUI:
                   i = 0
                   for itemdata in self.data:
                      itemname = "{%d}" % i
-                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i, hideDeprecated=hideDeprecated))
+                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden))
                      i += 1
 
             elif isinstance(self.type, (das.schematypes.Struct, das.schematypes.StaticDict)):
@@ -264,8 +274,10 @@ if not NoUI:
                   self.mappingkeys[k] = optional
                   if optional:
                      self.resizable = True
-                  if self.exists():
+                  if self.exists() and (showHidden or not t.hidden):
                      if isinstance(t, das.schematypes.Alias):
+                        if hideAliases:
+                           continue
                         v = None
                      elif not k in self.data:
                         if hideDeprecated and isinstance(t, das.schematypes.Deprecated):
@@ -273,7 +285,7 @@ if not NoUI:
                         v = t.make_default()
                      else:
                         v = self.data[k]
-                     self.children.append(ModelItem(k, v, type=t, parent=self, row=i, key=k, hideDeprecated=hideDeprecated))
+                     self.children.append(ModelItem(k, v, type=t, parent=self, row=i, key=k, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden))
                   i += 1
 
             elif isinstance(self.type, (das.schematypes.Dict, das.schematypes.DynamicDict)):
@@ -290,7 +302,7 @@ if not NoUI:
                      v = self.data[k]
                      ks = str(k)
                      vtype = self.type.vtypeOverrides.get(k, self.type.vtype)
-                     self.children.append(ModelItem(ks, v, type=vtype, parent=self, row=i, key=k, hideDeprecated=hideDeprecated))
+                     self.children.append(ModelItem(ks, v, type=vtype, parent=self, row=i, key=k, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden))
                      i += 1
 
          else:
@@ -780,6 +792,8 @@ if not NoUI:
          self._undos = []
          self._curundo = -1
          self._hideDeprecated = True
+         self._hideAliases = True
+         self._showHidden = False
          self._buildItemsTree(data=data, type=type, name=name)
 
       def __emitDataChanged(self, index1, index2):
@@ -794,16 +808,32 @@ if not NoUI:
             if data is None:
                data = self._rootItem.data
                type = self._rootItem.type
-            self._rootItem.update(data, type=type, hideDeprecated=self._hideDeprecated)
+            self._rootItem.update(data, type=type, hideDeprecated=self._hideDeprecated, hideAliases=self._hideAliases, showHidden=self._showHidden)
          elif data is not None:
-            self._rootItem = ModelItem("<root>" if name is None else name, data, type=type, hideDeprecated=self._hideDeprecated)
+            self._rootItem = ModelItem("<root>" if name is None else name, data, type=type, hideDeprecated=self._hideDeprecated, hideAliases=self._hideAliases, showHidden=self._showHidden)
 
       def hideDeprecated(self):
          return self._hideDeprecated
 
+      def hideAliases(self):
+         return self._hideAliases
+
+      def showHidden(self):
+         return self._showHidden
+
       def setHideDeprecated(self, on):
          if on != self._hideDeprecated:
             self._hideDeprecated = on
+            self._updateData()
+
+      def setHideAliases(self, on):
+         if on != self._hideAliases:
+            self._hideAliases = on
+            self._updateData()
+
+      def setShowHidden(self, on):
+         if on != self._showHidden:
+            self._showHidden = on
             self._updateData()
 
       def _updateData(self, data=None, type=None, name=None):
@@ -945,7 +975,7 @@ if not NoUI:
 
             elif index.column() == 1:
                if not self._readonly:
-                  if item.exists() and not item.compound:
+                  if item.exists() and not item.compound and item.editableType:
                      flags = flags | QtCore.Qt.ItemIsEnabled
                   # any other cases?
                   if item.editable:
@@ -1041,7 +1071,8 @@ if not NoUI:
 
             elif not item.compound:
                if role == QtCore.Qt.DisplayRole:
-                  if not item.editable:
+                  #if not item.editable:
+                  if not item.editableValue:
                      rv = "---"
                   #elif isinstance(item.type, das.schematypes.Class):
                   elif hasattr(item.data, "value_to_string"):
@@ -1428,10 +1459,18 @@ if not NoUI:
             actionExpandAll.triggered.connect(self.onExpandAll)
             actionCollapseAll = menu.addAction("Collapse All")
             actionCollapseAll.triggered.connect(self.onCollapseAll)
-            actionHideDeprecated = menu.addAction("Hide Deprecated Field(s)")
+            actionHideDeprecated = menu.addAction("Deprecated Field(s)")
             actionHideDeprecated.setCheckable(True)
             actionHideDeprecated.setChecked(self.model.hideDeprecated())
-            actionHideDeprecated.toggled.connect(self.onToggleHideDeprecated)
+            actionHideDeprecated.toggled.connect(self.onToggleDeprecated)
+            actionHideAliases = menu.addAction("Alias Field(s)")
+            actionHideAliases.setCheckable(True)
+            actionHideAliases.setChecked(self.model.hideAliases())
+            actionHideAliases.toggled.connect(self.onToggleAliases)
+            actionShowHidden = menu.addAction("Show Hidden Field(s)")
+            actionShowHidden.setCheckable(True)
+            actionShowHidden.setChecked(self.model.showHidden())
+            actionShowHidden.toggled.connect(self.onToggleShowHidden)
 
             menu.popup(event.globalPos())
 
@@ -1520,8 +1559,14 @@ if not NoUI:
       def onResizeToContents(self):
          self.header().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
-      def onToggleHideDeprecated(self, toggled):
+      def onToggleDeprecated(self, toggled):
          self.model.setHideDeprecated(toggled)
+
+      def onToggleAliases(self, toggled):
+         self.model.setHideAliases(toggled)
+
+      def onToggleShowHidden(self, toggled):
+         self.model.setShowHidden(toggled)
 
       def onExpandAll(self):
          self.expandAll()
