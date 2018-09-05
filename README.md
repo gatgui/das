@@ -206,4 +206,7 @@ To specify a custom defined directory, use the eco-dir= flag
 scons eco eco-dir=path/to/target/directory
 ```
 
-
+### TODO
+- [ ] Implemente copy-paste
+- [ ] Allow multiple items drag'n'drop
+- [ ] Add a toolbar class (open/save/save as, copy/cut/paste, undo/redo)
