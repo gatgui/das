@@ -853,7 +853,7 @@ if not NoUI:
       def replaceData(self, data, type=None, name=None):
          self._orgData = None
          self._rootItem = None
-         self._undos.clear()
+         self._undos = []
          self._curundo = -1
          self._updateData(data, type=type, name=name)
 
