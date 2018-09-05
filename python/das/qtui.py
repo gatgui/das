@@ -1309,7 +1309,6 @@ if not NoUI:
          self.delegate = ModelItemDelegate(parent=self)
          self.setModel(self.model)
          self.expandedState = {}
-         self.checkedState = {}
          self.setItemDelegate(self.delegate)
          QtCompat.setSectionResizeMode(self.header(), QtWidgets.QHeaderView.Interactive)
          self.header().setStretchLastSection(True)
@@ -1489,12 +1488,16 @@ if not NoUI:
          return self.model.getData()
 
       def setData(self, data, type=None, name=None):
-         self.expandedState = {}
          self.model.replaceData(data, type=type, name=name)
-         self.modelUpdated.emit(self.model)
          index = QtCore.QModelIndex()
-         if self.model.rowCount(index) > 0:
-            self.setExpanded(self.model.index(0, 0, index), True)
+         # Try to restore expanded State
+         if not self.restoreExpandedState():
+            # Only reset expanded set if we have data and nothing was restored
+            if data:
+               self.expandedState = {}
+            if self.model.rowCount(index) > 0:
+               self.setExpanded(self.model.index(0, 0, index), True)
+         self.modelUpdated.emit(self.model)
 
       def cleanData(self):
          self.model.cleanData()
@@ -1536,18 +1539,24 @@ if not NoUI:
          self.model.layoutChanged.emit()
 
       def restoreExpandedState(self, index=None):
+         stateSet = False
+
          if index is None:
             index = QtCore.QModelIndex()
          else:
             k = self.getItemKey(index)
             if k is not None and k in self.expandedState:
                self.setExpanded(index, self.expandedState[k])
+               stateSet = True
 
          nr = self.model.rowCount(index)
          for r in xrange(nr):
-            self.restoreExpandedState(index=self.model.index(r, 0, index))
+            if self.restoreExpandedState(index=self.model.index(r, 0, index)):
+               stateSet = True
 
          self.model.layoutChanged.emit()
+
+         return stateSet
 
       def onItemCollapsed(self, modelIndex):
          k = self.getItemKey(modelIndex)
