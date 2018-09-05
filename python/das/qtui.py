@@ -188,11 +188,12 @@ if not NoUI:
          self.optional = False
          self.deprecated = False
          self.editable = False # will be false for aliases
-         self.editableType = True
-         self.editableValue = True
+         self.editableType = True # is value tagged as editable in the schema type
+         self.editableValue = True # is value actually editable in the UI
          self.multi = False
          self.data = data # for alias, it is the same data as the original
          self.type = type
+         self.baseType = None
          self.typestr = ""
          self.desc = ""
 
@@ -200,6 +201,8 @@ if not NoUI:
             self.type = self.data._get_schema_type()
             if self.type is None:
                raise Exception("No schema type for model item")
+
+         self.baseType = self.type
 
          if isinstance(self.type, das.schematypes.Alias):
             # Shortcut
