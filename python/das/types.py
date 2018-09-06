@@ -63,7 +63,7 @@ class TypeBase(object):
       super(TypeBase, self).__init__()
       self.__dict__["_schema_type"] = None
       self.__dict__["_validate_globally_cb"] = None
-      self.__dict__["_global_validation_enabled"] = False
+      self.__dict__["_global_validation_enabled"] = True
 
    def _wrap(self, rhs):
       st = self._get_schema_type()
