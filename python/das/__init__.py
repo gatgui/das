@@ -12,7 +12,8 @@ from .types import (ReservedNameError,
                     Sequence,
                     Set,
                     Dict,
-                    Struct)
+                    Struct,
+                    GlobalValidationDisabled)
 from .schematypes import ValidationError
 from .validation import (UnknownSchemaError,
                          SchemaVersionError,

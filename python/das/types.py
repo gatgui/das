@@ -24,6 +24,28 @@ class VersionError(Exception):
       super(VersionError, self).__init__(fullmsg)
 
 
+class GlobalValidationDisabled(object):
+   def __init__(self, data):
+      super(GlobalValidationDisabled, self).__init__()
+      self.data = data
+      self.oldstate = None
+
+   def __enter__(self):
+      try:
+         self.oldstate = self.data._is_global_validation_enabled()
+         self.data._enable_global_validation(False)
+      except:
+         pass
+      return self.data
+
+   def __exit__(self, type, value, traceback):
+      if self.oldstate is not None:
+         self.data._enable_global_validation(self.oldstate)
+         self.oldstate = None
+      # Always re-raise exception
+      return False
+
+
 class TypeBase(object):
    @classmethod
    def TransferGlobalValidator(klass, src, dst):
@@ -41,6 +63,7 @@ class TypeBase(object):
       super(TypeBase, self).__init__()
       self.__dict__["_schema_type"] = None
       self.__dict__["_validate_globally_cb"] = None
+      self.__dict__["_global_validation_enabled"] = False
 
    def _wrap(self, rhs):
       st = self._get_schema_type()
@@ -60,6 +83,10 @@ class TypeBase(object):
 
    def _gvalidate(self):
       if self._get_schema_type() is not None:
+         if hasattr(self, "_is_global_validation_enabled"):
+            if not self._is_global_validation_enabled():
+               # Skip global validaton
+               return
          gvcb = self._get_validate_globally_cb()
          if gvcb is not None:
             gvcb()
@@ -86,6 +113,12 @@ class TypeBase(object):
 
    def _set_validate_globally_cb(self, cb):
       self.__dict__["_validate_globally_cb"] = cb
+
+   def _is_global_validation_enabled(self):
+      return self.__dict__["_global_validation_enabled"]
+
+   def _enable_global_validation(self, on):
+      self.__dict__["_global_validation_enabled"] = on
 
 
 class Tuple(TypeBase, tuple):
