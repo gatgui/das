@@ -695,8 +695,8 @@ class Or(TypeValidator):
 
 
 class Optional(TypeValidator):
-   def __init__(self, type):
-      super(Optional, self).__init__()
+   def __init__(self, type, description=None, editable=True, hidden=False):
+      super(Optional, self).__init__(description=description, editable=editable, hidden=hidden)
       self.type = type
 
    def _validate_self(self, value):
@@ -721,8 +721,8 @@ class Optional(TypeValidator):
 
 
 class Deprecated(Optional):
-   def __init__(self, type, message=""):
-      super(Deprecated, self).__init__(type)
+   def __init__(self, type, message="", description=None, editable=True, hidden=False):
+      super(Deprecated, self).__init__(type, description=description, editable=editable, hidden=hidden)
       self.message = message
 
    def _validate_self(self, value):
@@ -750,8 +750,8 @@ class Deprecated(Optional):
 
 
 class Empty(TypeValidator):
-   def __init__(self):
-      super(Empty, self).__init__()
+   def __init__(self, description=None, editable=True, hidden=False):
+      super(Empty, self).__init__(description=description, editable=editable, hidden=hidden)
 
    def _validate_self(self, value):
       if value is not None:
@@ -769,8 +769,8 @@ class Empty(TypeValidator):
 
 
 class Alias(TypeValidator):
-   def __init__(self, name):
-      super(Alias, self).__init__()
+   def __init__(self, name, description=None, editable=True, hidden=False):
+      super(Alias, self).__init__(description=description, editable=editable, hidden=hidden)
       self.name = name
 
    def _validate_self(self, value):
