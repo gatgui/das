@@ -218,13 +218,32 @@ class Set(TypeBase, set):
          return 1
 
    def add(self, e):
-      super(Set, self).add(self._adapt_value(e, index=len(self)))
-      self._gvalidate()
+      ae = self._adapt_value(e, index=len(self))
+      if ae in self:
+         return
+      super(Set, self).add(ae)
+      try:
+         self._gvalidate()
+      except Exception, e:
+         self.remove(ae)
+         raise e
 
    def update(self, *args):
+      added = set()
       for y in args:
-         super(Set, self).update([self._adapt_value(x, index=i) for i, x in enumerate(y)])
-      self._gvalidate()
+         #super(Set, self).update([self._adapt_value(x, index=i) for i, x in enumerate(y)])
+         lst = [self._adapt_value(x, index=i) for i, x in enumerate(y)]
+         for item in lst:
+            if item in self:
+               continue
+            super(Set, self).add(item)
+            added.add(item)
+      try:
+         self._gvalidate()
+      except Exception, e:
+         for item in added:
+            self.remove(item)
+         raise e
 
    def __iter__(self):
       for item in super(Set, self).__iter__():
@@ -237,8 +256,17 @@ class Dict(TypeBase, dict):
       dict.__init__(self, *args, **kwargs)
 
    def __setitem__(self, k, v):
+      wasset = (k in self)
+      oldval = (self[k] if wasset else None)
       super(Dict, self).__setitem__(k, self._adapt_value(v, key=k))
-      self._gvalidate()
+      try:
+         self._gvalidate()
+      except Exception, e:
+         if wasset:
+            super(Dict, self).__setitem__(k, oldval)
+         else:
+            del(self[k])
+         raise e
 
    def setdefault(self, *args):
       if len(args) >= 2:
@@ -249,17 +277,41 @@ class Dict(TypeBase, dict):
       return self._wrap(self)
 
    def update(self, *args, **kwargs):
+      oldvals = {}
+      remvals = set()
       if len(args) == 1:
          a0 = args[0]
          if hasattr(a0, "keys"):
             for k in a0.keys():
+               if k in self:
+                  oldvals[k] = self[k]
+               else:
+                  remvals.add(k)
                self[k] = self._adapt_value(a0[k], key=k)
          else:
             for k, v in a0:
+               if k in self:
+                  oldvals[k] = self[k]
+               else:
+                  remvals.add(k)
                self[k] = self._adapt_value(v, key=k)
+      elif len(args) > 1:
+         raise Exception("update expected at most 1 arguments, got %d" % len(args))
       for k, v in kwargs.iteritems():
+         if k in self:
+            if not k in oldvals:
+               oldvals[k] = self[k]
+         else:
+            remvals.add(k)
          self[k] = self._adapt_value(v, key=k)
-      self._gvalidate()
+      try:
+         self._gvalidate()
+      except Exception, e:
+         for k in remvals:
+            del(self[k])
+         for k, v in oldvals.iteritems():
+            self[k] = v
+         raise e
 
    def __getitem__(self, k):
       return TypeBase.TransferGlobalValidator(self, super(Dict, self).__getitem__(k))
@@ -310,12 +362,29 @@ class Struct(TypeBase):
       else:
          k = self._get_alias(k)
          self._check_reserved(k)
+         wasset = (k in self._dict)
+         oldval = (self._dict[k] if wasset else None)
          self._dict[k] = self._adapt_value(v, key=k)
-         self._gvalidate()
+         try:
+            self._gvalidate()
+         except Exception, e:
+            if wasset:
+               self._dict[k] = oldval
+            else:
+               del(self._dict[k])
+            raise e
 
    def __delattr__(self, k):
-      del(self._dict[self._get_alias(k)])
-      self._gvalidate()
+      k = self._get_alias(k)
+      oldval = self._dict.get(k, None)
+      del(self._dict[k])
+      try:
+         self._gvalidate()
+      except Exception, e:
+         # Note: del(self._dict[k]) will have raised an exception if k is not set
+         #       if we reach here, k was set
+         self._dict[k] = oldval
+         raise e
 
    def __getitem__(self, k):
       k = self._get_alias(k)
@@ -324,12 +393,28 @@ class Struct(TypeBase):
    def __setitem__(self, k, v):
       k = self._get_alias(k)
       self._check_reserved(k)
+      wasset = (k in self._dict)
+      oldval = (self._dict[k] if wasset else None)
       self._dict.__setitem__(k, self._adapt_value(v, key=k))
-      self._gvalidate()
+      try:
+         self._gvalidate()
+      except Exception, e:
+         if wasset:
+            self._dict[k] = oldval
+         else:
+            del(self._dict[k])
+         raise e
 
    def __delitem__(self, k):
-      self._dict.__delitem__(self._get_alias(k))
-      self._gvalidate()
+      k = self._get_alias(k)
+      oldval = self._dict.get(k, None)
+      self._dict.__delitem__(k)
+      try:
+         self._gvalidate()
+      except Exception, e:
+         # Note: same remark as in __delattr__
+         self._dict[k] = oldval
+         raise e
 
    def __contains__(self, k):
       return self._dict.__contains__(self._get_alias(k))
@@ -378,12 +463,47 @@ class Struct(TypeBase):
 
    # Override of dict.update
    def _update(self, *args, **kwargs):
-      self._dict.update(*args, **kwargs)
-      for k, v in self._dict.items():
+      oldvals = {}
+      remvals = set()
+      if len(args) == 1:
+         a0 = args[0]
+         if hasattr(a0, "keys"):
+            for k in a0.keys():
+               k = self._get_alias(k)
+               self._check_reserved(k)
+               if k in self._dict:
+                  oldvals[k] = self._dict[k]
+               else:
+                  remvals.add(k)
+               self._dict[k] = self._adapt_value(a0[k], key=k)
+         else:
+            for k, v in a0:
+               k = self._get_alias(k)
+               self._check_reserved(k)
+               if k in self._dict:
+                  oldvals[k] = self._dict[k]
+               else:
+                  remvals.add(k)
+               self._dict[k] = self._adapt_value(v, key=k)
+      elif len(args) > 1:
+         raise Exception("update expected at most 1 arguments, got %d" % len(args))
+      for k, v in kwargs.iteritems():
          k = self._get_alias(k)
          self._check_reserved(k)
+         if k in self._dict:
+            if not k in oldvals:
+               oldvals[k] = self._dict[k]
+         else:
+            remvals.add(k)
          self._dict[k] = self._adapt_value(v, key=k)
-      self._gvalidate()
+      try:
+         self._gvalidate()
+      except Exception, e:
+         for k in remvals:
+            del(self._dict[k])
+         for k, v in oldvals.iteritems():
+            self._dict[k] = v
+         raise e
 
    def _get_alias(self, k):
       st = self._get_schema_type()
