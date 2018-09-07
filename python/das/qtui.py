@@ -1317,7 +1317,7 @@ if not NoUI:
          self.expandedState = {}
          self.setItemDelegate(self.delegate)
          QtCompat.setSectionResizeMode(self.header(), QtWidgets.QHeaderView.Interactive)
-         self.header().setStretchLastSection(True)
+         self.header().setStretchLastSection(False)
          self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
          self.setAnimated(True)
          self.setHeaderHidden(False)
