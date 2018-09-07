@@ -729,7 +729,10 @@ if not NoUI:
             key = eval(widget.text())
          except:
             key = widget.text()
-         model.setData(modelIndex, key, QtCore.Qt.EditRole)
+         try:
+            model.setData(modelIndex, key, QtCore.Qt.EditRole)
+         except Exception, e:
+            model.setItemErrorMessage(str(e))
 
       def setOrModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
@@ -738,14 +741,20 @@ if not NoUI:
 
          if len(values) >= 1:
             _, v = values[0]
-            model.setData(modelIndex, v, QtCore.Qt.EditRole)
+            try:
+               model.setData(modelIndex, v, QtCore.Qt.EditRole)
+            except Exception, e:
+               model.setItemErrorMessage(item, str(e))
          else:
             model.setItemErrorMessage(item, "Input doesn't match any supported types")
 
       def setBoolModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
          data = (widget.checkState() == QtCore.Qt.Checked)
-         model.setData(modelIndex, data, QtCore.Qt.EditRole)
+         try:
+            model.setData(modelIndex, data, QtCore.Qt.EditRole)
+         except Exception, e:
+            model.setItemErrorMessage(item, str(e))
 
       def setIntModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
@@ -756,7 +765,10 @@ if not NoUI:
                data = widget.value()
             else:
                data = long(widget.text())
-         model.setData(modelIndex, data, QtCore.Qt.EditRole)
+         try:
+            model.setData(modelIndex, data, QtCore.Qt.EditRole)
+         except Exception, e:
+            model.setItemErrorMessage(item, str(e))
 
       def setFltModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
@@ -764,7 +776,10 @@ if not NoUI:
             data = widget.value()
          else:
             data = float(widget.text())
-         model.setData(modelIndex, data, QtCore.Qt.EditRole)
+         try:
+            model.setData(modelIndex, data, QtCore.Qt.EditRole)
+         except Exception, e:
+            model.setItemErrorMessage(item, str(e))
 
       def setStrModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
@@ -772,13 +787,19 @@ if not NoUI:
             data = widget.currentText()
          else:
             data = widget.text()
-         model.setData(modelIndex, data, QtCore.Qt.EditRole)
+         try:
+            model.setData(modelIndex, data, QtCore.Qt.EditRole)
+         except Exception, e:
+            model.setItemErrorMessage(item, str(e))
 
       def setClassModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
          data = item.data.copy()
          data.string_to_value(widget.text())
-         model.setData(modelIndex, data, QtCore.Qt.EditRole)
+         try:
+            model.setData(modelIndex, data, QtCore.Qt.EditRole)
+         except Exception, e:
+            model.setItemErrorMessage(item, str(e))
 
 
    class Model(QtCore.QAbstractItemModel):
