@@ -131,22 +131,21 @@ if not NoUI:
             return values
 
          s = kwargs.get("string", self.multi_string())
-         #tas = kwargs.get("typeAsString", True)
 
          for t in self.type.types:
+            if isinstance(t, das.schematypes.SchemaType):
+               t = das.get_schema_type(t.name)
             if isinstance(t, das.schematypes.Empty):
                if s.lower() == "none":
-                  #values.append(("empty" if tas else t, None))
                   values.append(("empty", None))
             elif isinstance(t, das.schematypes.Boolean):
                if s.lower() in ("on", "yes", "true", "off", "no", "false"):
                   v = (s.lower() in ("on", "yes", "true"))
-                  values.append(("boolean" if tas else t, v))
+                  values.append(("boolean", v))
             elif isinstance(t, das.schematypes.Integer):
                try:
                   v = long(s)
                   t._validate_self(v)
-                  #values.append(("integer" if tas else t, v))
                   values.append(("integer", v))
                except:
                   pass
@@ -154,14 +153,12 @@ if not NoUI:
                try:
                   v = float(s)
                   t._validate_self(v)
-                  #values.append(("real" if tas else t, v))
                   values.append(("real", v))
                except:
                   pass
             elif isinstance(t, das.schematypes.String):
                try:
                   t._validate_self(s)
-                  #values.append(("string" if tas else t, s))
                   values.append(("string", s))
                except:
                   pass
@@ -169,7 +166,6 @@ if not NoUI:
                try:
                   v = t.make_default()
                   v.string_to_value(s)
-                  #values.append((self.class_name(t.klass) if tas else t, v))
                   t._validate_self(v)
                   values.append((self.class_name(t.klass), v))
                except:
