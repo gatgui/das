@@ -94,13 +94,14 @@ class TypeBase(object):
             try:
                self._validate_globally()
             except Exception, e:
-               fn = ""
-               cm = self._validate_globally.im_class.__module__
-               if cm != "__main__":
-                  fn = cm + "."
-               fn += self._validate_globally.im_class.__name__
-               fn += "._validate_globally"
-               raise das.ValidationError("'%s' failed (%s)" % (fn, e))
+               # fn = ""
+               # cm = self._validate_globally.im_class.__module__
+               # if cm != "__main__":
+               #    fn = cm + "."
+               # fn += self._validate_globally.im_class.__name__
+               # fn += "._validate_globally"
+               # raise das.ValidationError("'%s' failed (%s)" % (fn, e))
+               raise das.ValidationError(str(e))
 
    def _get_schema_type(self):
       return self.__dict__["_schema_type"]
