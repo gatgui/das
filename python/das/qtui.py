@@ -713,7 +713,15 @@ if not NoUI:
          if not invalid:
             func = widget.property("setModelData")
             if func:
-               func(widget, model, modelIndex)
+               olddata = item.data
+               if not func(widget, model, modelIndex):
+                  # even if model.setData fails, UI still shows the
+                  # invalid edited value until next refresh
+                  msg = model.message()
+                  model.disableUndo()
+                  model.setData(modelIndex, olddata, QtCore.Qt.EditRole)
+                  model.enableUndo()
+                  model.setMessage(msg)
             else:
                model.setItemErrorMessage(item, "No 'setModelData' property set on editor widget")
          else:
@@ -722,17 +730,14 @@ if not NoUI:
       def setTypeModelData(self, widget, model, modelIndex):
          data = widget.itemData(widget.currentIndex())
          index = model.index(modelIndex.row(), 1, modelIndex.parent())
-         model.setData(index, data, QtCore.Qt.EditRole)
+         return model.setData(index, data, QtCore.Qt.EditRole)
 
       def setMappingKeyModelData(self, widget, model, modelIndex):
          try:
             key = eval(widget.text())
          except:
             key = widget.text()
-         try:
-            model.setData(modelIndex, key, QtCore.Qt.EditRole)
-         except Exception, e:
-            model.setItemErrorMessage(str(e))
+         return model.setData(modelIndex, key, QtCore.Qt.EditRole)
 
       def setOrModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
@@ -741,20 +746,15 @@ if not NoUI:
 
          if len(values) >= 1:
             _, v = values[0]
-            try:
-               model.setData(modelIndex, v, QtCore.Qt.EditRole)
-            except Exception, e:
-               model.setItemErrorMessage(item, str(e))
+            return model.setData(modelIndex, v, QtCore.Qt.EditRole)
          else:
             model.setItemErrorMessage(item, "Input doesn't match any supported types")
+            return False
 
       def setBoolModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
          data = (widget.checkState() == QtCore.Qt.Checked)
-         try:
-            model.setData(modelIndex, data, QtCore.Qt.EditRole)
-         except Exception, e:
-            model.setItemErrorMessage(item, str(e))
+         return model.setData(modelIndex, data, QtCore.Qt.EditRole)
 
       def setIntModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
@@ -765,10 +765,7 @@ if not NoUI:
                data = widget.value()
             else:
                data = long(widget.text())
-         try:
-            model.setData(modelIndex, data, QtCore.Qt.EditRole)
-         except Exception, e:
-            model.setItemErrorMessage(item, str(e))
+         return model.setData(modelIndex, data, QtCore.Qt.EditRole)
 
       def setFltModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
@@ -776,10 +773,7 @@ if not NoUI:
             data = widget.value()
          else:
             data = float(widget.text())
-         try:
-            model.setData(modelIndex, data, QtCore.Qt.EditRole)
-         except Exception, e:
-            model.setItemErrorMessage(item, str(e))
+         return model.setData(modelIndex, data, QtCore.Qt.EditRole)
 
       def setStrModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
@@ -787,19 +781,13 @@ if not NoUI:
             data = widget.currentText()
          else:
             data = widget.text()
-         try:
-            model.setData(modelIndex, data, QtCore.Qt.EditRole)
-         except Exception, e:
-            model.setItemErrorMessage(item, str(e))
+         return model.setData(modelIndex, data, QtCore.Qt.EditRole)
 
       def setClassModelData(self, widget, model, modelIndex):
          item = modelIndex.internalPointer()
          data = item.data.copy()
          data.string_to_value(widget.text())
-         try:
-            model.setData(modelIndex, data, QtCore.Qt.EditRole)
-         except Exception, e:
-            model.setItemErrorMessage(item, str(e))
+         return model.setData(modelIndex, data, QtCore.Qt.EditRole)
 
 
    class Model(QtCore.QAbstractItemModel):
@@ -821,6 +809,7 @@ if not NoUI:
          self._readonly = readonly
          self._undos = []
          self._curundo = -1
+         self._noundo = False
          self._hideDeprecated = True
          self._hideAliases = True
          self._showHidden = False
@@ -939,12 +928,20 @@ if not NoUI:
             return True
 
       def pushUndo(self, undoData):
+         if self._noundo:
+            return
          if self._rootItem and undoData is not None:
             curData = das.copy(self.getData())
             if curData != undoData:
                self._undos = self._undos[:self._curundo + 1]
                self._undos.append((undoData, curData))
                self._curundo = len(self._undos) - 1
+
+      def enableUndo(self):
+         self._noundo = False
+
+      def disableUndo(self):
+         self._noundo = True
 
       def clearUndos(self):
          self._undos = []
@@ -1143,33 +1140,30 @@ if not NoUI:
          undoData = (das.copy(self.getData()) if pushUndo else None)
 
          oldvalue = item.data
-         try:
-            item.data = value
-            item.update_multi_type_string()
-         except Exception, e:
-            self.setItemErrorMessage(item, str(e))
-         else:
-            self.setMessage("")
-            # Check whether we need to replace data reference in parent item, if any
-            if item.parent is not None:
-               if item.parent.mapping:
-                  item.parent.data[item.key] = item.data
-               elif item.parent.resizable:
-                  if isinstance(item.parent.type, das.schematypes.Sequence):
-                     item.parent.data[item.row] = item.data
-                  else:
-                     item.parent.data.remove(oldvalue)
-                     item.parent.data.add(item.data)
+         # The following statement may fails because of validation
+         item.data = value
+         item.update_multi_type_string()
+         self.setMessage("")
+         # Check whether we need to replace data reference in parent item, if any
+         if item.parent is not None:
+            if item.parent.mapping:
+               item.parent.data[item.key] = item.data
+            elif item.parent.resizable:
+               if isinstance(item.parent.type, das.schematypes.Sequence):
+                  item.parent.data[item.row] = item.data
                else:
-                  seq = list(item.parent.data)
-                  seq[item.row] = item.data
-                  #self.setData(self.parent(index), das.types.Tuple(seq), role)
-                  self._setRawData(self.parent(index), das.types.Tuple(seq), pushUndo=False)
-               # Force rebuild
-               # (note: not necessary all the time, but to simplify logic)
-               structureChanged = True
+                  item.parent.data.remove(oldvalue)
+                  item.parent.data.add(item.data)
+            else:
+               seq = list(item.parent.data)
+               seq[item.row] = item.data
+               #self.setData(self.parent(index), das.types.Tuple(seq), role)
+               self._setRawData(self.parent(index), das.types.Tuple(seq), pushUndo=False)
+            # Force rebuild
+            # (note: not necessary all the time, but to simplify logic)
+            structureChanged = True
 
-            self.pushUndo(undoData)
+         self.pushUndo(undoData)
 
          return structureChanged
 
@@ -1193,21 +1187,37 @@ if not NoUI:
                # Dict/DynamicDict keys
                item = index.internalPointer()
                newkey = das.copy(item.key)
-               newkey = value
-               self.setMessage("")
+               try:
+                  newkey = value
+               except Exception, e:
+                  self.setItemErrorMessage(item, str(e))
+                  return False
                if newkey != item.key:
                   if newkey in item.parent.data:
                      self.setItemErrorMessage(item.parent, "Key %s already exists" % value)
                      return False
                   else:
-                     item.parent.data[newkey] = item.data
-                     del(item.parent.data[item.key])
-                     structureChanged = True
+                     undoData = das.copy(self.getData())
+                     try:
+                        item.parent.data[newkey] = item.data
+                        del(item.parent.data[item.key])
+                     except Exception, e:
+                        self.setItemErrorMessage(item.parent, str(e))
+                        return False
+                     else:
+                        self.setMessage("")
+                        self.pushUndo(undoData)
+                        structureChanged = True
                else:
+                  # Nothing to do here
                   return True
 
             elif index.column() == 1:
-               structureChanged = self._setRawData(index, value)
+               try:
+                  structureChanged = self._setRawData(index, value)
+               except Exception, e:
+                  self.setItemErrorMessage(index.internalPointer(), str(e))
+                  return False
 
             elif index.column() == 2:
                # We actually never trigger this one... should we?
@@ -1287,15 +1297,20 @@ if not NoUI:
                   seq = list(seq)
                # Build re-ordered sequence
                seq = seq[:srcitem.row] + seq[srcitem.row+1:] + [srcitem.data]
-               self._setRawData(tgtindex, seq)
+               try:
+                  self._setRawData(tgtindex, seq)
+               except Exception, e:
+                  self.setItemErrorMessage(tgtitem, str(e))
+                  return False
                self.dataChanged.emit(self.index(0, 1, tgtindex), self.index(self.rowCount(tgtindex)-1, 1, tgtindex))
                self.rebuild()
                self.internallyRebuilt.emit()
+               return True
             elif tgtitem.parent == srcitem.parent:
                # Copy element data
                index = self.index(tgtindex.row(), 1, self.parent(tgtindex))
                data = das.copy(srcitem.data)
-               self.setData(index, data, QtCore.Qt.EditRole)
+               return self.setData(index, data, QtCore.Qt.EditRole)
             else:
                return False
 
@@ -1316,14 +1331,17 @@ if not NoUI:
                if tgtitem.row > srcitem.row:
                   idx -= 1
                seq.insert(idx, srcitem.data)
-               self._setRawData(pindex, seq)
+               try:
+                  self._setRawData(pindex, seq)
+               except Exception, e:
+                  self.setItemErrorMessage(pitem, str(e))
+                  return False
                self.dataChanged.emit(tgtindex if (tgtitem.row < srcitem.row) else srcindex, self.index(self.rowCount(pindex)-1, 1, pindex))
                self.rebuild()
                self.internallyRebuilt.emit()
+               return True
             else:
                return False
-
-         return True
 
 
    class Editor(QtWidgets.QTreeView):
