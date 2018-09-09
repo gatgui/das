@@ -1352,6 +1352,8 @@ if not NoUI:
          super(Editor, self).__init__(parent)
          self.model = Model(data, type=type, name=name, readonly=readonly, parent=self)
          self.delegate = ModelItemDelegate(parent=self)
+         self.selection = []
+         self.scrollState = None
          self.setModel(self.model)
          self.expandedState = {}
          self.setItemDelegate(self.delegate)
@@ -1370,6 +1372,8 @@ if not NoUI:
          self.model.internallyRebuilt.connect(self.restoreExpandedState)
          self.model.dataChanged.connect(self.onContentChanged)
          self.model.messageChanged.connect(self.onMessageChanged)
+         self.model.modelAboutToBeReset.connect(self.storeSelection)
+         self.model.modelReset.connect(self.restoreSelection )
          self.collapsed.connect(self.onItemCollapsed)
          self.expanded.connect(self.onItemExpanded)
          index = QtCore.QModelIndex()
@@ -1415,7 +1419,6 @@ if not NoUI:
                               self.remSeqItems(indices)
                         else:
                            self.remSetItems(indices)
-
 
       def mousePressEvent(self, event):
          if event.button() == QtCore.Qt.RightButton:
@@ -1523,11 +1526,28 @@ if not NoUI:
 
          else:
             super(Editor, self).mousePressEvent(event)
-
+ 
       def getItemKey(self, modelIndex):
          k = None
          item = modelIndex.internalPointer()
          return item.fullname()
+
+      def storeSelection(self):
+         mdl = self.selectionModel()
+         sel = mdl.selection()
+         self.selection = [self.getItemKey(x) for x in sel.indexes()]
+         self.scrollState = (self.horizontalScrollBar().value(), self.verticalScrollBar().value())
+
+      def restoreSelection(self):
+         self.setFocus()
+         mdl = self.selectionModel()
+         sel = QtCore.QItemSelection()
+         for item in self.selection:
+            index = self.model.findIndex(item)
+            if index:
+               sel.merge(QtCore.QItemSelection(index, index), QtCore.QItemSelectionModel.Select)
+         mdl.select(sel, QtCore.QItemSelectionModel.SelectCurrent|QtCore.QItemSelectionModel.Rows)
+         self.selection = []
 
       def getData(self):
          return self.model.getData()
@@ -1599,7 +1619,14 @@ if not NoUI:
             if self.restoreExpandedState(index=self.model.index(r, 0, index)):
                stateSet = True
 
-         self.model.layoutChanged.emit()
+         #self.model.layoutChanged.emit()
+
+         if index == QtCore.QModelIndex():
+            if self.scrollState:
+               hsv, vsv = self.scrollState
+               self.horizontalScrollBar().setValue(hsv)
+               self.verticalScrollBar().setValue(vsv)
+               self.scrollState = None
 
          return stateSet
 
