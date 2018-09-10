@@ -14,7 +14,8 @@ from .types import (ReservedNameError,
                     Dict,
                     Struct,
                     GlobalValidationDisabled)
-from .schematypes import ValidationError
+from .schematypes import (TypeValidator,
+                          ValidationError)
 from .validation import (UnknownSchemaError,
                          SchemaVersionError,
                          Schema,
@@ -95,8 +96,8 @@ def make_default(name):
    return SchemaTypesRegistry.instance.make_default(name)
 
 
-def make(_schema_type_name, *args, **kwargs):
-   return SchemaTypesRegistry.instance.make(_schema_type_name, *args, **kwargs)
+def make(name, *args, **kwargs):
+   return SchemaTypesRegistry.instance.make(name, *args, **kwargs)
 
 
 def adapt_value(value, schema_type=None, key=None, index=None):
@@ -132,13 +133,23 @@ def adapt_value(value, schema_type=None, key=None, index=None):
             return value
 
 
-def validate(d, schema):
-   return get_schema_type(schema).validate(d)
+def validate(d, schema_type):
+   if not isinstance(schema_type, (basestring, TypeValidator)):
+      raise Exception("Expected a string or a das.schematypes.TypeValidator instance as second argument")
+   if isinstance(schema_type, TypeValidator):
+      return schema_type.validate(d)
+   else:
+      return get_schema_type(schema_type).validate(d)
 
 
-def check(d, schema):
+def check(d, schema_type):
+   if not isinstance(schema_type, (basestring, TypeValidator)):
+      raise Exception("Expected a string or a das.schematypes.TypeValidator instance as second argument")
    try:
-      get_schema_type(schema).validate(das.copy(d))
+      if isinstance(schema_type, TypeValidator):
+         schema_type.validate(das.copy(d))
+      else:
+         get_schema_type(schema_type).validate(das.copy(d))
       return True
    except:
       return False
@@ -222,11 +233,22 @@ def decode(d, encoding):
 
 def read_string(s, schema_type=None, encoding=None, strict_schema=True, **funcs):
    if schema_type is not None:
-      sch = get_schema_type(schema_type)
-      mod = get_schema_module(schema_type)
-      if mod is not None and hasattr(mod, "__all__"):
-         for item in mod.__all__:
-            funcs[item] = getattr(mod, item)
+      if isinstance(schema_type, basestring):
+         schname = schema_type
+         sch = get_schema_type(schema_type)
+      elif isinstance(schema_type, TypeValidator):
+         schname = get_schema_type_name(schema_type)
+         sch = schema_type
+      else:
+         print_once("[das] 'schema_type' must either be a string or a das.schematypes.TypeValidator instance")
+         sch = None
+      if sch is not None:
+         mod = get_schema_module(schname)
+         if mod is not None and hasattr(mod, "__all__"):
+            for item in mod.__all__:
+               funcs[item] = getattr(mod, item)
+      else:
+         mod = None
    else:
       sch, mod = None, None
 
