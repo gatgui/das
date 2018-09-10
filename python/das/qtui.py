@@ -250,6 +250,11 @@ if not NoUI:
                         self.multi = False
                         self.compound = True
                         self.type = typ
+                        self.editableType = self.type.editable
+                        self.editableValue = self.is_editable(self.type)
+                        self.editable = (self.editableType and self.editableValue)
+                        if not self.desc:
+                           self.desc = self.type.description
                      break
 
             else:
