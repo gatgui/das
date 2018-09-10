@@ -96,8 +96,8 @@ def make_default(name):
    return SchemaTypesRegistry.instance.make_default(name)
 
 
-def make(name, *args, **kwargs):
-   return SchemaTypesRegistry.instance.make(name, *args, **kwargs)
+def make(_schema_type_name, *args, **kwargs):
+   return SchemaTypesRegistry.instance.make(_schema_type_name, *args, **kwargs)
 
 
 def adapt_value(value, schema_type=None, key=None, index=None):
