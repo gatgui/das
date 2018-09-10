@@ -101,6 +101,9 @@ if not NoUI:
             cn = mn + "." + cn
          if cn in self.ReservedTypeNames:
             cn += " (user)"
+         # convert das.types.SomeType to someType
+         if cn.startswith("das.types."):
+            cn = cn[10].lower() + cn[11:]
          return cn
 
       def update_multi_type_string(self):
@@ -237,6 +240,34 @@ if not NoUI:
 
          self.compound = self.is_compound(self.type)
 
+         if not self.compound:
+            if self.multi:
+               self.update_multi_type_string()
+               # Try to figure actual datatype. If it is a compound, built matching item tree
+               for typ in self.type.types:
+                  if das.check(data, typ):
+                     if isinstance(data, (das.types.Sequence, das.types.Tuple, das.types.Set, das.types.Struct, das.types.Dict)):
+                        self.multi = False
+                        self.compound = True
+                        self.type = typ
+                     break
+
+            else:
+               if isinstance(self.type, das.schematypes.Boolean):
+                  self.typestr = "boolean"
+               elif isinstance(self.type, das.schematypes.Integer):
+                  self.typestr = "integer"
+               elif isinstance(self.type, das.schematypes.Real):
+                  self.typestr = "real"
+               elif isinstance(self.type, das.schematypes.String):
+                  self.typestr = "string"
+               elif isinstance(self.type, das.schematypes.Empty):
+                  self.typestr = "empty"
+               elif isinstance(self.type, das.schematypes.Class):
+                  self.typestr = self.class_name(self.type.klass)
+               elif isinstance(self.type, das.schematypes.Alias):
+                  self.typestr = "alias"
+
          if self.compound:
             if isinstance(self.type, das.schematypes.Sequence):
                self.typestr = "list"
@@ -313,25 +344,6 @@ if not NoUI:
                      vtype = self.type.vtypeOverrides.get(k, self.type.vtype)
                      self.children.append(ModelItem(ks, v, type=vtype, parent=self, row=i, key=k, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden))
                      i += 1
-
-         else:
-            if self.multi:
-               self.update_multi_type_string()
-            else:
-               if isinstance(self.type, das.schematypes.Boolean):
-                  self.typestr = "boolean"
-               elif isinstance(self.type, das.schematypes.Integer):
-                  self.typestr = "integer"
-               elif isinstance(self.type, das.schematypes.Real):
-                  self.typestr = "real"
-               elif isinstance(self.type, das.schematypes.String):
-                  self.typestr = "string"
-               elif isinstance(self.type, das.schematypes.Empty):
-                  self.typestr = "empty"
-               elif isinstance(self.type, das.schematypes.Class):
-                  self.typestr = self.class_name(self.type.klass)
-               elif isinstance(self.type, das.schematypes.Alias):
-                  self.typestr = "alias"
 
 
    class NewValueDialog(QtWidgets.QDialog):
