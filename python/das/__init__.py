@@ -147,9 +147,9 @@ def check(d, schema_type):
       raise Exception("Expected a string or a das.schematypes.TypeValidator instance as second argument")
    try:
       if isinstance(schema_type, TypeValidator):
-         schema_type.validate(das.copy(d))
+         schema_type.validate(copy(d))
       else:
-         get_schema_type(schema_type).validate(das.copy(d))
+         get_schema_type(schema_type).validate(copy(d))
       return True
    except:
       return False
