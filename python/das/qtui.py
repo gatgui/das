@@ -1511,11 +1511,11 @@ if not NoUI:
             actionCollapseAll.triggered.connect(self.onCollapseAll)
             actionHideDeprecated = menu.addAction("Deprecated Field(s)")
             actionHideDeprecated.setCheckable(True)
-            actionHideDeprecated.setChecked(self.model.hideDeprecated())
+            actionHideDeprecated.setChecked(not self.model.hideDeprecated())
             actionHideDeprecated.toggled.connect(self.onToggleDeprecated)
             actionHideAliases = menu.addAction("Alias Field(s)")
             actionHideAliases.setCheckable(True)
-            actionHideAliases.setChecked(self.model.hideAliases())
+            actionHideAliases.setChecked(not self.model.hideAliases())
             actionHideAliases.toggled.connect(self.onToggleAliases)
             actionShowHidden = menu.addAction("Show Hidden Field(s)")
             actionShowHidden.setCheckable(True)
@@ -1644,10 +1644,10 @@ if not NoUI:
          self.header().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
       def onToggleDeprecated(self, toggled):
-         self.model.setHideDeprecated(toggled)
+         self.model.setHideDeprecated(not toggled)
 
       def onToggleAliases(self, toggled):
-         self.model.setHideAliases(toggled)
+         self.model.setHideAliases(not toggled)
 
       def onToggleShowHidden(self, toggled):
          self.model.setShowHidden(toggled)
