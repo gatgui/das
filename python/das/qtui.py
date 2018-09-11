@@ -1377,7 +1377,7 @@ if not NoUI:
          QtCompat.setSectionResizeMode(self.header(), QtWidgets.QHeaderView.Interactive)
          self.header().setStretchLastSection(False)
          self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-         self.setAnimated(True)
+         self.setAnimated(False)
          self.setHeaderHidden(False)
          self.setItemsExpandable(True)
          self.setAllColumnsShowFocus(True)
