@@ -249,7 +249,7 @@ if not NoUI:
                      if isinstance(data, (das.types.Sequence, das.types.Tuple, das.types.Set, das.types.Struct, das.types.Dict)):
                         self.multi = False
                         self.compound = True
-                        self.type = typ
+                        self.type = self.real_type(typ)
                         self.editableType = self.type.editable
                         self.editableValue = self.is_editable(self.type)
                         self.editable = (self.editableType and self.editableValue)
