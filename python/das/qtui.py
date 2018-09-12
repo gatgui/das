@@ -41,11 +41,11 @@ if not NoUI:
          k = ""
          item = self
          while item:
+            if skipRoot and not item.parent:
+               break
             suffix = ("" if not k else (".%s" % k))
             k = item.name + suffix
             item = item.parent
-            if skipRoot and item and not item.parent:
-               break
          return k
 
       def real_type(self, typ):
@@ -964,8 +964,15 @@ if not NoUI:
          self._undos = []
          self._curundo = -1
 
-      def findIndex(self, s):
+      def findIndex(self, s, addRoot=False):
+         if not s:
+            if addRoot:
+               return self._rootItem
+            else:
+               return None
          spl = s.split(".")
+         if addRoot and self._rootItem:
+            spl.insert(0, self._rootItem.name)
          cnt = len(spl)
          idx = 0
          parentIndex = QtCore.QModelIndex()
@@ -1545,9 +1552,7 @@ if not NoUI:
             super(Editor, self).mousePressEvent(event)
  
       def getItemKey(self, modelIndex):
-         k = None
-         item = modelIndex.internalPointer()
-         return item.fullname()
+         return modelIndex.internalPointer().fullname(skipRoot=True)
 
       def storeSelection(self):
          mdl = self.selectionModel()
@@ -1560,7 +1565,7 @@ if not NoUI:
          mdl = self.selectionModel()
          sel = QtCore.QItemSelection()
          for item in self.selection:
-            index = self.model.findIndex(item)
+            index = self.model.findIndex(item, addRoot=True)
             if index:
                sel.merge(QtCore.QItemSelection(index, index), QtCore.QItemSelectionModel.Select)
          mdl.select(sel, QtCore.QItemSelectionModel.SelectCurrent|QtCore.QItemSelectionModel.Rows)
@@ -1648,14 +1653,10 @@ if not NoUI:
          return stateSet
 
       def onItemCollapsed(self, modelIndex):
-         k = self.getItemKey(modelIndex)
-         if k is not None:
-            self.expandedState[k] = False
+         self.expandedState[self.getItemKey(modelIndex)] = False
       
       def onItemExpanded(self, modelIndex):
-         k = self.getItemKey(modelIndex)
-         if k is not None:
-            self.expandedState[k] = True
+         self.expandedState[self.getItemKey(modelIndex)] = True
 
       def onResizeToContents(self):
          self.header().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
