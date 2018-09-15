@@ -1689,16 +1689,19 @@ if not NoUI:
 
       def makeOnAddDictItem(self, index):
          def _callback(*args):
+            self.setExpanded(index, True)
             self.addDictItem(index)
          return _callback
 
       def makeOnAddSeqItem(self, index):
          def _callback(*args):
+            self.setExpanded(index, True)
             self.addSeqItem(index)
          return _callback
 
       def makeOnAddSetItem(self, index):
          def _callback(*args):
+            self.setExpanded(index, True)
             self.addSetItem(index)
          return _callback
 
