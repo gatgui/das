@@ -471,7 +471,7 @@ class Struct(TypeValidator, dict):
             try:
                vv = v.validate(value[k])
                if vv is not None and isinstance(v, Deprecated):
-                  message = ("[das] Field %s is deprecated" % repr(key) if not v.message else v.message)
+                  message = ("[das] Field %s is deprecated" % repr(k) if not v.message else v.message)
                   das.print_once(message)
                rv[k] = vv
             except KeyError, e:
