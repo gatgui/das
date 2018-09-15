@@ -1383,6 +1383,7 @@ if not NoUI:
          self.setItemDelegate(self.delegate)
          QtCompat.setSectionResizeMode(self.header(), QtWidgets.QHeaderView.Interactive)
          self.header().setStretchLastSection(False)
+         self.header().setMinimumSectionSize(100)
          self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
          self.setAnimated(False)
          self.setHeaderHidden(False)
@@ -1657,6 +1658,7 @@ if not NoUI:
       
       def onItemExpanded(self, modelIndex):
          self.expandedState[self.getItemKey(modelIndex)] = True
+         self.header().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
       def onResizeToContents(self):
          self.header().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
@@ -1671,7 +1673,10 @@ if not NoUI:
          self.model.setShowHidden(toggled)
 
       def onExpandAll(self):
+         # avoid onItemExpanded being called
+         self.blockSignals(True)
          self.expandAll()
+         self.blockSignals(False)
          self.resetExpandedState()
          self.header().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
