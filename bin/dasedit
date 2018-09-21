@@ -11,6 +11,7 @@ if __name__ == "__main__":
    file_path = None
    data = None
    readonly = False
+   darkmode = False
 
    args = sys.argv[1:]
    n = len(args)
@@ -45,6 +46,9 @@ if __name__ == "__main__":
       elif arg in ("-v", "--verbose"):
          verbose = True
 
+      elif arg in ("-dm", "--dark-mode"):
+         darkmode = True
+
       elif arg in ("-h", "--help"):
          print("USAGE")
          print("  dasedit [OPTIONS] path?")
@@ -53,6 +57,7 @@ if __name__ == "__main__":
          print("  -st/--schema-type <s>                     : Explicitely set file schema type")
          print("  -ss/--strict-schema 0|1|on|off|true|false : Toggle strict schema check on/off")
          print("  -ro/--read-only                           : Read only mode")
+         print("  -dm/--dark-mode                           : Use a dark color scheme (windows / linux only)")
          print("  -v/--verbose                              : Enable verbose mode")
          print("  -h/--help                                 : Show this help")
          print("")
@@ -87,6 +92,7 @@ if __name__ == "__main__":
    if not echo_only:
       from Qt import QtWidgets
       from Qt import QtGui
+      from Qt import QtWidgets
       import das.qtui
 
       class Window(QtWidgets.QMainWindow):
@@ -141,6 +147,7 @@ if __name__ == "__main__":
             self.editWidget.modelUpdated.connect(self.onModelUpdated)
             self.actionSave = actionSave
             self.actionSaveAs = actionSaveAs
+            self.resize(800, 600)
 
          def onOpen(self):
             if not readonly and self.editWidget.hasDataChanged():
@@ -186,9 +193,18 @@ if __name__ == "__main__":
                das.pprint(model.getData())
 
 
-      style = ("plastique" if sys.platform != "darwin" else "Fusion")
-
-      QtWidgets.QApplication.setStyle(style)
+      style = ""
+      if sys.platform == "darwin":
+         # Introduced in Qt5
+         style = "fusion"
+      else:
+         if darkmode:
+            style = "plastique"
+      if style:
+         if not style in map(lambda x: x.lower(), QtWidgets.QStyleFactory.keys()):
+            style = ""
+         else:
+            QtWidgets.QApplication.setStyle(style)
 
       app = QtWidgets.QApplication([sys.argv[0]])
 

@@ -395,6 +395,7 @@ if not NoUI:
          self.editor.modelUpdated.connect(self.onDataChanged)
          self.okbtn.clicked.connect(self.accept)
          cancelbtn.clicked.connect(self.reject)
+         self.resize(600, 200)
 
       def onDataChanged(self, model):
          self.data = model.getData()
