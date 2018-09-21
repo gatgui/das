@@ -344,10 +344,15 @@ if not NoUI:
                   i = 0
                   dkeys = [x for x in self.data.iterkeys()]
                   for k in sorted(dkeys):
+                     if isinstance(k, basestring):
+                        itemname = k
+                     elif hasattr(k, "value_to_string"):
+                        itemname = k.value_to_string()
+                     else:
+                        itemname = str(k)
                      v = self.data[k]
-                     ks = str(k)
                      vtype = self.type.vtypeOverrides.get(k, self.type.vtype)
-                     self.children.append(ModelItem(ks, v, type=vtype, parent=self, row=i, key=k, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden))
+                     self.children.append(ModelItem(itemname, v, type=vtype, parent=self, row=i, key=k, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden))
                      i += 1
 
 
@@ -681,7 +686,10 @@ if not NoUI:
          widget.setCurrentIndex(widget.findText(item.typestr))
 
       def setMappingKeyEditorData(self, widget, item):
-         widget.setText(str(item.key))
+         if hasattr(item.key, "value_to_string"):
+            widget.setText(item.key.value_to_string())
+         else:
+            widget.setText(str(item.key))
 
       def setOrEditorData(self, widget, item):
          if item.data is None or isinstance(item.data, bool):
@@ -754,6 +762,11 @@ if not NoUI:
             key = eval(widget.text())
          except:
             key = widget.text()
+         item = modelIndex.internalPointer()
+         if hasattr(item.key, "string_to_value"):
+            tmp = key
+            key = item.key.copy()
+            key.string_to_value(tmp)
          return model.setData(modelIndex, key, QtCore.Qt.EditRole)
 
       def setOrModelData(self, widget, model, modelIndex):
@@ -991,7 +1004,7 @@ if not NoUI:
             # may want to strip root name?
             idx += 1
          if curKey:
-            print("Can't find index for '%s'" % s)
+            # print("Can't find index for '%s'" % s)
             return None
          else:
             return parentIndex

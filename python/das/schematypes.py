@@ -626,7 +626,15 @@ class Class(TypeValidator):
 
    def _validate_self(self, value):
       if not isinstance(value, self.klass):
-         raise ValidationError("Expected a %s value, got %s" % (self.klass.__name__, type(value).__name__))
+         if isinstance(value, basestring) and hasattr(self.klass, "string_to_value"):
+            try:
+               newval = self.klass()
+               newval.string_to_value(value)
+               return newval
+            except Exception, e:
+               raise ValidationError("Cannot instanciace class '%s' from string %s" % (self.klass.__name__, repr(value)))
+         else:
+            raise ValidationError("Expected a %s value, got %s" % (self.klass.__name__, type(value).__name__))
       return value
 
    def _validate(self, value, key=None, index=None):
