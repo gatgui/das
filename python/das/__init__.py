@@ -459,7 +459,8 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
          stream.write(repr(d))
 
    else:
-      stream.write(str(d))
+      # stream.write(str(d))
+      stream.write(repr(d))
 
    if eof:
       stream.write("\n")

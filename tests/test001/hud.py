@@ -15,8 +15,8 @@ class Attribute(object):
    def string_to_value(self, s):
       self.attr = s
 
-   def __str__(self):
-      return "Attribute('%s')" % self.attr
+   # def __str__(self):
+   #    return "Attribute('%s')" % self.attr
 
    def __repr__(self):
       return "Attribute('%s')" % self.attr

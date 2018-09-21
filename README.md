@@ -174,9 +174,11 @@ $ python
 9. SchemaType
 10. Class
 
-Require methods:
+Required methods:
 - ```copy() -> instance```
-- ```__str__() and/or __repr__() -> str``` (use when serializing)
+- ```__repr__() -> str``` (use when serializing)
+
+*__repr__* should return a class instanciating call
 - ```__cmp__() -> -1, 0 or 1``` (use when comparing data sets)
 
 Optional methods:
