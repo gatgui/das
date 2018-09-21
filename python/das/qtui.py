@@ -48,6 +48,23 @@ if not NoUI:
             item = item.parent
          return k
 
+      def get_description(self, typ):
+         desc = typ.description
+         while not desc:
+            if isinstance(typ, das.schematypes.SchemaType):
+               typ = das.get_schema_type(typ.name)
+            elif isinstance(typ, das.schematypes.Or):
+               if len(typ.types) == 1:
+                  typ = typ.types[0]
+               else:
+                  break
+            elif isinstance(typ, das.schematypes.Optional):
+               typ = typ.type
+            else:
+               break
+            desc = typ.description
+         return desc
+
       def real_type(self, typ):
          while True:
             if isinstance(typ, das.schematypes.SchemaType):
@@ -221,16 +238,16 @@ if not NoUI:
 
          # initialize those two with original type
          self.editableType = self.type.editable
-         self.desc = self.type.description
+         self.desc = self.get_description(self.type)
 
          self.optional = isinstance(self.type, das.schematypes.Optional)
          self.deprecated = isinstance(self.type, das.schematypes.Deprecated)
 
          self.type = self.real_type(self.type)
 
-         # override description using used type
-         if not self.desc:
-            self.desc = self.type.description
+         # # override description using used type
+         # if not self.desc:
+         #    self.desc = self.type.description
 
          self.multi = isinstance(self.type, das.schematypes.Or)
 
@@ -249,12 +266,13 @@ if not NoUI:
                      if isinstance(data, (das.types.Sequence, das.types.Tuple, das.types.Set, das.types.Struct, das.types.Dict)):
                         self.multi = False
                         self.compound = True
+                        self.desc = self.get_description(typ)
                         self.type = self.real_type(typ)
                         self.editableType = self.type.editable
                         self.editableValue = self.is_editable(self.type)
                         self.editable = (self.editableType and self.editableValue)
-                        if not self.desc:
-                           self.desc = self.type.description
+                        # if not self.desc:
+                        #    self.desc = self.type.description
                      break
 
             else:
