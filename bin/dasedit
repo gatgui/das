@@ -155,7 +155,11 @@ if __name__ == "__main__":
                if rv == QtWidgets.QMessageBox.Yes:
                   self.onSave()
             rv = QtWidgets.QFileDialog.getOpenFileName(self, "Open File", "", "All Files (*.*)")
-            path = rv[0]
+            # PyQt4 and PySide behaves in a difference way
+            #   PyQt4  : QFileDialog.getOpenFileName -> str        [file path]
+            #   PySide : QFileDialog.getOpenFileName -> (str, str) [file path, filter]
+            if not isinstance(rv, basestring):
+               rv = rv[0]
             if path and os.path.isfile(path):
                try:
                   data = das.read(path)
@@ -175,6 +179,8 @@ if __name__ == "__main__":
 
          def onSaveAs(self):
             rv = QtWidgets.QFileDialog.getSaveFileName(self, "Save File", "", "All Files (*.*)")
+            if not isinstance(rv, basestring):
+               rv = rv[0]
             path = rv[0]
             if path:
                self.path = path
