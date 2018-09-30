@@ -88,4 +88,8 @@ LICENSE        text eol=lf
 *.compat       text eol=lf
 *.data         text eol=lf
 bin/dasedit    text eol=lf
+bin/dasrm      text eol=lf
+bin/dasadd     text eol=lf
+bin/dasget     text eol=lf
+bin/dasset     text eol=lf
 
