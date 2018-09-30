@@ -17,6 +17,27 @@ def usage():
    print("  -h/--help          : Show this help")
    print("")
 
+def merge(parts):
+   i = 0
+   n = len(parts)
+   o = []
+   while i < n:
+      part = parts[i]
+      opencnt = 0
+      opencnt += (part.count("(") + part.count("["))
+      opencnt -= (part.count(")") + part.count("]"))
+      while opencnt != 0:
+         i += 1
+         if i >= n:
+            raise Exception("Unbalanced parenthesis or brackets")
+         npart = parts[i]
+         opencnt += (npart.count("(") + npart.count("["))
+         opencnt -= (npart.count(")") + npart.count("]"))
+         part += "." + npart
+      o.append(part)
+      i += 1
+   return o
+
 if __name__ == "__main__":
    args = sys.argv[1:]
    nargs = len(args)
@@ -45,7 +66,7 @@ if __name__ == "__main__":
       elif arg in ("-i", "--input", "-o", "--output"):
          i += 1
          if i >= nargs:
-            print("%s flag expects an argument" % arg)
+            sys.stderr.write("%s flag expects an argument\n" % arg)
             sys.exit(1)
          if arg.startswith("-i"):
             infile = args[i]
@@ -60,7 +81,7 @@ if __name__ == "__main__":
       i += 1
 
    if infile is None:
-      print("No input")
+      sys.stderr.write("No input\n")
       sys.exit(1)
 
    if outfile is None:
@@ -73,7 +94,7 @@ if __name__ == "__main__":
       if verbose:
          das.pprint(data)
    except Exception, e:
-      print("Failed to read file '%s' (%s)" % (e, infile))
+      sys.stderr.write("Failed to read file '%s' (%s)\n" % (e, infile))
       sys.exit(1)
 
    orgdata = das.copy(data)
@@ -88,16 +109,21 @@ if __name__ == "__main__":
          try:
             value = eval(val)
          except Exception, e:
-            print("Skip invalid value '%s' for key '%s' (%s)" % (val, key, e))
+            sys.stderr.write("Skip invalid value '%s' for key '%s' (%s)\n" % (val, key, e))
             continue
 
-         parts = key.split(".")
+         parts = merge(key.split("."))
          nparts = len(parts)
 
          for i in xrange(nparts):
             part = parts[i]
             last = (i + 1 == nparts)
+
+            if not part:
+               continue
+
             m = e.match(part)
+
             if m is None:
                if last:
                   setattr(field, part, value)
@@ -107,11 +133,7 @@ if __name__ == "__main__":
             else:
                subscripts = []
                while m is not None:
-                  subscript = m.group(2)
-                  try:
-                     subscripts.append(int(subscript))
-                  except:
-                     subscripts.append(subscript)
+                  subscripts.append(eval(m.group(2)))
                   part = m.group(1)
                   m = e.match(part)
                subscripts.reverse()
@@ -127,22 +149,23 @@ if __name__ == "__main__":
                      field = field[subscript]
 
       except Exception, e:
-         print("Failed to set value for field '%s' (%s)" % (key, e))
+         sys.stderr.write("Failed to set value for field '%s' (%s)\n" % (key, e))
          continue
 
    if data != orgdata:
       if not dryrun:
          if os.path.isfile(outfile) and not overwrite:
-            print("Output file already exists")
+            sys.stderr.write("Output file already exists\n")
             sys.exit(1)
          try:
             das.write(data, outfile)
          except Exception, e:
-            print("Failed to write file '%s' (%s)" % (outfile, e))
+            sys.stderr.write("Failed to write file '%s' (%s)\n" % (outfile, e))
             sys.exit(1)
       else:
          das.pprint(data)
    else:
-      print("Data hasn't changed")
+      if verbose:
+         print("Data hasn't changed")
 
    sys.exit(0)

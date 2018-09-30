@@ -10,9 +10,31 @@ def usage():
    print("")
    print("OPTIONS")
    print("  -i/--input <path>  : Input file path (*)")
+   print("  -pp/--pretty-print : Pretty print output")
    print("  -v/--verbose       : Verbose mode")
    print("  -h/--help          : Show this help")
    print("")
+
+def merge(parts):
+   i = 0
+   n = len(parts)
+   o = []
+   while i < n:
+      part = parts[i]
+      opencnt = 0
+      opencnt += (part.count("(") + part.count("["))
+      opencnt -= (part.count(")") + part.count("]"))
+      while opencnt != 0:
+         i += 1
+         if i >= n:
+            raise Exception("Unbalanced parenthesis or brackets")
+         npart = parts[i]
+         opencnt += (npart.count("(") + npart.count("["))
+         opencnt -= (npart.count(")") + npart.count("]"))
+         part += "." + npart
+      o.append(part)
+      i += 1
+   return o
 
 if __name__ == "__main__":
    args = sys.argv[1:]
@@ -20,6 +42,7 @@ if __name__ == "__main__":
 
    infile = None
    verbose = False
+   pretty = False
    keys = []
    vals = []
 
@@ -33,10 +56,12 @@ if __name__ == "__main__":
          verbose = True
       elif arg in ("-dr", "--dry-run"):
          dryrun = True
+      elif arg in ("-pp", "--pretty-print"):
+         pretty = True
       elif arg in ("-i", "--input"):
          i += 1
          if i >= nargs:
-            print("%s flag expects an argument" % arg)
+            sys.stderr.write("%s flag expects an argument\n" % arg)
             sys.exit(1)
          infile = args[i]
       else:
@@ -44,7 +69,7 @@ if __name__ == "__main__":
       i += 1
 
    if infile is None:
-      print("No input")
+      sys.stderr.write("No input\n")
       sys.exit(1)
 
    try:
@@ -52,7 +77,7 @@ if __name__ == "__main__":
       if verbose:
          das.pprint(data)
    except Exception, e:
-      print("Failed to read file '%s' (%s)" % (e, infile))
+      sys.stderr.write("Failed to read file '%s' (%s)\n" % (e, infile))
       sys.exit(1)
 
    # subscripted field expression
@@ -62,9 +87,12 @@ if __name__ == "__main__":
       try:
          field = data
 
-         parts = key.split(".")
+         parts = merge(key.split("."))
 
          for part in parts:
+            if not part:
+               continue
+
             m = e.match(part)
             if m is None:
                field = getattr(field, part)
@@ -72,11 +100,7 @@ if __name__ == "__main__":
             else:
                subscripts = []
                while m is not None:
-                  subscript = m.group(2)
-                  try:
-                     subscripts.append(int(subscript))
-                  except:
-                     subscripts.append(subscript)
+                  subscripts.append(eval(m.group(2)))
                   part = m.group(1)
                   m = e.match(part)
                subscripts.reverse()
@@ -88,9 +112,12 @@ if __name__ == "__main__":
          vals.append(field)
 
       except Exception, e:
-         print("Failed to get value for field '%s' (%s)" % (key, e))
+         sys.stderr.write("Failed to get value for field '%s' (%s)\n" % (key, e))
          vals.append(None)
 
-   print(vals)
+   if pretty:
+      das.pprint(vals)
+   else:
+      print(vals)
 
    sys.exit(0)
