@@ -1,0 +1,121 @@
+#!/usr/bin/env python
+import os
+import sys
+import das
+
+def usage():
+   print("SYNOPSIS")
+   print("  dasset OPTIONS <key> <value>")
+   print("")
+   print("OPTIONS")
+   print("  -i/--input <path>  : Input file path (*)")
+   print("  -o/--output <path> : Output file path (input file if not set")
+   print("  -ov/--overwrite    : Overwrite existing output file")
+   print("  -dr/--dry-run      : Don't do anything")
+   print("  -v/--verbose       : Verbose mode")
+   print("")
+
+if __name__ == "__main__":
+   args = sys.argv[1:]
+   nargs = len(args)
+
+   infile = None
+   outfile = None
+   verbose = False
+   dryrun = False
+   overwrite = False
+   key = None
+   val = None
+
+   i = 0
+   while i < nargs:
+      arg = args[i]
+      if arg in ("-v", "--verbose"):
+         verbose = True
+      elif arg in ("-dr", "--dry-run"):
+         dryrun = True
+      elif arg in ("-ov", "--overwrite"):
+         overwrite = True
+      elif arg in ("-i", "--input", "-o", "--output"):
+         i += 1
+         if i >= nargs:
+            print("%s flag expects an argument" % arg)
+            sys.exit(1)
+         if arg.startswith("-i"):
+            infile = args[i]
+         else:
+            outfile = args[i]
+      else:
+         if key is None:
+            key = arg
+         elif val is None:
+            val = arg
+         else:
+            print("Unexpected argument '%s'" % arg)
+            sys.exit(1)
+      i += 1
+
+   if infile is None:
+      print("No input")
+      sys.exit(1)
+
+   if outfile is None:
+      outfile = infile
+      if verbose:
+         print("Use '%s' for output file" % infile)
+
+   try:
+      data = das.read(infile)
+      if verbose:
+         das.pprint(data)
+   except Exception, e:
+      print("Failed to read file '%s' (%s)" % (e, infile))
+      sys.exit(1)
+
+   orgdata = das.copy(data)
+
+   try:
+      es = "data"
+      if not isinstance(data, (tuple, list)):
+         es += "."
+      es += key
+      field = eval(es)
+   except Exception, e:
+      print("Cannot access field '%s' (%s)" % (key, e))
+      sys.exit(1)
+
+   if verbose:
+      das.pprint(field)
+
+   try:
+      value = eval(val)
+   except Exception, e:
+      print("Invalid value '%s' (%s)" % (val, e))
+      sys.exit(1)
+
+   if verbose:
+      das.pprint(value)
+
+   # Not working as expected
+   try:
+      field = value
+   except Exception, e:
+      print("Failed to set value (%s)" % e)
+      sys.exit(1)
+
+   if data != orgdata:
+      if os.path.isfile(outfile) and not overwrite:
+         print("Output file already exists")
+         sys.exit(1)
+      if not dryrun:
+         try:
+            das.write(data, outfile)
+         except Exception, e:
+            print("Failed to write file '%s' (%s)" % (outfile, e))
+            sys.exit(1)
+      else:
+         das.pprint(data)
+   else:
+      print("Data hasn't changed")
+
+   sys.exit(0)
