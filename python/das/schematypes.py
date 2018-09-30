@@ -155,7 +155,7 @@ class Real(TypeValidator):
       if self.min is not None and value < self.min:
          raise ValidationError("Real value out of range, %d < %d" % (value, self.min))
       if self.max is not None and value > self.max:
-         raise ValidationError("Real value out of range, %d < %d" % (value, self.min))
+         raise ValidationError("Real value out of range, %d > %d" % (value, self.max))
       return float(value)
 
    def _validate(self, value, key=None, index=None):
