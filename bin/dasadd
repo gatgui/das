@@ -115,20 +115,14 @@ if __name__ == "__main__":
          parts = merge(key.split("."))
          nparts = len(parts)
 
-         for i in xrange(nparts):
-            part = parts[i]
-            last = (i + 1 == nparts)
-
+         for part in parts:
             if not part:
                continue
 
             m = e.match(part)
 
             if m is None:
-               if last:
-                  setattr(field, part, value)
-               else:
-                  field = getattr(field, part)
+               field = getattr(field, part)
 
             else:
                subscripts = []
@@ -137,16 +131,17 @@ if __name__ == "__main__":
                   part = m.group(1)
                   m = e.match(part)
                subscripts.reverse()
-               nsubscripts = len(subscripts)
 
                field = getattr(field, part)
-               for j in xrange(nsubscripts):
-                  subscript = subscripts[j]
-                  lastsubscript = (j + 1 == nsubscripts)
-                  if lastsubscript:
-                     field[subscript] = value
-                  else: 
-                     field = field[subscript]
+               for subscript in subscripts:
+                  field = field[subscript]
+
+            if isinstance(field, list):
+               field.append(value)
+            elif isinstance(field, set):
+               field.add(value)
+            else:
+               raise Exception("Cannot add value to %s" % type(field).__name__)
 
       except Exception, e:
          sys.stderr.write("Failed to set value for field '%s' (%s)\n" % (key, e))
