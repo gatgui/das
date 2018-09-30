@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 import os
+import re
 import sys
 import das
 
 def usage():
    print("SYNOPSIS")
-   print("  dasset OPTIONS <key> <value>")
+   print("  dasset OPTIONS (<key> <value>)*")
    print("")
    print("OPTIONS")
    print("  -i/--input <path>  : Input file path (*)")
@@ -25,7 +26,8 @@ if __name__ == "__main__":
    dryrun = False
    overwrite = False
    key = None
-   val = None
+   # val = None
+   keyvals = []
 
    i = 0
    while i < nargs:
@@ -48,11 +50,9 @@ if __name__ == "__main__":
       else:
          if key is None:
             key = arg
-         elif val is None:
-            val = arg
          else:
-            print("Unexpected argument '%s'" % arg)
-            sys.exit(1)
+            keyvals.append((key, arg))
+            key = None
       i += 1
 
    if infile is None:
@@ -74,40 +74,63 @@ if __name__ == "__main__":
 
    orgdata = das.copy(data)
 
-   try:
-      es = "data"
-      if not isinstance(data, (tuple, list)):
-         es += "."
-      es += key
-      field = eval(es)
-   except Exception, e:
-      print("Cannot access field '%s' (%s)" % (key, e))
-      sys.exit(1)
+   # subscripted field expression
+   e = re.compile(r"^(.*)\[([^]]+)\]$")
 
-   if verbose:
-      das.pprint(field)
+   for key, val in keyvals:
+      try:
+         field = data
 
-   try:
-      value = eval(val)
-   except Exception, e:
-      print("Invalid value '%s' (%s)" % (val, e))
-      sys.exit(1)
+         try:
+            value = eval(val)
+         except Exception, e:
+            print("Skip invalid value '%s' for key '%s' (%s)" % (val, key, e))
+            continue
 
-   if verbose:
-      das.pprint(value)
+         parts = key.split(".")
+         nparts = len(parts)
 
-   # Not working as expected
-   try:
-      field = value
-   except Exception, e:
-      print("Failed to set value (%s)" % e)
-      sys.exit(1)
+         for i in xrange(nparts):
+            part = parts[i]
+            last = (i + 1 == nparts)
+            m = e.match(part)
+            if m is None:
+               if last:
+                  setattr(field, part, value)
+               else:
+                  field = getattr(field, part)
+
+            else:
+               subscripts = []
+               while m is not None:
+                  subscript = m.group(2)
+                  try:
+                     subscripts.append(int(subscript))
+                  except:
+                     subscripts.append(subscript)
+                  part = m.group(1)
+                  m = e.match(part)
+               subscripts.reverse()
+               nsubscripts = len(subscripts)
+
+               field = getattr(field, part)
+               for j in xrange(nsubscripts):
+                  subscript = subscripts[j]
+                  lastsubscript = (j + 1 == nsubscripts)
+                  if lastsubscript:
+                     field[subscript] = value
+                  else: 
+                     field = field[subscript]
+
+      except Exception, e:
+         print("Failed to set value for field '%s' (%s)" % (key, e))
+         sys.exit(1)
 
    if data != orgdata:
-      if os.path.isfile(outfile) and not overwrite:
-         print("Output file already exists")
-         sys.exit(1)
       if not dryrun:
+         if os.path.isfile(outfile) and not overwrite:
+            print("Output file already exists")
+            sys.exit(1)
          try:
             das.write(data, outfile)
          except Exception, e:
