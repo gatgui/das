@@ -1,0 +1,171 @@
+#!/usr/bin/env python
+import os
+import re
+import sys
+import das
+
+def usage():
+   print("SYNOPSIS")
+   print("  dasadd OPTIONS (<key> <value>)*")
+   print("")
+   print("OPTIONS")
+   print("  -i/--input <path>  : Input file path (*)")
+   print("  -o/--output <path> : Output file path (input file if not set")
+   print("  -ov/--overwrite    : Overwrite existing output file")
+   print("  -dr/--dry-run      : Don't do anything")
+   print("  -v/--verbose       : Verbose mode")
+   print("  -h/--help          : Show this help")
+   print("")
+
+def merge(parts):
+   i = 0
+   n = len(parts)
+   o = []
+   while i < n:
+      part = parts[i]
+      opencnt = 0
+      opencnt += (part.count("(") + part.count("["))
+      opencnt -= (part.count(")") + part.count("]"))
+      while opencnt != 0:
+         i += 1
+         if i >= n:
+            raise Exception("Unbalanced parenthesis or brackets")
+         npart = parts[i]
+         opencnt += (npart.count("(") + npart.count("["))
+         opencnt -= (npart.count(")") + npart.count("]"))
+         part += "." + npart
+      o.append(part)
+      i += 1
+   return o
+
+if __name__ == "__main__":
+   args = sys.argv[1:]
+   nargs = len(args)
+
+   infile = None
+   outfile = None
+   verbose = False
+   dryrun = False
+   overwrite = False
+   key = None
+   # val = None
+   keyvals = []
+
+   i = 0
+   while i < nargs:
+      arg = args[i]
+      if arg in ("-h", "--help"):
+         usage()
+         sys.exit(0)
+      elif arg in ("-v", "--verbose"):
+         verbose = True
+      elif arg in ("-dr", "--dry-run"):
+         dryrun = True
+      elif arg in ("-ov", "--overwrite"):
+         overwrite = True
+      elif arg in ("-i", "--input", "-o", "--output"):
+         i += 1
+         if i >= nargs:
+            sys.stderr.write("%s flag expects an argument\n" % arg)
+            sys.exit(1)
+         if arg.startswith("-i"):
+            infile = args[i]
+         else:
+            outfile = args[i]
+      else:
+         if key is None:
+            key = arg
+         else:
+            keyvals.append((key, arg))
+            key = None
+      i += 1
+
+   if infile is None:
+      sys.stderr.write("No input\n")
+      sys.exit(1)
+
+   if outfile is None:
+      outfile = infile
+      if verbose:
+         print("Use '%s' for output file" % infile)
+
+   try:
+      data = das.read(infile)
+      if verbose:
+         das.pprint(data)
+   except Exception, e:
+      sys.stderr.write("Failed to read file '%s' (%s)\n" % (e, infile))
+      sys.exit(1)
+
+   orgdata = das.copy(data)
+
+   # subscripted field expression
+   e = re.compile(r"^(.*)\[([^]]+)\]$")
+
+   for key, val in keyvals:
+      try:
+         field = data
+
+         try:
+            value = eval(val)
+         except Exception, e:
+            sys.stderr.write("Skip invalid value '%s' for key '%s' (%s)\n" % (val, key, e))
+            continue
+
+         parts = merge(key.split("."))
+         nparts = len(parts)
+
+         for i in xrange(nparts):
+            part = parts[i]
+            last = (i + 1 == nparts)
+
+            if not part:
+               continue
+
+            m = e.match(part)
+
+            if m is None:
+               if last:
+                  setattr(field, part, value)
+               else:
+                  field = getattr(field, part)
+
+            else:
+               subscripts = []
+               while m is not None:
+                  subscripts.append(eval(m.group(2)))
+                  part = m.group(1)
+                  m = e.match(part)
+               subscripts.reverse()
+               nsubscripts = len(subscripts)
+
+               field = getattr(field, part)
+               for j in xrange(nsubscripts):
+                  subscript = subscripts[j]
+                  lastsubscript = (j + 1 == nsubscripts)
+                  if lastsubscript:
+                     field[subscript] = value
+                  else: 
+                     field = field[subscript]
+
+      except Exception, e:
+         sys.stderr.write("Failed to set value for field '%s' (%s)\n" % (key, e))
+         continue
+
+   if data != orgdata:
+      if not dryrun:
+         if os.path.isfile(outfile) and not overwrite:
+            sys.stderr.write("Output file already exists\n")
+            sys.exit(1)
+         try:
+            das.write(data, outfile)
+         except Exception, e:
+            sys.stderr.write("Failed to write file '%s' (%s)\n" % (outfile, e))
+            sys.exit(1)
+      else:
+         das.pprint(data)
+   else:
+      if verbose:
+         print("Data hasn't changed")
+
+   sys.exit(0)
