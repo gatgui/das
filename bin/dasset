@@ -14,6 +14,7 @@ def usage():
    print("  -ov/--overwrite    : Overwrite existing output file")
    print("  -dr/--dry-run      : Don't do anything")
    print("  -v/--verbose       : Verbose mode")
+   print("  -h/--help          : Show this help")
    print("")
 
 if __name__ == "__main__":
@@ -32,7 +33,10 @@ if __name__ == "__main__":
    i = 0
    while i < nargs:
       arg = args[i]
-      if arg in ("-v", "--verbose"):
+      if arg in ("-h", "--help"):
+         usage()
+         sys.exit(0)
+      elif arg in ("-v", "--verbose"):
          verbose = True
       elif arg in ("-dr", "--dry-run"):
          dryrun = True
@@ -124,7 +128,7 @@ if __name__ == "__main__":
 
       except Exception, e:
          print("Failed to set value for field '%s' (%s)" % (key, e))
-         sys.exit(1)
+         continue
 
    if data != orgdata:
       if not dryrun:

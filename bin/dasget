@@ -1,0 +1,96 @@
+#!/usr/bin/env python
+import os
+import re
+import sys
+import das
+
+def usage():
+   print("SYNOPSIS")
+   print("  dasget OPTIONS (<key>)*")
+   print("")
+   print("OPTIONS")
+   print("  -i/--input <path>  : Input file path (*)")
+   print("  -v/--verbose       : Verbose mode")
+   print("  -h/--help          : Show this help")
+   print("")
+
+if __name__ == "__main__":
+   args = sys.argv[1:]
+   nargs = len(args)
+
+   infile = None
+   verbose = False
+   keys = []
+   vals = []
+
+   i = 0
+   while i < nargs:
+      arg = args[i]
+      if arg in ("-h", "--help"):
+         usage()
+         sys.exit(0)
+      elif arg in ("-v", "--verbose"):
+         verbose = True
+      elif arg in ("-dr", "--dry-run"):
+         dryrun = True
+      elif arg in ("-i", "--input"):
+         i += 1
+         if i >= nargs:
+            print("%s flag expects an argument" % arg)
+            sys.exit(1)
+         infile = args[i]
+      else:
+         keys.append(arg)
+      i += 1
+
+   if infile is None:
+      print("No input")
+      sys.exit(1)
+
+   try:
+      data = das.read(infile)
+      if verbose:
+         das.pprint(data)
+   except Exception, e:
+      print("Failed to read file '%s' (%s)" % (e, infile))
+      sys.exit(1)
+
+   # subscripted field expression
+   e = re.compile(r"^(.*)\[([^]]+)\]$")
+
+   for key in keys:
+      try:
+         field = data
+
+         parts = key.split(".")
+
+         for part in parts:
+            m = e.match(part)
+            if m is None:
+               field = getattr(field, part)
+
+            else:
+               subscripts = []
+               while m is not None:
+                  subscript = m.group(2)
+                  try:
+                     subscripts.append(int(subscript))
+                  except:
+                     subscripts.append(subscript)
+                  part = m.group(1)
+                  m = e.match(part)
+               subscripts.reverse()
+
+               field = getattr(field, part)
+               for subscript in subscripts:
+                  field = field[subscript]
+
+         vals.append(field)
+
+      except Exception, e:
+         print("Failed to get value for field '%s' (%s)" % (key, e))
+         vals.append(None)
+
+   print(vals)
+
+   sys.exit(0)
