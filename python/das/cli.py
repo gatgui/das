@@ -146,5 +146,4 @@ def eval(data, expr):
       ee += expr
    else:
       ee += "." + expr
-   print("Evaluate: '%s'" % ee)
    return _pyeval(ee)
