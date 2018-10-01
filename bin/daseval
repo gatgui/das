@@ -14,6 +14,7 @@ def usage():
    print("  -i/--input <path>  : Input file path (*)")
    print("  -o/--output <path> : Output file path (input file if not set")
    print("  -ov/--overwrite    : Overwrite existing output file")
+   print("  -pp/--pretty-print : Pretty print output")
    print("  -dr/--dry-run      : Don't do anything")
    print("  -h/--help          : Show this help")
    print("")
@@ -25,8 +26,10 @@ if __name__ == "__main__":
    infile = None
    outfile = None
    dryrun = False
+   pretty = False
    overwrite = False
    exprs = []
+   vals = []
 
    i = 0
    while i < nargs:
@@ -38,6 +41,8 @@ if __name__ == "__main__":
          dryrun = True
       elif arg in ("-ov", "--overwrite"):
          overwrite = True
+      elif arg in ("-pp", "--pretty-print"):
+         pretty = True
       elif arg in ("-i", "--input", "-o", "--output"):
          i += 1
          if i >= nargs:
@@ -68,9 +73,10 @@ if __name__ == "__main__":
 
    for expr in exprs:
       try:
-         das.cli.eval(data, expr)
+         vals.append(das.cli.eval(data, expr))
       except Exception, e:
          sys.stderr.write("Failed to evaluate expression '%s' (%s)\n" % (expr, e))
+         vals.append(None)
          continue
 
    if data != orgdata:
@@ -85,5 +91,13 @@ if __name__ == "__main__":
             sys.exit(1)
       else:
          das.pprint(data)
+
+   if len(exprs) == 1:
+      vals = vals[0]
+
+   if pretty:
+      das.pprint(vals)
+   else:
+      print(vals)
 
    sys.exit(0)
