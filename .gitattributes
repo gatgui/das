@@ -92,4 +92,5 @@ bin/dasrm      text eol=lf
 bin/dasadd     text eol=lf
 bin/dasget     text eol=lf
 bin/dasset     text eol=lf
+bin/daseval    text eol=lf
 
