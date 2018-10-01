@@ -1,0 +1,89 @@
+#!/usr/bin/env python
+import os
+import re
+import sys
+import das
+import das.cli
+
+
+def usage():
+   print("SYNOPSIS")
+   print("  dasrm OPTIONS (<key>)*")
+   print("")
+   print("OPTIONS")
+   print("  -i/--input <path>  : Input file path (*)")
+   print("  -o/--output <path> : Output file path (input file if not set")
+   print("  -ov/--overwrite    : Overwrite existing output file")
+   print("  -dr/--dry-run      : Don't do anything")
+   print("  -h/--help          : Show this help")
+   print("")
+
+if __name__ == "__main__":
+   args = sys.argv[1:]
+   nargs = len(args)
+
+   infile = None
+   outfile = None
+   dryrun = False
+   overwrite = False
+   keys = []
+
+   i = 0
+   while i < nargs:
+      arg = args[i]
+      if arg in ("-h", "--help"):
+         usage()
+         sys.exit(0)
+      elif arg in ("-dr", "--dry-run"):
+         dryrun = True
+      elif arg in ("-ov", "--overwrite"):
+         overwrite = True
+      elif arg in ("-i", "--input", "-o", "--output"):
+         i += 1
+         if i >= nargs:
+            sys.stderr.write("%s flag expects an argument\n" % arg)
+            sys.exit(1)
+         if arg.startswith("-i"):
+            infile = args[i]
+         else:
+            outfile = args[i]
+      else:
+         keys.append(arg)
+      i += 1
+
+   if infile is None:
+      sys.stderr.write("No input\n")
+      sys.exit(1)
+
+   if outfile is None:
+      outfile = infile
+
+   try:
+      data = das.read(infile)
+   except Exception, e:
+      sys.stderr.write("Failed to read file '%s' (%s)\n" % (e, infile))
+      sys.exit(1)
+
+   orgdata = das.copy(data)
+
+   for key in keys:
+      try:
+         das.cli.remove(data, key)
+      except Exception, e:
+         sys.stderr.write("Failed to remove field '%s' (%s)\n" % (key, e))
+         continue
+
+   if data != orgdata:
+      if not dryrun:
+         if os.path.isfile(outfile) and not overwrite:
+            sys.stderr.write("Output file already exists\n")
+            sys.exit(1)
+         try:
+            das.write(data, outfile)
+         except Exception, e:
+            sys.stderr.write("Failed to write file '%s' (%s)\n" % (outfile, e))
+            sys.exit(1)
+      else:
+         das.pprint(data)
+
+   sys.exit(0)
