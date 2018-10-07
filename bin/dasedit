@@ -137,7 +137,7 @@ if __name__ == "__main__":
             layout.setContentsMargins(10, 10, 10, 10)
             layout.setSpacing(5)
             name = "<%s>" % ("data" if not self.path else os.path.basename(self.path))
-            self.editWidget = das.qtui.Editor(data, name=name, readonly=readonly, parent=centralWidget)
+            self.editWidget = das.qtui.Editor(data, name=name, readonly=readonly, headers=[], parent=centralWidget)
             self.infoLabel = QtWidgets.QLabel("", parent=centralWidget)
             layout.addWidget(self.editWidget, 1)
             layout.addWidget(self.infoLabel)

@@ -380,7 +380,7 @@ if not NoUI:
          self.setWindowTitle("Create new value")
          self.excludes = excludes
          self.data = vtype.make_default()
-         self.editor = Editor(self.data, type=vtype, name=name, parent=self)
+         self.editor = Editor(self.data, type=vtype, name=name, headers=[], parent=self)
          layout = QtWidgets.QVBoxLayout()
          self.okbtn = QtWidgets.QPushButton("Ok", self)
          self.okbtn.setEnabled(True if excludes is None else (self.data not in self.excludes))
@@ -395,7 +395,7 @@ if not NoUI:
          self.editor.modelUpdated.connect(self.onDataChanged)
          self.okbtn.clicked.connect(self.accept)
          cancelbtn.clicked.connect(self.reject)
-         self.resize(600, 200)
+         self.resize(400, 200)
 
       def onDataChanged(self, model):
          self.data = model.getData()
@@ -840,18 +840,29 @@ if not NoUI:
 
 
    class Model(QtCore.QAbstractItemModel):
+      AllHeaders = ["Name", "Value", "Type", "Description"]
+      OptionalHeaders = ["Type", "Description"]
+
       internallyRebuilt = QtCore.Signal()
       dataChanged2Args = QtCore.Signal(QtCore.QModelIndex, QtCore.QModelIndex)
       messageChanged = QtCore.Signal(str)
 
-      def __init__(self, data, type=None, name=None, readonly=False, parent=None):
+      def __init__(self, data, type=None, name=None, readonly=False, parent=None, headers=None):
          super(Model, self).__init__(parent)
          # A little hacky but how else?
          if IsPySide2():
             self._org_data_changed = self.dataChanged
             self.dataChanged = self.dataChanged2Args
             self.dataChanged.connect(self.__emitDataChanged)
-         self._headers = ["Name", "Value", "Type", "Description"]
+         if headers is None:
+            self._headers = self.AllHeaders[:]
+         else:
+            hdrs = filter(lambda x: x in self.AllHeaders, headers)
+            if not "Name" in hdrs:
+               hdrs.insert(0, "Name")
+            if not "Value" in hdrs:
+               hdrs.insert(hdrs.index("Name") + 1, "Value")
+            self._headers = hdrs
          self._rootItem = None
          self._orgData = None
          self._message = ""
@@ -862,6 +873,7 @@ if not NoUI:
          self._hideDeprecated = True
          self._hideAliases = True
          self._showHidden = False
+         self._fieldFilter = None
          self._buildItemsTree(data=data, type=type, name=name)
 
       def __emitDataChanged(self, index1, index2):
@@ -903,6 +915,21 @@ if not NoUI:
          if on != self._showHidden:
             self._showHidden = on
             self._updateData()
+
+      def isHeaderShown(self, name):
+         return (name in self._headers)
+
+      def setShowHeader(self, name, onoff):
+         if not name in self.OptionalHeaders:
+            return
+         if onoff:
+            if not name in self._headers:
+               self._headers.insert(self.AllHeaders.index(name), name)
+               self.layoutChanged.emit()
+         else:
+            if name in self._headers:
+               del(self._headers[self._headers.index(name)])
+               self.layoutChanged.emit()
 
       def _updateData(self, data=None, type=None, name=None):
          self.beginResetModel()
@@ -1047,7 +1074,7 @@ if not NoUI:
                if item.compound  and not item.mapping and item.orderable:
                   flags = flags | QtCore.Qt.ItemIsDropEnabled
 
-            if index.column() == 0:
+            if self._headers[index.column()] == "Name":
                if item.exists():
                   flags = flags | QtCore.Qt.ItemIsEnabled
                # flags = flags | QtCore.Qt.ItemIsUserCheckable
@@ -1056,7 +1083,7 @@ if not NoUI:
                      if item.parent.mapping and item.parent.mappingkeytype is not None:
                         flags = flags | QtCore.Qt.ItemIsEditable
 
-            elif index.column() == 1:
+            elif self._headers[index.column()] == "Value":
                if not self._readonly:
                   if item.exists() and not item.compound and item.editableType:
                      flags = flags | QtCore.Qt.ItemIsEnabled
@@ -1064,12 +1091,12 @@ if not NoUI:
                   if item.editable:
                      flags = flags | QtCore.Qt.ItemIsEditable
 
-            elif index.column() == 2:
+            elif self._headers[index.column()] == "Type":
                if not self._readonly:
                   if item.editable and item.multi and len(item.get_valid_types()) > 1:
                      flags = flags | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
 
-            elif index.column() == 3:
+            elif self._headers[index.column()] == "Description":
                if not self._readonly:
                   if item.exists():
                      flags = flags | QtCore.Qt.ItemIsEnabled
@@ -1131,7 +1158,7 @@ if not NoUI:
             return None
 
          elif role == QtCore.Qt.FontRole:
-            if item.optional and index.column() == 0:
+            if item.optional and self._headers[index.column()] == "Name":
                font = QtGui.QFont()
                font.setStyle(QtGui.QFont.StyleItalic)
                if item.exists():
@@ -1145,10 +1172,10 @@ if not NoUI:
 
          rv = None
 
-         if index.column() == 0:
+         if self._headers[index.column()] == "Name":
             rv = item.name
 
-         elif index.column() == 1:
+         elif self._headers[index.column()] == "Value":
             if item.typestr == "alias":
                rv = "= " + item.type.name
 
@@ -1178,13 +1205,13 @@ if not NoUI:
             else:
                rv = "---"
 
-         elif index.column() == 2:
+         elif self._headers[index.column()] == "Type":
             rv = item.typestr
 
-         elif index.column() == 3:
+         elif self._headers[index.column()] == "Description":
             rv = item.desc
 
-         if role == QtCore.Qt.DisplayRole and index.column() == 1:
+         if role == QtCore.Qt.DisplayRole and self._headers[index.column()] == "Value":
             rv = "    " + rv
 
          return rv
@@ -1239,7 +1266,7 @@ if not NoUI:
             if self._readonly:
                return False
 
-            if index.column() == 0:
+            if self._headers[index.column()] == "Name":
                # Dict/DynamicDict keys
                item = index.internalPointer()
                newkey = das.copy(item.key)
@@ -1268,18 +1295,18 @@ if not NoUI:
                   # Nothing to do here
                   return True
 
-            elif index.column() == 1:
+            elif self._headers[index.column()] == "Value":
                try:
                   structureChanged = self._setRawData(index, value)
                except Exception, e:
                   self.setItemErrorMessage(index.internalPointer(), str(e))
                   return False
 
-            elif index.column() == 2:
+            elif self._headers[index.column()] == "Type":
                # We actually never trigger this one... should we?
                return False
 
-            elif index.column() == 3:
+            elif self._headers[index.column()] == "Description":
                return False
 
             self.dataChanged.emit(index, index)
@@ -1404,9 +1431,9 @@ if not NoUI:
       modelUpdated = QtCore.Signal(Model)
       messageChanged = QtCore.Signal(str)
 
-      def __init__(self, data, type=None, name=None, readonly=False, parent=None):
+      def __init__(self, data, type=None, name=None, readonly=False, headers=None, parent=None):
          super(Editor, self).__init__(parent)
-         self.model = Model(data, type=type, name=name, readonly=readonly, parent=self)
+         self.model = Model(data, type=type, name=name, readonly=readonly, headers=headers, parent=self)
          self.delegate = ModelItemDelegate(parent=self)
          self.selection = []
          self.scrollState = None
@@ -1416,6 +1443,8 @@ if not NoUI:
          QtCompat.setSectionResizeMode(self.header(), QtWidgets.QHeaderView.Interactive)
          self.header().setStretchLastSection(False)
          self.header().setMinimumSectionSize(100)
+         self.header().setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+         self.header().customContextMenuRequested.connect(self.headerMenu)
          self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
          self.setAnimated(False)
          self.setHeaderHidden(False)
@@ -1437,6 +1466,23 @@ if not NoUI:
          if self.model.rowCount(index) > 0:
             self.setExpanded(self.model.index(0, 0, index), True)
          self._readonly = readonly
+
+      def makeOnToggleHeader(self, name, show):
+         def _callback(*args):
+            self.model.setShowHeader(name, show)
+         return _callback
+
+      def headerMenu(self, pos):
+         # column = self.header().logicalIndexAt(pos.x())
+         # => clicked column... if ever needed
+         menu = QtWidgets.QMenu(self)
+         for item in Model.OptionalHeaders:
+            shown = self.model.isHeaderShown(item)
+            act = menu.addAction(item)
+            act.setCheckable(True)
+            act.setChecked(shown)
+            act.triggered.connect(self.makeOnToggleHeader(item, not shown))
+         menu.popup(self.header().mapToGlobal(pos))
 
       def keyPressEvent(self, event):
          if (event.modifiers() & QtCore.Qt.ControlModifier) != 0:
@@ -1666,7 +1712,10 @@ if not NoUI:
          else:
             k = self.getItemKey(index)
             if k is not None and k in self.expandedState:
+               # avoid header resizing
+               self.blockSignals(True)
                self.setExpanded(index, self.expandedState[k])
+               self.blockSignals(False)
                stateSet = True
 
          nr = self.model.rowCount(index)
@@ -1785,7 +1834,7 @@ if not NoUI:
       def addDictItem(self, index):
          # Show a dialog with another Editor for just the key type
          item = index.internalPointer()
-         dlg = NewValueDialog(item.type.ktype, excludes=item.data, name="<new key>", parent=self)
+         dlg = NewValueDialog(item.type.ktype, excludes=item.data, name="%s[...]" % item.name, parent=self)
          def _addDictItem():
             undoData = das.copy(self.model.getData())
             try:
@@ -1812,7 +1861,7 @@ if not NoUI:
       def addSetItem(self, index):
          # Show a dialog with another Editor for just the value type
          item = index.internalPointer()
-         dlg = NewValueDialog(item.type.type, excludes=item.data, name="<new value>", parent=self)
+         dlg = NewValueDialog(item.type.type, excludes=item.data, name="%s{...}" % item.name, parent=self)
          def _addSetItem():
             undoData = das.copy(self.model.getData())
             try:
