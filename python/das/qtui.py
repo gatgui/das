@@ -992,7 +992,7 @@ if not NoUI:
       dataChanged2Args = QtCore.Signal(QtCore.QModelIndex, QtCore.QModelIndex)
       messageChanged = QtCore.Signal(str)
 
-      def __init__(self, data, type=None, name=None, readonly=False, headers=None, fieldFilters=None, parent=None):
+      def __init__(self, data, type=None, name=None, readonly=False, headers=None, fieldfilters=None, parent=None):
          super(Model, self).__init__(parent)
          # A little hacky but how else?
          if IsPySide2():
@@ -1018,7 +1018,7 @@ if not NoUI:
          self._hideDeprecated = True
          self._hideAliases = True
          self._showHidden = False
-         self._fieldFilters = (fieldFilters.copy() if fieldFilters else None)
+         self._fieldFilters = (fieldfilters.copy() if fieldfilters is not None else None)
          self._buildItemsTree(data=data, type=type, name=name)
 
       def __emitDataChanged(self, index1, index2):
@@ -1583,9 +1583,9 @@ if not NoUI:
       modelUpdated = QtCore.Signal(Model)
       messageChanged = QtCore.Signal(str)
 
-      def __init__(self, data, type=None, name=None, readonly=False, headers=None, parent=None):
+      def __init__(self, data, type=None, name=None, readonly=False, headers=None, fieldfilters=None, parent=None):
          super(Editor, self).__init__(parent)
-         self.model = Model(data, type=type, name=name, readonly=readonly, headers=headers, parent=self)
+         self.model = Model(data, type=type, name=name, readonly=readonly, headers=headers, fieldfilters=None, parent=self)
          self.delegate = ModelItemDelegate(parent=self)
          self.selection = []
          self.scrollState = None
