@@ -1,4 +1,6 @@
 import das
+import re
+import fnmatch
 import math
 
 NoUI = False
@@ -23,16 +25,156 @@ if not NoUI:
       return False
 
 
+   class FieldFilter(object):
+      def __init__(self, name):
+         super(FieldFilter, self).__init__()
+         self.name = name
+
+      def copy(self):
+         raise Exception("Not implemented")
+
+      def matches(self, fullname):
+         raise Exception("Not implemented")
+
+   class GlobFilter(object):
+      def __init__(self, name, pattern, invert=False):
+         super(GlobFilter, self).__init__(name)
+         self.pattern = pattern
+         self.invert = invert
+
+      def copy(self):
+         return GlobFilter(self.name, self.pattern, self.invert)
+
+      def matches(self, fullname):
+         rv = fnmatch.fnmatch(fullname, self.pattern)
+         return ((not rv) if self.invert else rv)
+
+   class RegexFilter(object):
+      def __init__(self, name, pattern, partial=False, invert=False):
+         super(RegexFilter, self).__init__(name)
+         self.regex = re.compile(pattern)
+         self.partial = partial
+         self.invert = invert
+
+      def copy(self):
+         return RegexFilter(self.name, self.regex.pattern, self.partial, self.invert)
+
+      def matches(self, fullname):
+         if self.partial:
+            rv = (self.regex.search(fullname) is not None)
+         else:
+            rv = (self.regex.match(fullname) is not None)
+         return ((not rv) if self.invert else rv)
+
+   class ListFilter(object):
+      def __init__(self, name, values, partial=False, invert=False):
+         super(ListFilter, self).__init__(name)
+         self.values = set(map(str, values))
+         self.partial = partial
+         self.invert = invert
+
+      def copy(self):
+         return ListFilter(self.name, self.values, self.partial, self.invert)
+
+      def matches(self, fullname):
+         if self.partial:
+            rv = True
+            for item in self.allowed:
+               if item in fullname:
+                  rv = False
+                  break
+         else:
+            rv = (fullname in self.allowed)
+         return ((not rv) if self.invert else rv)
+
+   class FilterSet(object):
+      All = 0
+      Any = 1
+
+      def __init__(self, mode, invert=False):
+         super(FilterSet, self).__init__()
+         self.filters = []
+         if mode != self.All and mode != self.Any:
+            raise Exception("[das] Invalid FilterSet mode: %d" % mode)
+         self.mode = mode
+         self.invert = invert
+
+      def copy(self):
+         rv = FilterSet(self.mode, self.invert)
+         rv.filters = map(lambda x: x.copy(), self.filters)
+         return rv
+
+      def add(self, flt, force=False):
+         for i in xrange(len(self.filters)):
+            if flt.name == self.filters[i].name:
+               if force:
+                  self.filters[i] = flt.copy()
+                  return True
+               else:
+                  return False
+         self.filters.append(flt.copy())
+         return True
+
+      def count(self):
+         return len(self.filters)
+
+      def at(self, idx):
+         return self.filters[idx]
+
+      def get(self, name):
+         for f in self.filters:
+            if f.name == name:
+               return f
+         return None
+
+      def clear(self):
+         self.filters = []
+
+      def remove(self, idxOrName):
+         if isisnstance(idxOrName, basestring):
+            idx = -1
+            for i in xrange(len(self.filters)):
+               if idxOrName == self.filters[i].name:
+                  idx = i
+                  break
+            if idx != -1:
+               del(self.filters[idx])
+               return True
+            else:
+               return False
+         else:
+            try:
+               del(self.filters[idxOrName])
+               return True
+            except:
+               return False
+
+      def matches(self, fullname):
+         if self.mode == self.All:
+            rv = True
+            for f in self.filters:
+               if not f.matches(fullname):
+                  rv = False
+                  break
+         else:
+            rv = False
+            for f in self.filters:
+               if f.matches(fullname):
+                  rv = True
+                  break
+         return ((not rv) if self.invert else rv)
+
+
    class ModelItem(object):
       ReservedTypeNames = set(["alias", "empty", "boolean", "integer", "real", "string", "list", "tuple", "set", "dict", "struct"])
 
-      def __init__(self, name, data, type=None, parent=None, row=0, key=None, hideDeprecated=True, hideAliases=True, showHidden=False):
+      def __init__(self, name, data, type=None, parent=None, row=0, key=None, hideDeprecated=True, hideAliases=True, showHidden=False, fieldFilters=None):
          super(ModelItem, self).__init__()
          self.row = row
          self.key = key
          self.name = name
          self.parent = parent
-         self.update(data, type, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden)
+         self.update(data, type, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters)
 
       def __str__(self):
          return "ModelItem(%s, compound=%s, resizable=%s, multi=%s, editable=%s, optional=%s, parent=%s, children=%d)" % (self.name, self.compound, self.resizable, self.multi, self.editable, self.optional, ("None" if not self.parent else self.parent.name), len(self.children))
@@ -202,7 +344,7 @@ if not NoUI:
          else:
             return False
 
-      def update(self, data, type=None, hideDeprecated=True, hideAliases=True, showHidden=False):
+      def update(self, data, type=None, hideDeprecated=True, hideAliases=True, showHidden=False, fieldFilters=None):
          self.children = []
          self.compound = False
          self.mapping = False
@@ -300,7 +442,7 @@ if not NoUI:
                   for i in xrange(len(self.data)):
                      itemname = "[%d]" % i
                      itemdata = self.data[i]
-                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden))
+                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters))
 
             elif isinstance(self.type, das.schematypes.Tuple):
                self.typestr = "tuple"
@@ -310,7 +452,7 @@ if not NoUI:
                   for i in xrange(len(self.data)):
                      itemname = "(%d)" % i
                      itemdata = self.data[i]
-                     self.children.append(ModelItem(itemname, itemdata, type=self.type.types[i], parent=self, row=i, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden))
+                     self.children.append(ModelItem(itemname, itemdata, type=self.type.types[i], parent=self, row=i, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters))
 
             elif isinstance(self.type, das.schematypes.Set):
                self.typestr = "set"
@@ -320,10 +462,11 @@ if not NoUI:
                   i = 0
                   for itemdata in self.data:
                      itemname = "{%d}" % i
-                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden))
+                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters))
                      i += 1
 
             elif isinstance(self.type, (das.schematypes.Struct, das.schematypes.StaticDict)):
+               fn = self.fullname(skipRoot=True) + "."
                self.typestr = "struct"
                self.resizable = False
                self.orderable = False
@@ -338,6 +481,8 @@ if not NoUI:
                   if optional:
                      self.resizable = True
                   if self.exists() and (showHidden or not t.hidden):
+                     if fieldFilters and not fieldFilters.matches(fn + k):
+                        continue
                      if isinstance(t, das.schematypes.Alias):
                         if hideAliases:
                            continue
@@ -348,7 +493,7 @@ if not NoUI:
                         v = t.make_default()
                      else:
                         v = self.data[k]
-                     self.children.append(ModelItem(k, v, type=t, parent=self, row=i, key=k, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden))
+                     self.children.append(ModelItem(k, v, type=t, parent=self, row=i, key=k, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters))
                   i += 1
 
             elif isinstance(self.type, (das.schematypes.Dict, das.schematypes.DynamicDict)):
@@ -370,7 +515,7 @@ if not NoUI:
                         itemname = str(k)
                      v = self.data[k]
                      vtype = self.type.vtypeOverrides.get(k, self.type.vtype)
-                     self.children.append(ModelItem(itemname, v, type=vtype, parent=self, row=i, key=k, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden))
+                     self.children.append(ModelItem(itemname, v, type=vtype, parent=self, row=i, key=k, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters))
                      i += 1
 
 
@@ -847,7 +992,7 @@ if not NoUI:
       dataChanged2Args = QtCore.Signal(QtCore.QModelIndex, QtCore.QModelIndex)
       messageChanged = QtCore.Signal(str)
 
-      def __init__(self, data, type=None, name=None, readonly=False, parent=None, headers=None):
+      def __init__(self, data, type=None, name=None, readonly=False, headers=None, fieldFilters=None, parent=None):
          super(Model, self).__init__(parent)
          # A little hacky but how else?
          if IsPySide2():
@@ -873,7 +1018,7 @@ if not NoUI:
          self._hideDeprecated = True
          self._hideAliases = True
          self._showHidden = False
-         self._fieldFilter = None
+         self._fieldFilters = (fieldFilters.copy() if fieldFilters else None)
          self._buildItemsTree(data=data, type=type, name=name)
 
       def __emitDataChanged(self, index1, index2):
@@ -888,9 +1033,9 @@ if not NoUI:
             if data is None:
                data = self._rootItem.data
                type = self._rootItem.type
-            self._rootItem.update(data, type=type, hideDeprecated=self._hideDeprecated, hideAliases=self._hideAliases, showHidden=self._showHidden)
+            self._rootItem.update(data, type=type, hideDeprecated=self._hideDeprecated, hideAliases=self._hideAliases, showHidden=self._showHidden, fieldFilters=self._fieldFilters)
          elif data is not None:
-            self._rootItem = ModelItem("<root>" if name is None else name, data, type=type, hideDeprecated=self._hideDeprecated, hideAliases=self._hideAliases, showHidden=self._showHidden)
+            self._rootItem = ModelItem("<root>" if name is None else name, data, type=type, hideDeprecated=self._hideDeprecated, hideAliases=self._hideAliases, showHidden=self._showHidden, fieldFilters=self._fieldFilters)
 
       def hideDeprecated(self):
          return self._hideDeprecated
@@ -930,6 +1075,13 @@ if not NoUI:
             if name in self._headers:
                del(self._headers[self._headers.index(name)])
                self.layoutChanged.emit()
+
+      def fieldFilters(self):
+         return self._fieldFilters.copy()
+
+      def setFieldFilters(self, filterSet):
+         self._fieldFilters = filterSet.copy()
+         self._updateData()
 
       def _updateData(self, data=None, type=None, name=None):
          self.beginResetModel()
