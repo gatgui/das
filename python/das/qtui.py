@@ -1061,20 +1061,24 @@ if not NoUI:
             self._showHidden = on
             self._updateData()
 
-      def isHeaderShown(self, name):
+      def isColumnShown(self, name):
          return (name in self._headers)
 
-      def setShowHeader(self, name, onoff):
+      def setShowColumn(self, name, onoff):
          if not name in self.OptionalHeaders:
             return
          if onoff:
             if not name in self._headers:
-               self._headers.insert(self.AllHeaders.index(name), name)
-               self.layoutChanged.emit()
+               idx = self.AllHeaders.index(name)
+               self.beginInsertColumns(QtCore.QModelIndex(), idx, idx)
+               self._headers.insert(idx, name)
+               self.endInsertColumns()
          else:
             if name in self._headers:
-               del(self._headers[self._headers.index(name)])
-               self.layoutChanged.emit()
+               idx = self._headers.index(name)
+               self.beginRemoveColumns(QtCore.QModelIndex(), idx, idx)
+               del(self._headers[idx])
+               self.endRemoveColumns()
 
       def fieldFilters(self):
          return self._fieldFilters.copy()
@@ -1212,8 +1216,19 @@ if not NoUI:
          self._buildItemsTree()
          self.endResetModel()
 
-      def flags(self, index):
+      def _checkIndex(self, index):
          if not index.isValid():
+            return False
+         col = index.column()
+         if col < 0 or col >= len(self._headers):
+            return False
+         ptr = index.internalPointer()
+         if not ptr:
+            return False
+         return True
+
+      def flags(self, index):
+         if not self._checkIndex(index):
             return QtCore.Qt.NoItemFlags
          else:
             flags = QtCore.Qt.ItemIsSelectable
@@ -1295,7 +1310,7 @@ if not NoUI:
                return self.createIndex(row, col, item.children[row])
 
       def data(self, index, role):
-         if not index.isValid():
+         if not self._checkIndex(index):
             return None
 
          item = index.internalPointer()
@@ -1403,7 +1418,7 @@ if not NoUI:
          return structureChanged
 
       def setData(self, index, value, role):
-         if not index.isValid():
+         if not self._checkIndex(index):
             return False
 
          if role == QtCore.Qt.CheckStateRole:
@@ -1474,7 +1489,7 @@ if not NoUI:
          return False
 
       def rowCount(self, index):
-         if index.isValid():
+         if self._checkIndex(index):
             cnt = len(index.internalPointer().children)
          else:
             cnt = (0 if self._rootItem is None else 1)
@@ -1619,9 +1634,9 @@ if not NoUI:
             self.setExpanded(self.model.index(0, 0, index), True)
          self._readonly = readonly
 
-      def makeOnToggleHeader(self, name, show):
+      def makeOnToggleColumn(self, name, show):
          def _callback(*args):
-            self.model.setShowHeader(name, show)
+            self.model.setShowColumn(name, show)
          return _callback
 
       def headerMenu(self, pos):
@@ -1629,11 +1644,11 @@ if not NoUI:
          # => clicked column... if ever needed
          menu = QtWidgets.QMenu(self)
          for item in Model.OptionalHeaders:
-            shown = self.model.isHeaderShown(item)
+            shown = self.model.isColumnShown(item)
             act = menu.addAction(item)
             act.setCheckable(True)
             act.setChecked(shown)
-            act.triggered.connect(self.makeOnToggleHeader(item, not shown))
+            act.triggered.connect(self.makeOnToggleColumn(item, not shown))
          menu.popup(self.header().mapToGlobal(pos))
 
       def keyPressEvent(self, event):
