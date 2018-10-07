@@ -59,12 +59,15 @@ class Schema(object):
       if os.path.isfile(pmp):
          try:
             modname = os.path.splitext(os.path.basename(self.path))[0]
-            self.module = imp.load_source("das.schema.%s" % modname, pmp)
-            setattr(das.schema, modname, self.module)
+            mod = imp.load_source("das.schema.%s" % modname, pmp)
          except Exception, e:
             import traceback
             print("[das] Failed to load schema module '%s' (%s)" % (pmp, e))
             traceback.print_exc()
+            return False
+         else:
+            self.module = mod
+            setattr(das.schema, modname, self.module)
 
       eval_locals = {"Boolean": das.schematypes.Boolean,
                      "Integer": das.schematypes.Integer,
