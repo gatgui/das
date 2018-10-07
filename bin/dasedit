@@ -160,15 +160,15 @@ if __name__ == "__main__":
             #   PySide : QFileDialog.getOpenFileName -> (str, str) [file path, filter]
             if not isinstance(rv, basestring):
                rv = rv[0]
-            if path and os.path.isfile(path):
+            if rv and os.path.isfile(rv):
                try:
-                  data = das.read(path)
+                  data = das.read(rv)
                   self.editWidget.setData(data)
-                  self.path = path
+                  self.path = rv
                   self.actionSaveAs.setEnabled(not readonly)
                   self.actionSave.setEnabled(False)
                except Exception, e:
-                  QtWidgets.QMessageBox.critical(self, "Error", "Couldn't read file '%s'\n%s" % (path, e), QtWidgets.QMessageBox.Close)
+                  QtWidgets.QMessageBox.critical(self, "Error", "Couldn't read file '%s'\n%s" % (rv, e), QtWidgets.QMessageBox.Close)
 
          def onSave(self):
             try:
@@ -181,9 +181,8 @@ if __name__ == "__main__":
             rv = QtWidgets.QFileDialog.getSaveFileName(self, "Save File", "", "All Files (*.*)")
             if not isinstance(rv, basestring):
                rv = rv[0]
-            path = rv[0]
-            if path:
-               self.path = path
+            if rv:
+               self.path = rv
                self.onSave()
 
          def onAbout(self):
