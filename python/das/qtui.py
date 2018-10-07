@@ -36,7 +36,7 @@ if not NoUI:
       def matches(self, fullname):
          raise Exception("Not implemented")
 
-   class GlobFilter(object):
+   class GlobFilter(FieldFilter):
       def __init__(self, name, pattern, invert=False):
          super(GlobFilter, self).__init__(name)
          self.pattern = pattern
@@ -49,7 +49,7 @@ if not NoUI:
          rv = fnmatch.fnmatch(fullname, self.pattern)
          return ((not rv) if self.invert else rv)
 
-   class RegexFilter(object):
+   class RegexFilter(FieldFilter):
       def __init__(self, name, pattern, partial=False, invert=False):
          super(RegexFilter, self).__init__(name)
          self.regex = re.compile(pattern)
@@ -66,7 +66,7 @@ if not NoUI:
             rv = (self.regex.match(fullname) is not None)
          return ((not rv) if self.invert else rv)
 
-   class ListFilter(object):
+   class ListFilter(FieldFilter):
       def __init__(self, name, values, partial=False, invert=False):
          super(ListFilter, self).__init__(name)
          self.values = set(map(str, values))
@@ -87,12 +87,12 @@ if not NoUI:
             rv = (fullname in self.allowed)
          return ((not rv) if self.invert else rv)
 
-   class FilterSet(object):
+   class FilterSet(FieldFilter):
       All = 0
       Any = 1
 
-      def __init__(self, mode, invert=False):
-         super(FilterSet, self).__init__()
+      def __init__(self, name, mode, invert=False):
+         super(FilterSet, self).__init__(name)
          self.filters = []
          if mode != self.All and mode != self.Any:
             raise Exception("[das] Invalid FilterSet mode: %d" % mode)
@@ -100,9 +100,24 @@ if not NoUI:
          self.invert = invert
 
       def copy(self):
-         rv = FilterSet(self.mode, self.invert)
+         rv = FilterSet(self.name, self.mode, self.invert)
          rv.filters = map(lambda x: x.copy(), self.filters)
          return rv
+
+      def matches(self, fullname):
+         if self.mode == self.All:
+            rv = True
+            for f in self.filters:
+               if not f.matches(fullname):
+                  rv = False
+                  break
+         else:
+            rv = False
+            for f in self.filters:
+               if f.matches(fullname):
+                  rv = True
+                  break
+         return ((not rv) if self.invert else rv)
 
       def add(self, flt, force=False):
          for i in xrange(len(self.filters)):
@@ -148,21 +163,6 @@ if not NoUI:
                return True
             except:
                return False
-
-      def matches(self, fullname):
-         if self.mode == self.All:
-            rv = True
-            for f in self.filters:
-               if not f.matches(fullname):
-                  rv = False
-                  break
-         else:
-            rv = False
-            for f in self.filters:
-               if f.matches(fullname):
-                  rv = True
-                  break
-         return ((not rv) if self.invert else rv)
 
 
    class ModelItem(object):
