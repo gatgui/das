@@ -1,0 +1,11 @@
+# name: validation
+# version: 1.2
+# das_minimum_version: 0.5
+{
+   "SomeType": Struct(valid_keys=Sequence(String()),
+                      value_pairs=Dict(String(), Or(Boolean(), Integer(), Real(), String())),
+                      accepted_values=Struct(boolean=Boolean(default=True),
+                                             integer=Boolean(default=True),
+                                             real=Boolean(default=True),
+                                             string=Boolean(default=True)))
+}

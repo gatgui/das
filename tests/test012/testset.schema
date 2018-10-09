@@ -1,0 +1,5 @@
+# version: 1.0
+# das_minimum_version: 0.5.0
+{
+   "MySet": Set(type=Or(String(), Integer(), Real()))
+}

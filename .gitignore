@@ -108,3 +108,4 @@ ENV/
 /eco
 /das.env.tmp
 /.vscode
+/eco.out

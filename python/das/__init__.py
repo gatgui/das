@@ -3,17 +3,21 @@ import re
 import sys
 import datetime
 
-__version__ = "0.4.1"
+__version__ = "0.5.0"
 
 from .types import (ReservedNameError,
+                    VersionError,
                     TypeBase,
                     Tuple,
                     Sequence,
                     Set,
                     Dict,
-                    Struct)
-from .schematypes import ValidationError
+                    Struct,
+                    GlobalValidationDisabled)
+from .schematypes import (TypeValidator,
+                          ValidationError)
 from .validation import (UnknownSchemaError,
+                         SchemaVersionError,
                          Schema,
                          SchemaLocation,
                          SchemaTypesRegistry)
@@ -41,7 +45,10 @@ def has_schema():
    return SchemaTypesRegistry.instance.has_schema()
 
 
-def get_schema(name):
+def get_schema(name_or_type):
+   if not isinstance(name_or_type, basestring):
+      name_or_type = get_schema_type_name(name_or_type)
+   name = name_or_type.split(".")[0]
    return SchemaTypesRegistry.instance.get_schema(name)
 
 
@@ -126,53 +133,208 @@ def adapt_value(value, schema_type=None, key=None, index=None):
             return value
 
 
-def validate(d, schema):
-   return get_schema_type(schema).validate(d)
+def validate(d, schema_type):
+   if not isinstance(schema_type, (basestring, TypeValidator)):
+      raise Exception("Expected a string or a das.schematypes.TypeValidator instance as second argument")
+   if isinstance(schema_type, TypeValidator):
+      return schema_type.validate(d)
+   else:
+      return get_schema_type(schema_type).validate(d)
+
+
+def check(d, schema_type):
+   if not isinstance(schema_type, (basestring, TypeValidator)):
+      raise Exception("Expected a string or a das.schematypes.TypeValidator instance as second argument")
+   try:
+      if isinstance(schema_type, TypeValidator):
+         schema_type.validate(copy(d))
+      else:
+         get_schema_type(schema_type).validate(copy(d))
+      return True
+   except:
+      return False
+
+
+def _read_file(path, skip_content=False):
+   mde = re.compile("^\s*([^:]+):\s*(.*)\s*$")
+   reading_content = False
+   content = ""
+   md = {}
+   if os.path.isfile(path):
+      with open(path, "rb") as f:
+         for l in f.readlines():
+            sl = l.strip()
+            if sl.startswith("#"):
+               if not reading_content:
+                  m = mde.match(sl[1:])
+                  if m is not None:
+                     md[m.group(1)] = m.group(2)
+            else:
+               reading_content = True
+               if skip_content:
+                  break
+               else:
+                  # Convert line endings to LF on the fly
+                  content += l.rstrip() + "\n"
+   return md, content
 
 
 def read_meta(path):
-   md = {}
-   mde = re.compile("^\s*([^:]+):\s*(.*)\s*$")
-   with open(path, "r") as f:
-      for l in f.readlines():
-         l = l.strip()
-         if l.startswith("#"):
-            m = mde.match(l[1:])
-            if m is not None:
-               md[m.group(1)] = m.group(2)
-         else:
-            break
-   return md
+   return _read_file(path, skip_content=True)[0]
 
 
-def read_string(s, schema_type=None, **funcs):
+def ascii_or_unicode(s, encoding=None):
+   if isinstance(s, str):
+      try:
+         s.decode("ascii")
+         return s
+      except Exception, e:
+         if encoding is None:
+            raise Exception("Input string must be 'ascii' encoded (%s)" % e)
+         try:
+            return s.decode(encoding)
+         except Exception, e:
+            raise Exception("Input string must be 'ascii' or '%s' encoded (%s)" % (encoding, e))
+   elif isinstance(s, unicode):
+      try:
+         return s.encode("ascii")
+      except:
+         return s
+   else:
+      raise Exception("'ascii_or_unicode' only works on string types (str, unicode)")
+
+
+def decode(d, encoding):
+   if hasattr(d, "_decode") and callable(getattr(d, "_decode")):
+      try:
+         return d._decode(encoding)
+      except Exception, e:
+         print_once("[das] '%s._decode' method call failed (%s)\n[das] Fallback to default decoding" % (d.__class__.__name__, e))
+
+   if isinstance(d, basestring):
+      return ascii_or_unicode(d, encoding=encoding)
+   elif isinstance(d, tuple):
+      return d.__class__([decode(x, encoding) for x in d])
+   elif isinstance(d, set):
+      return d.__class__([decode(x, encoding) for x in d])
+   else:
+      # In-place
+      if isinstance(d, list):
+         for idx, val in enumerate(d):
+            d[idx] = decode(val, encoding)
+      elif isinstance(d, dict):
+         for k, v in d.iteritems():
+            d[k] = decode(v, encoding)
+      elif isinstance(d, Struct):
+         for k, v in d._dict.iteritems():
+            d[k] = decode(v, encoding)
+      return d
+
+
+def read_string(s, schema_type=None, encoding=None, strict_schema=True, **funcs):
    if schema_type is not None:
-      sch = get_schema_type(schema_type)
-      mod = get_schema_module(schema_type)
-      if mod is not None and hasattr(mod, "__all__"):
-         for item in mod.__all__:
-            funcs[item] = getattr(mod, item)
+      if isinstance(schema_type, basestring):
+         schname = schema_type
+         sch = get_schema_type(schema_type)
+      elif isinstance(schema_type, TypeValidator):
+         schname = get_schema_type_name(schema_type)
+         sch = schema_type
+      else:
+         print_once("[das] 'schema_type' must either be a string or a das.schematypes.TypeValidator instance")
+         sch = None
+      if sch is not None:
+         mod = get_schema_module(schname)
+         if mod is not None and hasattr(mod, "__all__"):
+            for item in mod.__all__:
+               funcs[item] = getattr(mod, item)
+      else:
+         mod = None
    else:
       sch, mod = None, None
 
+   if not encoding:
+      print_once("[das] Warning: das.read assumes system default encoding for unicode characters unless explicitely set.")
+   else:
+      s = ("# encoding: %s\n" % encoding) + s
+
    rv = eval(s, globals(), funcs)
 
-   return (rv if sch is None else sch.validate(rv))
+   if encoding:
+      rv = decode(rv, encoding)
+
+   if sch is None:
+      return rv
+   else:
+      try:
+         schematypes.Struct.UseDefaultForMissingFields = (True if not strict_schema else False)
+         return sch.validate(rv)
+      finally:
+         schematypes.Struct.UseDefaultForMissingFields = False
 
 
-def read(path, schema_type=None, ignore_meta=False, **funcs):
+# returns: -2 if version check could not be performed
+#          -1 imcompatible
+#           0 forward compatible
+#           1 fully compatible
+#           2 backward compatible
+def is_version_compatible(reqver, curver):
+   try:
+      cur = map(int, curver.split("."))
+      req = map(int, reqver.split("."))
+      if req[0] != cur[0]:
+         return -1
+      elif req[1] > cur[1]:
+         return 0
+      else:
+         return (1 if req[1] == cur[1] else 2)
+   except:
+      return -2
+
+
+def read(path, schema_type=None, ignore_meta=False, strict_schema=None, **funcs):
    # Read header data
-   md = {}
-   if not ignore_meta:
-      md = read_meta(path)
+   md, src = _read_file(path)  
 
-   if schema_type is None:
+   libver = md.get("version", None)
+   if libver:
+      compat = is_version_compatible(libver, __version__)
+      if compat <= 0:
+         raise VersionError("Library", current_version=__version__, required_version=libver)
+
+   schema_version = None
+   if schema_type is None and not ignore_meta:
       schema_type = md.get("schema_type", None)
 
-   with open(path, "r") as f:
-      src = f.read()
+   if schema_type:
+      schema = get_schema(schema_type)
+      if schema:
+         schema_version = md.get("schema_version", None)
+         if schema_version:
+            if not schema.version:
+               raise SchemaVersionError(schema.name, required_version=schema_version)
+            else:
+               compat = is_version_compatible(schema_version, schema.version)
+               if compat == -2:
+                  # Invalid version specifications
+                  raise SchemaVersionError(schema.name, current_version=schema.version, required_version=schema_version)
+               elif compat == -1:
+                  # Incompatible schema
+                  raise SchemaVersionError(schema.name, current_version=schema.version, required_version=schema_version)
+               elif compat == 2:
+                  print_once("[das] Warning: '%s' data was saved using an older version of the schema, newly added fields will be set to their default value" % schema_type)
+                  if strict_schema is None:
+                     strict_schema = False
+               elif compat == 0:
+                  print_once("[das] Warning: '%s' data was saved using a newer version of the schema, you may loose information in the process" % schema_type)
 
-   return read_string(src, schema_type=schema_type, **funcs)
+   encoding = md.get("encoding", None)
+   if encoding is None:
+      print_once("[das] Warning: No encoding specified in file '%s'." % path.replace("\\", "/"))
+
+   if strict_schema is None:
+      strict_schema = True
+
+   return read_string(src, schema_type=schema_type, encoding=encoding, strict_schema=strict_schema, **funcs)
 
 
 def copy(d, deep=True):
@@ -214,7 +376,7 @@ def copy(d, deep=True):
    return rv
 
 
-def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
+def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encoding=None):
    if stream is None:
       stream = sys.stdout
 
@@ -230,9 +392,20 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
       keys = [k for k in d]
       keys.sort()
       for k in keys:
-         stream.write("%s%s'%s': " % (tindent, indent, k))
+         # We assume string keys are 'ascii'
+         if isinstance(k, unicode):
+            try:
+               k = k.encode("ascii")
+            except:
+               raise Exception("Non-ascii keys are not supported!")
+         elif isinstance(k, str):
+            try:
+               k.decode("ascii")
+            except:
+               raise Exception("Non-ascii keys are not supported!")
+         stream.write("%s%s%s: " % (tindent, indent, repr(k)))
          v = d[k]
-         pprint(v, stream, indent=indent, depth=depth+1, inline=True, eof=False)
+         pprint(v, stream, indent=indent, depth=depth+1, inline=True, eof=False, encoding=encoding)
          i += 1
          if i >= n:
             stream.write("\n")
@@ -245,7 +418,7 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
       n = len(d)
       i = 0
       for v in d:
-         pprint(v, stream, indent=indent, depth=depth+1, inline=False, eof=False)
+         pprint(v, stream, indent=indent, depth=depth+1, inline=False, eof=False, encoding=encoding)
          i += 1
          if i >= n:
             stream.write("\n")
@@ -258,7 +431,7 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
       n = len(d)
       i = 0
       for v in d:
-         pprint(v, stream, indent=indent, depth=depth+1, inline=False, eof=False)
+         pprint(v, stream, indent=indent, depth=depth+1, inline=False, eof=False, encoding=encoding)
          i += 1
          if i >= n:
             stream.write("\n")
@@ -266,29 +439,116 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True):
             stream.write(",\n")
       stream.write("%s])" % tindent)
 
-   elif isinstance(d, (str, unicode)):
-      stream.write("'%s'" % d)
+   elif isinstance(d, str):
+      try:
+         d.decode("ascii")
+         stream.write("'%s'" % d)
+      except Exception, e:
+         if not encoding:
+            raise Exception("Non-ascii string value found but no encoding provided (%s)." % e)
+         try:
+            stream.write(repr(d.decode(encoding)))
+         except Exception, e:
+            raise Exception("Non-ascii string value cannot be decoded to '%s' (%s)." % (encoding, e))
+
+   elif isinstance(d, unicode):
+      try:
+         s = d.encode("ascii")
+         stream.write("'%s'" % s)
+      except:
+         stream.write(repr(d))
 
    else:
-      stream.write(str(d))
+      # stream.write(str(d))
+      stream.write(repr(d))
 
    if eof:
       stream.write("\n")
 
 
-def write(d, path, indent="  "):
+def write(d, path, indent="  ", encoding=None):
    d._validate()
 
    schema_type = d._get_schema_type()
 
-   with open(path, "w") as f:
+   if encoding is None and schema_type:
+      encoding = "utf8"
+
+   with open(path, "wb") as f:
+      if encoding is not None:
+         f.write("# encoding: %s\n" % encoding)
       f.write("# version: %s\n" % __version__)
       f.write("# author: %s\n" % os.environ["USER" if sys.platform != "win32" else "USERNAME"])
       f.write("# date: %s\n" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
       if schema_type:
          st = get_schema_type_name(schema_type)
          f.write("# schema_type: %s\n" % st)
-      pprint(d, stream=f, indent=indent)
+         sn = get_schema(st)
+         if sn and sn.version is not None:
+            f.write("# schema_version: %s\n" % sn.version)
+      pprint(d, stream=f, indent=indent, encoding=encoding)
+
+
+def generate_empty_schema(path, name=None, version=None, author=None):
+   with open(path, "wb") as f:
+      if not name:
+         name = os.path.basename(path).split(".")[0]
+      if not author:
+         author = os.environ["USER" if sys.platform != "win32" else "USERNAME"]
+      if not version:
+         version = "1.0"
+      f.write("# encoding: utf8\n")
+      f.write("# name: %s\n" % name)
+      f.write("# version: %s\n" % version)
+      f.write("# das_minimum_version: %s\n" % __version__)
+      f.write("# author: %s\n" % author)
+      f.write("# date: %s\n" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
+      f.write("{\n")
+      f.write("}\n\n")
+
+
+def update_schema_metadata(path, name=None, version=None, author=None):
+   md, content = _read_file(path)
+   changed = False
+
+   if not "encoding" in md:
+      md["encoding"] = "ascii"
+      changed = True
+
+   if name:
+      if md.get("name", "") != name:
+         md["name"] = name
+         changed = True
+   elif not "name" in md:
+      md["name"] = os.path.basename(path).split(".")[0]
+      changed = True
+
+   if version:
+      if md.get("version", "") != version:
+         md["version"] = version
+         changed = True
+   
+   if author:
+      if md.get("author", "") != author:
+         md["author"] = author
+         changed = True
+   
+   if not "das_minimum_version" in md:
+      md["das_minimum_version"] = __version__
+      changed = True
+
+   if changed:
+      md["date"] = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+
+      with open(path, "wb") as f:
+         for mdn in ("encoding", "name", "version", "das_minimum_version", "author", "date"):
+            if not mdn in md:
+               continue
+            f.write("# %s: %s\n" % (mdn, md[mdn]))
+         f.write(content)
+
+   else:
+      print("[das] No need to update schema metadata")
 
 
 # Utilities

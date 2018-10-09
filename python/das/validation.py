@@ -12,40 +12,68 @@ class UnknownSchemaError(Exception):
       super(UnknownSchemaError, self).__init__("'%s' is not a known schema%s" % (name, " type" if "." in name else ""))
 
 
+class SchemaVersionError(das.VersionError):
+   def __init__(self, name, current_version=None, required_version=None):
+      super(SchemaVersionError, self).__init__("Schema '%s'" % name, current_version, required_version)
+
+
 class Schema(object):
    def __init__(self, location, path, dont_load=False):
       super(Schema, self).__init__()
-      name = os.path.splitext(os.path.basename(path))[0]
-      if "." in name:
-         raise Exception("Schema file base name must not contain '.'")
-      self.name = name
       self.path = path
       self.location = location
       self.module = None
       self.types = {}
+      self.version = None
+      self.name = das.read_meta(path).get("name", None)
+      if not self.name:
+         name = os.path.splitext(os.path.basename(path))[0]
+         if "." in name:
+            raise Exception("Schema file base name must not contain '.'")
+         else:
+            self.name = name
       if not dont_load:
          self.load()
 
    def load(self):
       if not self.path:
-         return
+         return False
 
       self.unload()
+
+      md, content = das._read_file(self.path)
+
+      dmv = md.get("das_minimum_version", None)
+      if dmv is not None:
+         try:
+            spl = map(int, dmv.split("."))
+            wmaj, wmin = spl[0], spl[1]
+         except:
+            raise Exception("'das_minimum_version' must follow MAJOR.MINOR format")
+         else:
+            dmaj, dmin, _ = map(int, das.__version__.split("."))
+            if wmaj != dmaj or wmin > dmin:
+               raise das.VersionError("Library", current_version=das.__version__, required_version=dmv)
 
       pmp = os.path.splitext(self.path)[0] + ".py"
       if os.path.isfile(pmp):
          try:
-            self.module = imp.load_source("das.schema.%s" % self.name, pmp)
-            setattr(das.schema, self.name, self.module)
+            modname = os.path.splitext(os.path.basename(self.path))[0]
+            mod = imp.load_source("das.schema.%s" % modname, pmp)
          except Exception, e:
             import traceback
             print("[das] Failed to load schema module '%s' (%s)" % (pmp, e))
             traceback.print_exc()
+            return False
+         else:
+            self.module = mod
+            setattr(das.schema, modname, self.module)
 
       eval_locals = {"Boolean": das.schematypes.Boolean,
                      "Integer": das.schematypes.Integer,
                      "Real": das.schematypes.Real,
                      "String": das.schematypes.String,
+                     "Set": das.schematypes.Set,
                      "Sequence": das.schematypes.Sequence,
                      "Tuple": das.schematypes.Tuple,
                      "StaticDict": das.schematypes.StaticDict, # Deprecated
@@ -57,22 +85,31 @@ class Schema(object):
                      "Optional": das.schematypes.Optional,
                      "Empty": das.schematypes.Empty,
                      "Deprecated": das.schematypes.Deprecated,
-                     "SchemaType": das.schematypes.SchemaType}
+                     "SchemaType": das.schematypes.SchemaType,
+                     "Alias": das.schematypes.Alias}
       if self.module is not None and hasattr(self.module, "__all__"):
          for an in self.module.__all__:
             eval_locals[an] = getattr(self.module, an)
 
-      names = []
-      with open(self.path, "r") as f:
+      if content:
+         self.version = md.get("version", None)
+         if self.version is None:
+            das.print_once("[das] Warning: Schema '%s' defined in %s is unversioned" % (self.name, self.path))
+
          das.schematypes.SchemaType.CurrentSchema = self.name
-         rv = eval(f.read(), globals(), eval_locals)
+         rv = das.read_string(content, encoding=md.get("encoding", None), **eval_locals)
          das.schematypes.SchemaType.CurrentSchema = ""
          for typename, validator in rv.iteritems():
             k = "%s.%s" % (self.name, typename)
             if SchemaTypesRegistry.instance.has_schema_type(k):
-               raise Exception("[das] Schema type '%s' already registered in another schema")
+               raise Exception("[das] Schema type '%s' already registered in another schema" % k)
             else:
                self.types[k] = validator
+
+         return True
+
+      else:
+         return False
 
    def unload(self):
       if self.module is not None:
@@ -128,8 +165,8 @@ class SchemaLocation(object):
             if SchemaTypesRegistry.instance.has_schema(schema.name):
                raise Exception("[das] Schema '%s' already registered in another schema")
             else:
-               schema.load()
-               self.schemas[schema.name] = schema
+               if schema.load():
+                  self.schemas[schema.name] = schema
          # except Exception, e:
          #    print("[das] Failed to read schemas from '%s' (%s)" % (schema_file, e))
          #    raise e

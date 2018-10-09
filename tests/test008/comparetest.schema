@@ -1,0 +1,6 @@
+{
+   "Person": Struct(name=String(), age=Integer()),
+   "CompareType": Struct(attribs=Sequence(Dict(String(), Real())),
+                         people=Tuple(SchemaType("Person"), SchemaType("Person")),
+                         option=Optional(Boolean()))
+}

@@ -1,0 +1,8 @@
+# name: compatibility
+# version: 1.1
+# das_minimum_version: 0.4.0
+{
+   "SomeType": Struct(field1=Real(),
+                      field2=String(),
+                      field3=Integer())
+}

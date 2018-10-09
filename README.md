@@ -171,8 +171,20 @@ $ python
 6. Sequence
 7. Struct
 8. Dict
-9. SchemaType (NamedType)
+9. SchemaType
 10. Class
+
+Required methods:
+- ```copy() -> instance```
+- ```__repr__() -> str``` (use when serializing)
+
+*__repr__* should return a class instanciating call
+- ```__cmp__() -> -1, 0 or 1``` (use when comparing data sets)
+
+Optional methods:
+- ```string_to_value(str) -> noreturn``` (used by the editor)
+- ```value_to_string() -> str``` (used by the editor)
+
 11. Or
 12. Optional
 13. Empty
@@ -206,4 +218,7 @@ To specify a custom defined directory, use the eco-dir= flag
 scons eco eco-dir=path/to/target/directory
 ```
 
-
+### TODO
+- [ ] Implemente copy-paste
+- [ ] Allow multiple items drag'n'drop
+- [ ] Add a toolbar class (open/save/save as, copy/cut/paste, undo/redo)

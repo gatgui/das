@@ -1,0 +1,5 @@
+# schema_type: compatibility.SomeType
+{
+   "field1": 2.0,
+   "field2": "hello"
+}
