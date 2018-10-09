@@ -168,13 +168,12 @@ if not NoUI:
    class ModelItem(object):
       ReservedTypeNames = set(["alias", "empty", "boolean", "integer", "real", "string", "list", "tuple", "set", "dict", "struct"])
 
-      def __init__(self, name, data, type=None, parent=None, row=0, key=None, hideDeprecated=True, hideAliases=True, showHidden=False, fieldFilters=None):
+      def __init__(self, name, row=0, key=None, parent=None):
          super(ModelItem, self).__init__()
          self.row = row
          self.key = key
          self.name = name
          self.parent = parent
-         self.update(data, type, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters)
 
       def __str__(self):
          return "ModelItem(%s, compound=%s, resizable=%s, multi=%s, editable=%s, optional=%s, parent=%s, children=%d)" % (self.name, self.compound, self.resizable, self.multi, self.editable, self.optional, ("None" if not self.parent else self.parent.name), len(self.children))
@@ -376,7 +375,10 @@ if not NoUI:
             # Shortcut
             self.typestr = "alias"
             self.data = None
-            return
+            if fieldFilters and not fieldFilters.matches(self.fullname(skipRoot=True)):
+               return False
+            else:
+               return True
 
          # initialize those two with original type
          self.editableType = self.type.editable
@@ -442,7 +444,9 @@ if not NoUI:
                   for i in xrange(len(self.data)):
                      itemname = "[%d]" % i
                      itemdata = self.data[i]
-                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters))
+                     newitem = ModelItem(itemname, row=i, parent=self)
+                     if newitem.update(itemdata, type=self.type.type, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters):
+                        self.children.append(newitem)
 
             elif isinstance(self.type, das.schematypes.Tuple):
                self.typestr = "tuple"
@@ -452,7 +456,9 @@ if not NoUI:
                   for i in xrange(len(self.data)):
                      itemname = "(%d)" % i
                      itemdata = self.data[i]
-                     self.children.append(ModelItem(itemname, itemdata, type=self.type.types[i], parent=self, row=i, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters))
+                     newitem = ModelItem(itemname, row=i, parent=self)
+                     if newitem.update(itemdata, type=self.type.types[i], hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters):
+                        self.children.append(newitem)
 
             elif isinstance(self.type, das.schematypes.Set):
                self.typestr = "set"
@@ -462,11 +468,12 @@ if not NoUI:
                   i = 0
                   for itemdata in self.data:
                      itemname = "{%d}" % i
-                     self.children.append(ModelItem(itemname, itemdata, type=self.type.type, parent=self, row=i, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters))
+                     newitem = ModelItem(itemname, row=i, parent=self)
+                     if newitem.update(itemdata, type=self.type.type, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters):
+                        self.children.append(newitem)
                      i += 1
 
             elif isinstance(self.type, (das.schematypes.Struct, das.schematypes.StaticDict)):
-               fn = self.fullname(skipRoot=True) + "."
                self.typestr = "struct"
                self.resizable = False
                self.orderable = False
@@ -481,8 +488,6 @@ if not NoUI:
                   if optional:
                      self.resizable = True
                   if self.exists() and (showHidden or not t.hidden):
-                     if fieldFilters and not fieldFilters.matches(fn + k):
-                        continue
                      if isinstance(t, das.schematypes.Alias):
                         if hideAliases:
                            continue
@@ -493,7 +498,9 @@ if not NoUI:
                         v = t.make_default()
                      else:
                         v = self.data[k]
-                     self.children.append(ModelItem(k, v, type=t, parent=self, row=i, key=k, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters))
+                     newitem = ModelItem(k, row=i, key=k, parent=self)
+                     if newitem.update(v, type=t, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters):
+                        self.children.append(newitem)
                   i += 1
 
             elif isinstance(self.type, (das.schematypes.Dict, das.schematypes.DynamicDict)):
@@ -515,8 +522,27 @@ if not NoUI:
                         itemname = str(k)
                      v = self.data[k]
                      vtype = self.type.vtypeOverrides.get(k, self.type.vtype)
-                     self.children.append(ModelItem(itemname, v, type=vtype, parent=self, row=i, key=k, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters))
+                     newitem = ModelItem(itemname, row=i, key=k, parent=self)
+                     if newitem.update(v, type=vtype, hideDeprecated=hideDeprecated, hideAliases=hideAliases, showHidden=showHidden, fieldFilters=fieldFilters):
+                        self.children.append(newitem)
                      i += 1
+
+            # Never filter out root item, even when all its children are gone
+            if self.parent is None:
+               return True
+            else:
+               if len(self.children) > 0:
+                  if fieldFilters and not fieldFilters.matches(self.fullname(skipRoot=True)):
+                     return False
+                  else:
+                     return True
+               else:
+                  return False
+         else:
+            if fieldFilters and not fieldFilters.matches(self.fullname(skipRoot=True)):
+               return False
+            else:
+               return True
 
 
    class NewValueDialog(QtWidgets.QDialog):
@@ -1035,7 +1061,9 @@ if not NoUI:
                type = self._rootItem.type
             self._rootItem.update(data, type=type, hideDeprecated=self._hideDeprecated, hideAliases=self._hideAliases, showHidden=self._showHidden, fieldFilters=self._fieldFilters)
          elif data is not None:
-            self._rootItem = ModelItem("<root>" if name is None else name, data, type=type, hideDeprecated=self._hideDeprecated, hideAliases=self._hideAliases, showHidden=self._showHidden, fieldFilters=self._fieldFilters)
+            # self._rootItem = ModelItem("<root>" if name is None else name, data, type=type, hideDeprecated=self._hideDeprecated, hideAliases=self._hideAliases, showHidden=self._showHidden, fieldFilters=self._fieldFilters)
+            self._rootItem = ModelItem("<root>" if name is None else name)
+            self._rootItem.update(data, type=type, hideDeprecated=self._hideDeprecated, hideAliases=self._hideAliases, showHidden=self._showHidden, fieldFilters=self._fieldFilters)
 
       def hideDeprecated(self):
          return self._hideDeprecated
@@ -1600,7 +1628,7 @@ if not NoUI:
 
       def __init__(self, data, type=None, name=None, readonly=False, headers=None, fieldfilters=None, parent=None):
          super(Editor, self).__init__(parent)
-         self.model = Model(data, type=type, name=name, readonly=readonly, headers=headers, fieldfilters=None, parent=self)
+         self.model = Model(data, type=type, name=name, readonly=readonly, headers=headers, fieldfilters=fieldfilters, parent=self)
          self.delegate = ModelItemDelegate(parent=self)
          self.selection = []
          self.scrollState = None
@@ -1855,6 +1883,12 @@ if not NoUI:
 
       def hasDataChanged(self):
          return self.model.hasDataChanged()
+
+      def fieldFilters(self):
+         return self.model().fieldFilters()
+
+      def setFieldFilters(self, filterSet):
+         self.model().setFieldFilters(filterSet)
 
       def resetExpandedState(self, index=None):
          if index is None:
