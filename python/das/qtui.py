@@ -532,12 +532,12 @@ if not NoUI:
                return True
             else:
                if len(self.children) > 0:
+                  return True
+               else:
                   if fieldFilters and not fieldFilters.matches(self.fullname(skipRoot=True)):
                      return False
                   else:
                      return True
-               else:
-                  return False
          else:
             if fieldFilters and not fieldFilters.matches(self.fullname(skipRoot=True)):
                return False
