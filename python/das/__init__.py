@@ -3,7 +3,7 @@ import re
 import sys
 import datetime
 
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 
 from .types import (ReservedNameError,
                     VersionError,
