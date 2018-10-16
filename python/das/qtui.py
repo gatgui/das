@@ -174,9 +174,31 @@ if not NoUI:
          self.key = key
          self.name = name
          self.parent = parent
+         self.reset_members()
 
       def __str__(self):
          return "ModelItem(%s, compound=%s, resizable=%s, multi=%s, editable=%s, optional=%s, parent=%s, children=%d)" % (self.name, self.compound, self.resizable, self.multi, self.editable, self.optional, ("None" if not self.parent else self.parent.name), len(self.children))
+
+      def reset_members(self):
+         self.children = []
+         self.compound = False
+         self.mapping = False
+         self.mappingkeys = None
+         self.mappingkeytype = None
+         self.uniformmapping = True # mapping of uniform type values
+         self.resizable = False
+         self.orderable = False # orderable compound
+         self.optional = False
+         self.deprecated = False
+         self.editable = False # will be false for aliases
+         self.editableType = True # is value tagged as editable in the schema type
+         self.editableValue = True # is value actually editable in the UI
+         self.multi = False
+         self.data = None # for alias, it is the same data as the original
+         self.type = None
+         self.baseType = None
+         self.typestr = ""
+         self.desc = ""
 
       def fullname(self, skipRoot=False):
          k = ""
@@ -344,25 +366,10 @@ if not NoUI:
             return False
 
       def update(self, data, type=None, hideDeprecated=True, hideAliases=True, showHidden=False, fieldFilters=None):
-         self.children = []
-         self.compound = False
-         self.mapping = False
-         self.mappingkeys = None
-         self.mappingkeytype = None
-         self.uniformmapping = True # mapping of uniform type values
-         self.resizable = False
-         self.orderable = False # orderable compound
-         self.optional = False
-         self.deprecated = False
-         self.editable = False # will be false for aliases
-         self.editableType = True # is value tagged as editable in the schema type
-         self.editableValue = True # is value actually editable in the UI
-         self.multi = False
-         self.data = data # for alias, it is the same data as the original
+         self.reset_members()
+
+         self.data = data
          self.type = type
-         self.baseType = None
-         self.typestr = ""
-         self.desc = ""
 
          if self.type is None and self.data is not None:
             self.type = self.data._get_schema_type()
@@ -1077,17 +1084,17 @@ if not NoUI:
       def setHideDeprecated(self, on):
          if on != self._hideDeprecated:
             self._hideDeprecated = on
-            self._updateData()
+            self._updateData(None)
 
       def setHideAliases(self, on):
          if on != self._hideAliases:
             self._hideAliases = on
-            self._updateData()
+            self._updateData(None)
 
       def setShowHidden(self, on):
          if on != self._showHidden:
             self._showHidden = on
-            self._updateData()
+            self._updateData(None)
 
       def isColumnShown(self, name):
          return (name in self._headers)
@@ -1113,9 +1120,9 @@ if not NoUI:
 
       def setFieldFilters(self, filterSet):
          self._fieldFilters = filterSet.copy()
-         self._updateData()
+         self._updateData(None)
 
-      def _updateData(self, data=None, type=None, name=None):
+      def _updateData(self, data, type=None, name=None):
          self.beginResetModel()
          self._buildItemsTree(data=data, type=type, name=name)
          self.endResetModel()
@@ -1125,6 +1132,9 @@ if not NoUI:
 
       def getData(self):
          return (None if self._rootItem is None else self._rootItem.data)
+
+      def updateData(self):
+         self._updateData(None)
 
       def replaceData(self, data, type=None, name=None):
          self._orgData = None
@@ -1174,7 +1184,7 @@ if not NoUI:
             return False
          else:
             self._rootItem.data = das.copy(self._undos[self._curundo][0])
-            self._updateData()
+            self._updateData(None)
             self._curundo -= 1
             return True
 
@@ -1184,7 +1194,7 @@ if not NoUI:
          else:
             self._curundo += 1
             self._rootItem.data = das.copy(self._undos[self._curundo][1])
-            self._updateData()
+            self._updateData(None)
             return True
 
       def pushUndo(self, undoData):
@@ -1855,6 +1865,18 @@ if not NoUI:
          if not self.restoreExpandedState():
             # Only reset expanded set if we have data and nothing was restored
             if data:
+               self.expandedState = {}
+            if self.model.rowCount(index) > 0:
+               self.setExpanded(self.model.index(0, 0, index), True)
+         self.modelUpdated.emit(self.model)
+
+      def refreshData(self):
+         self.model.updateData()
+         index = QtCore.QModelIndex()
+         # Try to restore expanded State
+         if not self.restoreExpandedState():
+            # Only reset expanded set if we have data and nothing was restored
+            if self.model.getData():
                self.expandedState = {}
             if self.model.rowCount(index) > 0:
                self.setExpanded(self.model.index(0, 0, index), True)
