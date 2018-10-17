@@ -1907,10 +1907,10 @@ if not NoUI:
          return self.model.hasDataChanged()
 
       def fieldFilters(self):
-         return self.model().fieldFilters()
+         return self.model.fieldFilters()
 
       def setFieldFilters(self, filterSet):
-         self.model().setFieldFilters(filterSet)
+         self.model.setFieldFilters(filterSet)
 
       def resetExpandedState(self, index=None):
          if index is None:
