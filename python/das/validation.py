@@ -293,10 +293,18 @@ class SchemaTypesRegistry(object):
          rv.sort()
       return rv
 
+   def _samepath(self, path0, path1):
+      if sys.platform == "win32":
+         np0 = os.path.abspath(path0).replace("\\", "/").lower()
+         np1 = os.path.abspath(path1).replace("\\", "/").lower()
+         return (np0 == np1)
+      else:
+         return os.path.samefile(path0, path1)
+
    def get_location(self, path):
       self.load_schemas()
       for location in self.locations:
-         if os.path.issamefile(path, location.path):
+         if self._samepath(path, location.path):
             return location
       return None
 
