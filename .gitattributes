@@ -94,3 +94,5 @@ bin/dasget     text eol=lf
 bin/dasset     text eol=lf
 bin/daseval    text eol=lf
 
+PKG-INFO       text eol=lf
+README.rst     text eol=lf
