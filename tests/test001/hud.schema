@@ -1,3 +1,4 @@
+# master_types: HUD, Text
 {
    "Color": Sequence(type=Real(), size=3, default=(0, 0, 0)),
 

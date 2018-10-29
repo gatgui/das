@@ -52,8 +52,8 @@ def get_schema(name_or_type):
    return SchemaTypesRegistry.instance.get_schema(name)
 
 
-def list_schema_types(schema=None):
-   return SchemaTypesRegistry.instance.list_schema_types(schema)
+def list_schema_types(schema=None, masters_only=False):
+   return SchemaTypesRegistry.instance.list_schema_types(schema, masters_only=masters_only)
 
 
 def has_schema_type(name):

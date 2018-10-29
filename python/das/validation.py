@@ -24,6 +24,7 @@ class Schema(object):
       self.location = location
       self.module = None
       self.types = {}
+      self.master_types = None
       self.version = None
       self.name = das.read_meta(path).get("name", None)
       if not self.name:
@@ -106,6 +107,11 @@ class Schema(object):
             else:
                self.types[k] = validator
 
+         mt = md.get("master_types", None)
+         if mt is not None:
+            mt = filter(lambda y: len(y) > 0, map(lambda x: x.strip(), mt.split(",")))
+            self.master_types = set(map(lambda x: "%s.%s" % (self.name, x), mt))
+
          return True
 
       else:
@@ -116,12 +122,18 @@ class Schema(object):
          delattr(das.schema, self.module.__name__.split(".")[-1])
          self.module = None
       self.types = {}
+      self.master_types = None
 
-   def list_types(self, sort=True):
+   def list_types(self, sort=True, masters_only=False):
       rv = self.types.keys()
+      if masters_only and self.master_types is not None:
+         rv = filter(lambda x: x in self.master_types, rv)
       if sort:
          rv.sort()
       return rv
+
+   def is_master_type(self, name):
+      return (self.master_types is None or name in self.master_types)
 
    def has_type(self, name):
       return (name in self.types)
@@ -188,12 +200,12 @@ class SchemaLocation(object):
    def get_schema(self, name):
       return self.schemas.get(name, None)
 
-   def list_schema_types(self, schema=None, sort=True):
+   def list_schema_types(self, schema=None, sort=True, masters_only=False):
       rv = set()
       for n, s in self.schemas.iteritems():
          if schema is not None and n != schema:
             continue
-         rv = rv.union(s.list_types(sort=False))
+         rv = rv.union(s.list_types(sort=False, masters_only=masters_only))
       rv = list(rv)
       if sort:
          rv.sort()
@@ -315,14 +327,14 @@ class SchemaTypesRegistry(object):
          rv.sort()
       return rv
 
-   def list_schema_types(self, schema=None, sort=True):
+   def list_schema_types(self, schema=None, sort=True, masters_only=False):
       self.load_schemas()
       if schema is None:
          rv = self.cache["name_to_type"].keys()
       else:
          schema = self.cache["name_to_schema"].get(schema, None)
          if schema:
-            rv = schema.list_types(sort=False)
+            rv = schema.list_types(sort=False, masters_only=masters_only)
          else:
             rv = []
       if sort:
