@@ -232,6 +232,14 @@ class SchemaLocation(object):
             return rv
       return ""
 
+   def __cmp__(self, oth):
+      p0 = os.path.abspath(self.path)
+      p1 = os.path.abspath(oth.path)
+      if sys.platform == "win32":
+         p0 = p0.replace("\\", "/").lower()
+         p1 = p1.replace("\\", "/").lower()
+      return cmp(p0, p1)
+
    def __hash__(self):
       return hash(self.path)
 
@@ -244,6 +252,7 @@ class SchemaTypesRegistry(object):
       if SchemaTypesRegistry.instance is not None:
          raise Exception("SchemaTypesRegistry must be globally unique")
       self.path = ""
+      self.addedpath = ""
       self.locations = set()
       self.properties = {}
       self.cache = {"name_to_schema": {},
@@ -251,32 +260,88 @@ class SchemaTypesRegistry(object):
                     "type_to_name": {}}
       SchemaTypesRegistry.instance = self
 
-   def load_schemas(self, paths=None):
-      path = (os.pathsep.join(paths) if paths is not None else os.environ.get("DAS_SCHEMA_PATH", ""))
-      if path == self.path:
+   def load_schemas(self, paths=None, incremental=False, force=False):
+      incremental = (paths is not None)
+      if not incremental:
+         path = os.environ.get("DAS_SCHEMA_PATH", "")
+         # Keep in mind paths added incrementally
+         if self.addedpath:
+            if path:
+               path += os.pathsep
+            path += self.addedpath
+      else:
+         path = self.path
+         for p in paths:
+            if not p in path:
+               if path:
+                  path += os.pathsep
+               path += p
+            # Also keep track of added paths
+            if not p in self.addedpath:
+               if self.addedpath:
+                  self.addedpath += os.pathsep
+               self.addedpath += p
+
+      if not force and path == self.path:
          return
 
       self.cache = {"name_to_schema": {},
                     "name_to_type": {},
                     "type_to_name": {}}
 
-      locations = set()
-      for d in path.split(os.pathsep):
-         if not os.path.isdir(d):
-            continue
-         location = SchemaLocation(d, dont_load=True)
-         if not location in locations:
-            locations.add(location)
+      if not incremental:
+         locations = set()
 
-      for location in self.locations:
-         if not location in locations:
-            location.unload_schemas()
+         # Build list of not locations
+         for d in path.split(os.pathsep):
+            if not os.path.isdir(d):
+               continue
+            location = SchemaLocation(d, dont_load=True)
+            if not location in locations:
+               locations.add(location)
 
-      # Load schemas after removing the unncessary ones
-      for location in locations:
-         location.load_schemas()
+         # Unload unwanted locations
+         remove_locations = set()
+         for location in self.locations:
+            if not location in locations:
+               location.unload_schemas()
+               remove_locations.add(location)
 
-      self.locations = locations
+         if force:
+            # Force load all locations and replace existing ones
+            for location in locations:
+               location.load_schemas()
+            self.locations = locations
+         else:
+            # Add new locations...
+            for location in locations:
+               if not location in self.locations:
+                  location.load_schemas()
+                  self.locations.add(location)
+               else:
+                  # Already here and loaded
+                  pass
+            # ... and remove unloaded
+            for location in remove_locations:
+               self.locations.remove(location)
+
+      else:
+         for d in path.split(os.pathsep):
+            if not os.path.isdir(d):
+               continue
+            location = SchemaLocation(d, dont_load=True)
+            if not location in self.locations:
+               location.load_schemas()
+               self.locations.add(location)
+
+         if force:
+            forcelocations = set()
+            for p in paths:
+               forcelocations.add(SchemaLocation(d, dont_load=True))
+            for location in self.locations:
+               if location in forcelocations:
+                  location.load_schemas()
+
       self.path = path
 
       # Create caches

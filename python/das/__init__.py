@@ -33,8 +33,8 @@ from . import schema
 Das = Struct
 
 
-def load_schemas(paths=None):
-   SchemaTypesRegistry.instance.load_schemas(paths=paths)
+def load_schemas(paths=None, force=False):
+   SchemaTypesRegistry.instance.load_schemas(paths=paths, force=force)
 
 
 def list_schemas():
