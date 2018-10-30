@@ -517,7 +517,7 @@ class Struct(TypeBase):
 
    def _get_alias(self, k):
       st = self._get_schema_type()
-      if st is not None:
+      if st is not None and st.has_key(k):
          if isinstance(st[k], das.schematypes.Alias):
             return st[k].name
       return k
