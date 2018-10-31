@@ -213,12 +213,14 @@ if __name__ == "__main__":
             if rv:
                self.path = rv
                self.onSave()
+               self.actionSave.setEnabled(False)
 
          def onAbout(self):
             pass
 
          def _makeNewCallback(self, typeName):
             def __callback():
+               self.actionSaveAs.setEnabled(True)
                data = das.make_default(typeName)
                self.editWidget.setData(data, name="<%s>" % typeName)
 
@@ -229,7 +231,9 @@ if __name__ == "__main__":
 
          def onModelUpdated(self, model):
             if not readonly:
-               self.actionSave.setEnabled(model.hasDataChanged())
+               self.actionSaveAs.setEnabled(True)
+               if self.path is not None:
+                  self.actionSave.setEnabled(model.hasDataChanged())
             if verbose and model.hasDataChanged():
                das.pprint(model.getData())
 
