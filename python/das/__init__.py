@@ -4,6 +4,11 @@ import sys
 import datetime
 
 __version__ = "0.6.0"
+__verbose__ = False
+try:
+   __verbose__ = (int(os.environ.get("DAS_VERBOSE", "0")) != 0)
+except:
+   pass
 
 from .types import (ReservedNameError,
                     VersionError,
@@ -69,7 +74,8 @@ def get_schema_type_name(typ):
 
 
 def register_mixins(*mixins):
-   print("[das] Register mixins: %s" % ", ".join(map(lambda x: x.__module__ + "." + x.__name__, mixins)))
+   if __verbose__:
+      print("[das] Register mixins: %s" % ", ".join(map(lambda x: x.__module__ + "." + x.__name__, mixins)))
    tmp = {}
    for mixin in mixins:
       st = mixin.get_schema_type()
@@ -253,7 +259,8 @@ def read_string(s, schema_type=None, encoding=None, strict_schema=True, **funcs)
       sch, mod = None, None
 
    if not encoding:
-      print_once("[das] Warning: das.read assumes system default encoding for unicode characters unless explicitely set.")
+      if __verbose__:
+         print_once("[das] Warning: das.read assumes system default encoding for unicode characters unless explicitely set.")
    else:
       s = ("# encoding: %s\n" % encoding) + s
 
@@ -321,15 +328,18 @@ def read(path, schema_type=None, ignore_meta=False, strict_schema=None, **funcs)
                   # Incompatible schema
                   raise SchemaVersionError(schema.name, current_version=schema.version, required_version=schema_version)
                elif compat == 2:
-                  print_once("[das] Warning: '%s' data was saved using an older version of the schema, newly added fields will be set to their default value" % schema_type)
+                  if __verbose__:
+                     print_once("[das] Warning: '%s' data was saved using an older version of the schema, newly added fields will be set to their default value" % schema_type)
                   if strict_schema is None:
                      strict_schema = False
                elif compat == 0:
-                  print_once("[das] Warning: '%s' data was saved using a newer version of the schema, you may loose information in the process" % schema_type)
+                  if __verbose__:
+                     print_once("[das] Warning: '%s' data was saved using a newer version of the schema, you may loose information in the process" % schema_type)
 
    encoding = md.get("encoding", None)
    if encoding is None:
-      print_once("[das] Warning: No encoding specified in file '%s'." % path.replace("\\", "/"))
+      if __verbose__:
+         print_once("[das] Warning: No encoding specified in file '%s'." % path.replace("\\", "/"))
 
    if strict_schema is None:
       strict_schema = True
@@ -548,7 +558,8 @@ def update_schema_metadata(path, name=None, version=None, author=None):
          f.write(content)
 
    else:
-      print("[das] No need to update schema metadata")
+      if __verbose__:
+         print("[das] No need to update schema metadata")
 
 
 # Utilities

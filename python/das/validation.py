@@ -95,7 +95,8 @@ class Schema(object):
       if content:
          self.version = md.get("version", None)
          if self.version is None:
-            das.print_once("[das] Warning: Schema '%s' defined in %s is unversioned" % (self.name, self.path))
+            if das.__verbose__:
+               das.print_once("[das] Warning: Schema '%s' defined in %s is unversioned" % (self.name, self.path))
 
          das.schematypes.SchemaType.CurrentSchema = self.name
          rv = das.read_string(content, encoding=md.get("encoding", None), **eval_locals)
@@ -171,17 +172,14 @@ class SchemaLocation(object):
 
       schema_files = glob.glob(self.path + "/*.schema")
       for schema_file in schema_files:
-         # try:
+         if das.__verbose__:
             print("[das] Load schema file: %s" % schema_file)
-            schema = Schema(self, schema_file, dont_load=True)
-            if SchemaTypesRegistry.instance.has_schema(schema.name):
-               raise Exception("[das] Schema '%s' already registered in another schema")
-            else:
-               if schema.load():
-                  self.schemas[schema.name] = schema
-         # except Exception, e:
-         #    print("[das] Failed to read schemas from '%s' (%s)" % (schema_file, e))
-         #    raise e
+         schema = Schema(self, schema_file, dont_load=True)
+         if SchemaTypesRegistry.instance.has_schema(schema.name):
+            raise Exception("[das] Schema '%s' already registered in another schema")
+         else:
+            if schema.load():
+               self.schemas[schema.name] = schema
 
    def unload_schemas(self):
       for _, schema in self.schemas.iteritems():
