@@ -1733,6 +1733,35 @@ if not NoUI:
             event.accept()
             menu = QtWidgets.QMenu(self)
 
+            # Clicked item
+            gpos = QtGui.QCursor.pos()
+            pos = self.viewport().mapFromGlobal(gpos)
+            modelIndex = self.indexAt(pos)
+            item = (None if (modelIndex is None or not modelIndex.isValid()) else modelIndex.internalPointer())
+            validitem = (item and item.exists())
+
+            if not self._readonly and item:
+               pn = ""
+               if item.parent:
+                  pn = item.parent.fullname(skipRoot=True)
+                  if not pn:
+                     pn = item.parent.fullname(skipRoot=False)
+               if item.exists():
+                  if item.parent and item.parent.mapping and item.parent.mappingkeytype is None and item.optional:
+                     lbl = "Remove '%s'" % item.name
+                     if pn:
+                        lbl += " from '%s'" % pn
+                     actionRemItem = menu.addAction(lbl)
+                     actionRemItem.triggered.connect(self.makeOnRemOptionalItem(modelIndex))
+                     menu.addSeparator()
+               elif item.typestr != "alias":
+                  lbl = "Add '%s'" % item.name
+                  if pn:
+                     lbl += " to '%s'" % pn
+                  actionAddItem = menu.addAction(lbl)
+                  actionAddItem.triggered.connect(self.makeOnAddOptionalItem(modelIndex))
+                  menu.addSeparator()
+
             # Selected items
             iipairs = []
             if not self._readonly:
@@ -1749,27 +1778,75 @@ if not NoUI:
                # All items have same parent
                index, item = iipairs[0]
 
+               def type_str(t):
+                  if isinstance(t, das.schematypes.SchemaType):
+                     return t.name.split(".")[-1]
+                  elif isinstance(t, das.schematypes.Or):
+                     return type_str(t.types[0])
+                  elif isinstance(t, das.schematypes.Optional):
+                     return type_str(t.type)
+                  elif isinstance(t, das.schematypes.Alias):
+                     return "alias '%s'" % t.name
+                  elif isinstance(t, das.schematypes.Set):
+                     return "set {%s}" % type_str(t.type)
+                  elif isinstance(t, das.schematypes.Sequence):
+                     return "sequence [%s]" % type_str(t.type)
+                  elif isinstance(t, das.schematypes.Tuple):
+                     return "tuple (%s)" % ", ".join(map(type_str, t.types))
+                  elif isinstance(t, das.schematypes.Dict):
+                     return "mapping {%s -> %s}" % (type_str(t.ktype), type_str(t.vtype))
+                  else:
+                     return t.__class__.__name__.lower()
+
                if len(iipairs) == 1 and item.exists():
                   actionAddItem = None
                   actionClearItems = None
                   if item.compound:
+                     ifn = item.fullname(skipRoot=True)
                      if item.mapping:
                         if item.mappingkeytype is not None:
-                           actionAddItem = menu.addAction("Add ...")
-                           actionAddItem.triggered.connect(self.makeOnAddDictItem(index))
-                           actionClearItems = menu.addAction("Clear")
+                           vtypes = []
+                           if isinstance(item.type.vtype, das.schematypes.Or):
+                              vtypes = filter(lambda x: not isinstance(x, das.schematypes.Deprecated), item.type.vtype.types)
+                           if len(vtypes) > 1:
+                              actionAddMenu = menu.addMenu("Add to '%s'..." % ifn)
+                              for ot in vtypes:
+                                 actionAddItem = actionAddMenu.addAction(type_str(ot))
+                                 actionAddItem.triggered.connect(self.makeOnAddDictItem(index, ot.make_default()))
+                           else:
+                              actionAddItem = menu.addAction("Add to '%s'..." % ifn)
+                              actionAddItem.triggered.connect(self.makeOnAddDictItem(index))
+                           actionClearItems = menu.addAction("Clear '%s'" % ifn)
                            actionClearItems.triggered.connect(self.makeOnClearDictItems(index))
                      else:
                         if item.orderable:
                            if item.resizable:
-                              actionAddItem = menu.addAction("Add")
-                              actionAddItem.triggered.connect(self.makeOnAddSeqItem(index))
-                              actionClearItems = menu.addAction("Clear")
+                              vtypes = []
+                              if isinstance(item.type.type, das.schematypes.Or):
+                                 vtypes = filter(lambda x: not isinstance(x, das.schematypes.Deprecated), item.type.type.types)
+                              if len(vtypes) > 1:
+                                 actionAddMenu = menu.addMenu("Add to '%s'" % ifn)
+                                 for ot in vtypes:
+                                    actionAddItem = actionAddMenu.addAction(type_str(ot))
+                                    actionAddItem.triggered.connect(self.makeOnAddSeqItem(index, ot.make_default()))
+                              else:
+                                 actionAddItem = menu.addAction("Add to '%s'" % ifn)
+                                 actionAddItem.triggered.connect(self.makeOnAddSeqItem(index))
+                              actionClearItems = menu.addAction("Clear '%s'" % ifn)
                               actionClearItems.triggered.connect(self.makeOnClearSeqItems(index))
                         else:
-                           actionAddItem = menu.addAction("Add ...")
-                           actionAddItem.triggered.connect(self.makeOnAddSetItem(index))
-                           actionClearItems = menu.addAction("Clear")
+                           vtypes = []
+                           if isinstance(item.type.type, das.schematypes.Or):
+                              vtypes = filter(lambda x: not isinstance(x, das.schematypes.Deprecated), item.type.type.types)
+                           if len(vtypes) > 1:
+                              actionAddMenu = menu.addMenu("Add to '%s'..." % ifn)
+                              for ot in vtypes:
+                                 actionAddItem = actionAddMenu.addAction(type_str(ot))
+                                 actionAddItem.triggered.connect(self.makeOnAddSetItem(index, ot))
+                           else:
+                              actionAddItem = menu.addAction("Add to '%s'..." % ifn)
+                              actionAddItem.triggered.connect(self.makeOnAddSetItem(index))
+                           actionClearItems = menu.addAction("Clear '%s'" % ifn)
                            actionClearItems.triggered.connect(self.makeOnClearSetItems(index))
                   if actionAddItem:
                      menu.addSeparator()
@@ -1793,23 +1870,7 @@ if not NoUI:
                   if actionRemItem:
                      menu.addSeparator()
 
-            # Clicked item
-            gpos = QtGui.QCursor.pos()
-            pos = self.viewport().mapFromGlobal(gpos)
-            modelIndex = self.indexAt(pos)
-            item = (None if (modelIndex is None or not modelIndex.isValid()) else modelIndex.internalPointer())
-            validitem = (item and item.exists())
-
-            if not self._readonly and item:
-               if item.exists():
-                  if item.parent and item.parent.mapping and item.parent.mappingkeytype is None and item.optional:
-                     actionRemItem = menu.addAction("Remove '%s'" % item.name)
-                     actionRemItem.triggered.connect(self.makeOnRemOptionalItem(modelIndex))
-                     menu.addSeparator()
-               elif item.typestr != "alias":
-                  actionAddItem = menu.addAction("Add '%s'" % item.name)
-                  actionAddItem.triggered.connect(self.makeOnAddOptionalItem(modelIndex))
-                  menu.addSeparator()
+            # View controls
 
             actionResize = menu.addAction("Resize to Contents")
             actionResize.triggered.connect(self.onResizeToContents)
@@ -1996,22 +2057,22 @@ if not NoUI:
          # Forward signal
          self.messageChanged.emit(msg)
 
-      def makeOnAddDictItem(self, index):
+      def makeOnAddDictItem(self, index, value=None):
          def _callback(*args):
             self.setExpanded(index, True)
-            self.addDictItem(index)
+            self.addDictItem(index, value=value)
          return _callback
 
-      def makeOnAddSeqItem(self, index):
+      def makeOnAddSeqItem(self, index, value=None):
          def _callback(*args):
             self.setExpanded(index, True)
-            self.addSeqItem(index)
+            self.addSeqItem(index, value=value)
          return _callback
 
-      def makeOnAddSetItem(self, index):
+      def makeOnAddSetItem(self, index, type_override=None):
          def _callback(*args):
             self.setExpanded(index, True)
-            self.addSetItem(index)
+            self.addSetItem(index, type_override=type_override)
          return _callback
 
       def makeOnAddOptionalItem(self, index):
@@ -2054,14 +2115,14 @@ if not NoUI:
             self.remOptionalItem(index)
          return _callback
 
-      def addDictItem(self, index):
+      def addDictItem(self, index, value=None):
          # Show a dialog with another Editor for just the key type
          item = index.internalPointer()
          dlg = NewValueDialog(item.type.ktype, excludes=item.data, name="%s[...]" % item.name, parent=self)
          def _addDictItem():
             undoData = das.copy(self.model.getData())
             try:
-               item.data[dlg.data] = item.type.vtype.make_default()
+               item.data[dlg.data] = (item.type.vtype.make_default() if value is None else value)
             except Exception, e:
                self.model.setItemErrorMessage(item, "Failed to add key %s\n(%s)" % (dlg.data, e))
             else:
@@ -2072,19 +2133,19 @@ if not NoUI:
          dlg.accepted.connect(_addDictItem)
          dlg.show()
 
-      def addSeqItem(self, index):
+      def addSeqItem(self, index, value=None):
          item = index.internalPointer()
          undoData = das.copy(self.model.getData())
-         item.data.append(item.type.type.make_default())
+         item.data.append(item.type.type.make_default() if value is None else value)
          self.model.pushUndo(undoData)
          self.model.rebuild()
          self.restoreExpandedState()
          self.modelUpdated.emit(self.model)
 
-      def addSetItem(self, index):
+      def addSetItem(self, index, type_override=None):
          # Show a dialog with another Editor for just the value type
          item = index.internalPointer()
-         dlg = NewValueDialog(item.type.type, excludes=item.data, name="%s{...}" % item.name, parent=self)
+         dlg = NewValueDialog(item.type.type if type_override is None else type_override, excludes=item.data, name="%s{...}" % item.name, parent=self)
          def _addSetItem():
             undoData = das.copy(self.model.getData())
             try:
