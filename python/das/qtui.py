@@ -1220,7 +1220,7 @@ if not NoUI:
       def findIndex(self, s, addRoot=False):
          if not s:
             if addRoot:
-               return self._rootItem
+               return self.index(0, 0, QtCore.QModelIndex())
             else:
                return None
          spl = s.split(".")
@@ -1664,7 +1664,7 @@ if not NoUI:
          self.model.dataChanged.connect(self.onContentChanged)
          self.model.messageChanged.connect(self.onMessageChanged)
          self.model.modelAboutToBeReset.connect(self.storeSelection)
-         self.model.modelReset.connect(self.restoreSelection )
+         self.model.modelReset.connect(self.restoreSelection)
          self.collapsed.connect(self.onItemCollapsed)
          self.expanded.connect(self.onItemExpanded)
          index = QtCore.QModelIndex()
