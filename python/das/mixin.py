@@ -165,4 +165,9 @@ def bind(mixins, instance, reset=False, verbose=False):
          cclass = klass
 
    instance.__class__ = klass
+
+   # Call all mixin __init__ function so they can initialize their internal state (if any)
+   for mixin in mixins:
+      mixin.__init__(instance)
+
    return instance

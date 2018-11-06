@@ -24,6 +24,7 @@ class Schema(object):
       self.location = location
       self.module = None
       self.types = {}
+      self.master_types = None
       self.version = None
       self.name = das.read_meta(path).get("name", None)
       if not self.name:
@@ -94,7 +95,8 @@ class Schema(object):
       if content:
          self.version = md.get("version", None)
          if self.version is None:
-            das.print_once("[das] Warning: Schema '%s' defined in %s is unversioned" % (self.name, self.path))
+            if das.__verbose__:
+               das.print_once("[das] Warning: Schema '%s' defined in %s is unversioned" % (self.name, self.path))
 
          das.schematypes.SchemaType.CurrentSchema = self.name
          rv = das.read_string(content, encoding=md.get("encoding", None), **eval_locals)
@@ -106,6 +108,11 @@ class Schema(object):
             else:
                self.types[k] = validator
 
+         mt = md.get("master_types", None)
+         if mt is not None:
+            mt = filter(lambda y: len(y) > 0, map(lambda x: x.strip(), mt.split(",")))
+            self.master_types = set(map(lambda x: "%s.%s" % (self.name, x), mt))
+
          return True
 
       else:
@@ -116,12 +123,18 @@ class Schema(object):
          delattr(das.schema, self.module.__name__.split(".")[-1])
          self.module = None
       self.types = {}
+      self.master_types = None
 
-   def list_types(self, sort=True):
+   def list_types(self, sort=True, masters_only=False):
       rv = self.types.keys()
+      if masters_only and self.master_types is not None:
+         rv = filter(lambda x: x in self.master_types, rv)
       if sort:
          rv.sort()
       return rv
+
+   def is_master_type(self, name):
+      return (self.master_types is None or name in self.master_types)
 
    def has_type(self, name):
       return (name in self.types)
@@ -159,17 +172,14 @@ class SchemaLocation(object):
 
       schema_files = glob.glob(self.path + "/*.schema")
       for schema_file in schema_files:
-         # try:
+         if das.__verbose__:
             print("[das] Load schema file: %s" % schema_file)
-            schema = Schema(self, schema_file, dont_load=True)
-            if SchemaTypesRegistry.instance.has_schema(schema.name):
-               raise Exception("[das] Schema '%s' already registered in another schema")
-            else:
-               if schema.load():
-                  self.schemas[schema.name] = schema
-         # except Exception, e:
-         #    print("[das] Failed to read schemas from '%s' (%s)" % (schema_file, e))
-         #    raise e
+         schema = Schema(self, schema_file, dont_load=True)
+         if SchemaTypesRegistry.instance.has_schema(schema.name):
+            raise Exception("[das] Schema '%s' already registered in another schema")
+         else:
+            if schema.load():
+               self.schemas[schema.name] = schema
 
    def unload_schemas(self):
       for _, schema in self.schemas.iteritems():
@@ -188,12 +198,12 @@ class SchemaLocation(object):
    def get_schema(self, name):
       return self.schemas.get(name, None)
 
-   def list_schema_types(self, schema=None, sort=True):
+   def list_schema_types(self, schema=None, sort=True, masters_only=False):
       rv = set()
       for n, s in self.schemas.iteritems():
          if schema is not None and n != schema:
             continue
-         rv = rv.union(s.list_types(sort=False))
+         rv = rv.union(s.list_types(sort=False, masters_only=masters_only))
       rv = list(rv)
       if sort:
          rv.sort()
@@ -220,6 +230,14 @@ class SchemaLocation(object):
             return rv
       return ""
 
+   def __cmp__(self, oth):
+      p0 = os.path.abspath(self.path)
+      p1 = os.path.abspath(oth.path)
+      if sys.platform == "win32":
+         p0 = p0.replace("\\", "/").lower()
+         p1 = p1.replace("\\", "/").lower()
+      return cmp(p0, p1)
+
    def __hash__(self):
       return hash(self.path)
 
@@ -232,6 +250,7 @@ class SchemaTypesRegistry(object):
       if SchemaTypesRegistry.instance is not None:
          raise Exception("SchemaTypesRegistry must be globally unique")
       self.path = ""
+      self.addedpath = ""
       self.locations = set()
       self.properties = {}
       self.cache = {"name_to_schema": {},
@@ -239,32 +258,88 @@ class SchemaTypesRegistry(object):
                     "type_to_name": {}}
       SchemaTypesRegistry.instance = self
 
-   def load_schemas(self, paths=None):
-      path = (os.pathsep.join(paths) if paths is not None else os.environ.get("DAS_SCHEMA_PATH", ""))
-      if path == self.path:
+   def load_schemas(self, paths=None, incremental=False, force=False):
+      incremental = (paths is not None)
+      if not incremental:
+         path = os.environ.get("DAS_SCHEMA_PATH", "")
+         # Keep in mind paths added incrementally
+         if self.addedpath:
+            if path:
+               path += os.pathsep
+            path += self.addedpath
+      else:
+         path = self.path
+         for p in paths:
+            if not p in path:
+               if path:
+                  path += os.pathsep
+               path += p
+            # Also keep track of added paths
+            if not p in self.addedpath:
+               if self.addedpath:
+                  self.addedpath += os.pathsep
+               self.addedpath += p
+
+      if not force and path == self.path:
          return
 
       self.cache = {"name_to_schema": {},
                     "name_to_type": {},
                     "type_to_name": {}}
 
-      locations = set()
-      for d in path.split(os.pathsep):
-         if not os.path.isdir(d):
-            continue
-         location = SchemaLocation(d, dont_load=True)
-         if not location in locations:
-            locations.add(location)
+      if not incremental:
+         locations = set()
 
-      for location in self.locations:
-         if not location in locations:
-            location.unload_schemas()
+         # Build list of not locations
+         for d in path.split(os.pathsep):
+            if not os.path.isdir(d):
+               continue
+            location = SchemaLocation(d, dont_load=True)
+            if not location in locations:
+               locations.add(location)
 
-      # Load schemas after removing the unncessary ones
-      for location in locations:
-         location.load_schemas()
+         # Unload unwanted locations
+         remove_locations = set()
+         for location in self.locations:
+            if not location in locations:
+               location.unload_schemas()
+               remove_locations.add(location)
 
-      self.locations = locations
+         if force:
+            # Force load all locations and replace existing ones
+            for location in locations:
+               location.load_schemas()
+            self.locations = locations
+         else:
+            # Add new locations...
+            for location in locations:
+               if not location in self.locations:
+                  location.load_schemas()
+                  self.locations.add(location)
+               else:
+                  # Already here and loaded
+                  pass
+            # ... and remove unloaded
+            for location in remove_locations:
+               self.locations.remove(location)
+
+      else:
+         for d in path.split(os.pathsep):
+            if not os.path.isdir(d):
+               continue
+            location = SchemaLocation(d, dont_load=True)
+            if not location in self.locations:
+               location.load_schemas()
+               self.locations.add(location)
+
+         if force:
+            forcelocations = set()
+            for p in paths:
+               forcelocations.add(SchemaLocation(d, dont_load=True))
+            for location in self.locations:
+               if location in forcelocations:
+                  location.load_schemas()
+
       self.path = path
 
       # Create caches
@@ -293,10 +368,18 @@ class SchemaTypesRegistry(object):
          rv.sort()
       return rv
 
+   def _samepath(self, path0, path1):
+      if sys.platform == "win32":
+         np0 = os.path.abspath(path0).replace("\\", "/").lower()
+         np1 = os.path.abspath(path1).replace("\\", "/").lower()
+         return (np0 == np1)
+      else:
+         return os.path.samefile(path0, path1)
+
    def get_location(self, path):
       self.load_schemas()
       for location in self.locations:
-         if os.path.issamefile(path, location.path):
+         if self._samepath(path, location.path):
             return location
       return None
 
@@ -307,14 +390,14 @@ class SchemaTypesRegistry(object):
          rv.sort()
       return rv
 
-   def list_schema_types(self, schema=None, sort=True):
+   def list_schema_types(self, schema=None, sort=True, masters_only=False):
       self.load_schemas()
       if schema is None:
          rv = self.cache["name_to_type"].keys()
       else:
          schema = self.cache["name_to_schema"].get(schema, None)
          if schema:
-            rv = schema.list_types(sort=False)
+            rv = schema.list_types(sort=False, masters_only=masters_only)
          else:
             rv = []
       if sort:

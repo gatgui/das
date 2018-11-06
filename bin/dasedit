@@ -120,6 +120,35 @@ if __name__ == "__main__":
             actionQuit.setShortcut("Ctrl+Q")
             actionQuit.triggered.connect(self.close)
             menuFile = menuBar.addMenu("File")
+            newMenu = menuFile.addMenu("&New")
+            # newMenu.setShortcut("Ctrl+N")
+            for schemaName in sorted(das.list_schemas()):
+               schema = das.get_schema(schemaName)
+               schemaMenu = newMenu.addMenu(schemaName)
+               for typeName in das.list_schema_types(schemaName, masters_only=True):
+                  try:
+                     # Only list the data that have a schema type
+                     das.make_default(typeName)._get_schema_type()
+                     # Put sub types under another menu
+                     act = schemaMenu.addAction(typeName.split(".")[-1])
+                     act.triggered.connect(self._makeNewCallback(typeName))
+                  except:
+                     # Ignore this type
+                     pass
+               subMenu = None
+               for typeName in das.list_schema_types(schemaName, masters_only=False):
+                  try:
+                     # Put sub types under another menu
+                     if not schema.is_master_type(typeName):
+                        # Only list the data that have a schema type
+                        das.make_default(typeName)._get_schema_type()
+                        if subMenu is None:
+                           subMenu = schemaMenu.addMenu("Sub-types")
+                        act = subMenu.addAction(typeName.split(".")[-1])
+                        act.triggered.connect(self._makeNewCallback(typeName))
+                  except:
+                     # Ignore this type
+                     pass
             menuFile.addAction(actionOpen)
             menuFile.addAction(actionSave)
             menuFile.addAction(actionSaveAs)
@@ -184,26 +213,38 @@ if __name__ == "__main__":
             if rv:
                self.path = rv
                self.onSave()
+               self.actionSave.setEnabled(False)
 
          def onAbout(self):
             pass
+
+         def _makeNewCallback(self, typeName):
+            def __callback():
+               self.actionSaveAs.setEnabled(True)
+               data = das.make_default(typeName)
+               self.editWidget.setData(data, name="<%s>" % typeName)
+
+            return __callback
 
          def onMessageChanged(self, msg):
             self.infoLabel.setText(msg)
 
          def onModelUpdated(self, model):
             if not readonly:
-               self.actionSave.setEnabled(model.hasDataChanged())
+               self.actionSaveAs.setEnabled(True)
+               if self.path is not None:
+                  self.actionSave.setEnabled(model.hasDataChanged())
             if verbose and model.hasDataChanged():
                das.pprint(model.getData())
 
 
       style = ""
-      if sys.platform == "darwin":
+      #if sys.platform == "darwin":
+      if Qt.__binding__ in ("PySide2", "PyQt5"):
          # Introduced in Qt5
          style = "fusion"
       else:
-         if darkmode:
+         if darkmode or sys.platform not in ("win32", "darwin"):
             style = "plastique"
       if style:
          if not style in map(lambda x: x.lower(), QtWidgets.QStyleFactory.keys()):
@@ -213,7 +254,7 @@ if __name__ == "__main__":
 
       app = QtWidgets.QApplication([sys.argv[0]])
 
-      if style == "plastique":
+      if style == "plastique" and darkmode:
          # Nuke-like color palette
          palette = app.palette()
    

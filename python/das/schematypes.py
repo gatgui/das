@@ -420,7 +420,8 @@ class Struct(TypeValidator, dict):
       for name in ("default", "description", "editable", "hidden"):
          if name in kwargs:
             removedValues[name] = kwargs[name]
-            das.print_once("[das] '%s' treated as a standard field for Struct type. Use '__%s__' to set schema type's attribute" % (name, name))
+            if das.__verbose__:
+               das.print_once("[das] '%s' treated as a standard field for Struct type. Use '__%s__' to set schema type's attribute" % (name, name))
             del(kwargs[name])
 
       super(Struct, self).__init__(default=None, description=__description__, editable=__editable__, hidden=__hidden__, **kwargs)
@@ -524,14 +525,16 @@ class Struct(TypeValidator, dict):
 class StaticDict(Struct):
    def __init__(self, __description__=None, __editable__=True, __hidden__=False, **kwargs):
       super(StaticDict, self).__init__(__description__=__description__, __editable__=__editable__, __hidden__=__hidden__, **kwargs)
-      das.print_once("[das] Warning: Schema type 'StaticDict' is deprecated, use 'Struct' instead")
+      if das.__verbose__:
+         das.print_once("[das] Warning: Schema type 'StaticDict' is deprecated, use 'Struct' instead")
 
 
 class Dict(TypeValidator):
    def __init__(self, ktype, vtype, __default__=None, __description__=None, __editable__=True, __hidden__=False, **kwargs):
       for name in ("default", "description", "editable", "hidden"):
          if name in kwargs:
-            das.print_once("[das] '%s' treated as a possible key name for Dict type overrides. Use '__%s__' to set schema type's attribute" % (name, name))
+            if das.__verbose__:
+               das.print_once("[das] '%s' treated as a possible key name for Dict type overrides. Use '__%s__' to set schema type's attribute" % (name, name))
       super(Dict, self).__init__(default=({} if __default__ is None else __default__), description=__description__, editable=__editable__, hidden=__hidden__)
       self.ktype = ktype
       self.vtype = vtype
@@ -591,7 +594,8 @@ class Dict(TypeValidator):
 class DynamicDict(Dict):
    def __init__(self, ktype, vtype, __default__=None, __description__=None, __editable__=True, __hidden__=False, **kwargs):
       super(DynamicDict, self).__init__(ktype, vtype, __default__=__default__, __description__=__description__, __editable__=__editable__, __hidden__=__hidden__, **kwargs)
-      das.print_once("[das] Warning: Schema type 'DynamicDict' is deprecated, use 'Dict' instead")
+      if das.__verbose__:
+         das.print_once("[das] Warning: Schema type 'DynamicDict' is deprecated, use 'Dict' instead")
 
 
 class Class(TypeValidator):

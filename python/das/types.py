@@ -256,7 +256,12 @@ class Dict(TypeBase, dict):
       TypeBase.__init__(self)
       dict.__init__(self, *args, **kwargs)
 
+   def _adapt_key(self, key):
+      st = self._get_schema_type()
+      return (key if st is None else das.adapt_value(key, schema_type=st.ktype))
+
    def __setitem__(self, k, v):
+      k = self._adapt_key(k)
       wasset = (k in self)
       oldval = (self[k] if wasset else None)
       super(Dict, self).__setitem__(k, self._adapt_value(v, key=k))
@@ -284,6 +289,7 @@ class Dict(TypeBase, dict):
          a0 = args[0]
          if hasattr(a0, "keys"):
             for k in a0.keys():
+               k = self._adapt_key(k)
                if k in self:
                   oldvals[k] = self[k]
                else:
@@ -291,6 +297,7 @@ class Dict(TypeBase, dict):
                self[k] = self._adapt_value(a0[k], key=k)
          else:
             for k, v in a0:
+               k = self._adapt_key(k)
                if k in self:
                   oldvals[k] = self[k]
                else:
@@ -299,6 +306,7 @@ class Dict(TypeBase, dict):
       elif len(args) > 1:
          raise Exception("update expected at most 1 arguments, got %d" % len(args))
       for k, v in kwargs.iteritems():
+         k = self._adapt_key(k)
          if k in self:
             if not k in oldvals:
                oldvals[k] = self[k]
@@ -315,7 +323,7 @@ class Dict(TypeBase, dict):
          raise e
 
    def __getitem__(self, k):
-      return TypeBase.TransferGlobalValidator(self, super(Dict, self).__getitem__(k))
+      return TypeBase.TransferGlobalValidator(self, super(Dict, self).__getitem__(self._adapt_key(k)))
 
    def itervalues(self):
       for v in super(Dict, self).itervalues():
@@ -509,7 +517,7 @@ class Struct(TypeBase):
 
    def _get_alias(self, k):
       st = self._get_schema_type()
-      if st is not None:
+      if st is not None and st.has_key(k):
          if isinstance(st[k], das.schematypes.Alias):
             return st[k].name
       return k
