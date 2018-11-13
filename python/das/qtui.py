@@ -488,7 +488,8 @@ if not NoUI:
                self.mappingkeys = {}
                self.uniformmapping = False
                i = 0
-               for k in sorted(self.type.keys()):
+               # for k in sorted(self.type.keys()):
+               for k in self.type.ordered_keys():
                   t = self.type[k]
                   optional = isinstance(t, das.schematypes.Optional)
                   self.mappingkeys[k] = optional
