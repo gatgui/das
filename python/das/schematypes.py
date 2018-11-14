@@ -429,7 +429,7 @@ class Struct(TypeValidator, dict):
       if __order__ is not None:
          for n in self.keys():
             if not n in __order__:
-               __order__.append(k)
+               __order__.append(n)
       else:
          __order__ = sorted(self.keys())
       self.__dict__["_order"] = __order__
