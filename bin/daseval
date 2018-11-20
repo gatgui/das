@@ -18,6 +18,9 @@ def usage():
    print("  -dr/--dry-run      : Don't do anything")
    print("  -h/--help          : Show this help")
    print("")
+   print("NOTE")
+   print("  Top-level object is assigned to 'data' variable")
+   print("")
 
 if __name__ == "__main__":
    args = sys.argv[1:]

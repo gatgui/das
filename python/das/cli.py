@@ -141,9 +141,4 @@ def get(data, key):
    return _generic_do(data, key)
 
 def eval(data, expr):
-   ee = "data"
-   if expr.startswith("(") or expr.startswith("["):
-      ee += expr
-   else:
-      ee += "." + expr
-   return _pyeval(ee)
+   return _pyeval(ee, globals(), {"data": data})
