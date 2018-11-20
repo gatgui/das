@@ -141,4 +141,4 @@ def get(data, key):
    return _generic_do(data, key)
 
 def eval(data, expr):
-   return _pyeval(ee, globals(), {"data": data})
+   return _pyeval(expr, globals(), {"data": data})
