@@ -414,7 +414,7 @@ class Tuple(TypeValidator):
 class Struct(TypeValidator, dict):
    UseDefaultForMissingFields = False
 
-   def __init__(self, __description__=None, __editable__=True, __hidden__=False, **kwargs):
+   def __init__(self, __description__=None, __editable__=True, __hidden__=False, __order__=None, **kwargs):
       # MRO: TypeValidator, dict, object
       removedValues = {}
       for name in ("default", "description", "editable", "hidden"):
@@ -425,6 +425,14 @@ class Struct(TypeValidator, dict):
             del(kwargs[name])
 
       super(Struct, self).__init__(default=None, description=__description__, editable=__editable__, hidden=__hidden__, **kwargs)
+
+      if __order__ is not None:
+         for n in self.keys():
+            if not n in __order__:
+               __order__.append(n)
+      else:
+         __order__ = sorted(self.keys())
+      self.__dict__["_order"] = __order__
 
       # As some fields were removed from kwargs to avoid conflict with
       #   TypeValidator class initializer, add them back
@@ -489,6 +497,9 @@ class Struct(TypeValidator, dict):
          self[k] = das.decode(self[k], encoding)
       return self
 
+   def ordered_keys(self):
+      return self.__dict__["_order"]
+
    def make_default(self):
       if not self.default_validated and self.default is None:
          self.default = das.types.Struct()
@@ -523,8 +534,8 @@ class Struct(TypeValidator, dict):
 
 
 class StaticDict(Struct):
-   def __init__(self, __description__=None, __editable__=True, __hidden__=False, **kwargs):
-      super(StaticDict, self).__init__(__description__=__description__, __editable__=__editable__, __hidden__=__hidden__, **kwargs)
+   def __init__(self, __description__=None, __editable__=True, __hidden__=False, __order__=None, **kwargs):
+      super(StaticDict, self).__init__(__description__=__description__, __editable__=__editable__, __hidden__=__hidden__, __order__=__order__, **kwargs)
       if das.__verbose__:
          das.print_once("[das] Warning: Schema type 'StaticDict' is deprecated, use 'Struct' instead")
 
