@@ -253,10 +253,30 @@ class SchemaTypesRegistry(object):
       self.addedpath = ""
       self.locations = set()
       self.properties = {}
+      self.dyntypes = {}
       self.cache = {"name_to_schema": {},
                     "name_to_type": {},
                     "type_to_name": {}}
       SchemaTypesRegistry.instance = self
+
+   def _rebuild_cache(self):
+      nts = {}
+      ntt = {}
+      ttn = {}
+      for location in self.locations:
+         for sname in location.list_schemas():
+            schema = location.get_schema(sname)
+            if not sname in nts:
+               nts[sname] = schema
+            for tname in schema.list_types():
+               ttype = schema.get_type(tname)
+               if not tname in ntt:
+                  ntt[tname] = ttype
+               if not ttype in ttn:
+                  ttn[ttype] = tname
+      self.cache["name_to_schema"] = nts
+      self.cache["name_to_type"] = ntt
+      self.cache["type_to_name"] = ttn
 
    def load_schemas(self, paths=None, incremental=False, force=False):
       incremental = (paths is not None)
@@ -342,24 +362,16 @@ class SchemaTypesRegistry(object):
 
       self.path = path
 
-      # Create caches
-      nts = {}
-      ntt = {}
-      ttn = {}
-      for location in self.locations:
-         for sname in location.list_schemas():
-            schema = location.get_schema(sname)
-            if not sname in nts:
-               nts[sname] = schema
-            for tname in schema.list_types():
-               ttype = schema.get_type(tname)
-               if not tname in ntt:
-                  ntt[tname] = ttype
-               if not ttype in ttn:
-                  ttn[ttype] = tname
-      self.cache["name_to_schema"] = nts
-      self.cache["name_to_type"] = ntt
-      self.cache["type_to_name"] = ttn
+      # re register dynamically added schema types
+      if len(self.dyntypes):
+         for k, v in self.dyntypes.iteritems():
+            try:
+               if not self._add_schema_type(k, v):
+                  print("Failed to re register dynamically added type '%s' (already registered)" % k)
+            except Exception, e:
+               print("Failed to re register dynamically added type '%s' (%s)" % (k, e))
+
+      self._rebuild_cache()
 
    def list_locations(self, sort=True):
       self.load_schemas()
@@ -427,6 +439,25 @@ class SchemaTypesRegistry(object):
    def get_schema_type_name(self, typ):
       self.load_schemas()
       return self.cache["type_to_name"].get(typ, "")
+
+   def _add_schema_type(self, name, typ):
+      if self.has_schema_type(name):
+         return False
+      else:
+         spl = name.split(".")
+         if len(spl) != 2:
+            raise Exception("Invalid schema type name '%s'" % name)
+         schema = self.get_schema(spl[0])
+         schema.types[name] = typ
+         self.dyntypes[name] = typ
+         return True
+
+   def add_schema_type(self, name, typ):
+      if self._add_schema_type(name, typ):
+         self._rebuild_cache()
+         return True
+      else:
+         return False
 
    def set_schema_type_property(self, name, pname, pvalue):
       props = self.properties.get(name, {})
