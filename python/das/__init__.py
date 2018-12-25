@@ -3,7 +3,7 @@ import re
 import sys
 import datetime
 
-__version__ = "0.7.1"
+__version__ = "0.8.0"
 __verbose__ = False
 try:
    __verbose__ = (int(os.environ.get("DAS_VERBOSE", "0")) != 0)
@@ -71,6 +71,10 @@ def get_schema_type(name):
 
 def get_schema_type_name(typ):
    return SchemaTypesRegistry.instance.get_schema_type_name(typ)
+
+
+def add_schema_type(name, typ):
+   return SchemaTypesRegistry.instance.add_schema_type(name, typ)
 
 
 def register_mixins(*mixins):
