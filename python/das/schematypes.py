@@ -427,7 +427,9 @@ class Struct(TypeValidator, dict):
       super(Struct, self).__init__(default=None, description=__description__, editable=__editable__, hidden=__hidden__, **kwargs)
 
       if __order__ is not None:
-         for n in self.keys():
+         keys = self.keys()
+         __order__ = filter(lambda x: x in keys, __order__)
+         for n in keys:
             if not n in __order__:
                __order__.append(n)
       else:
