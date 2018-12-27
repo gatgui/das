@@ -87,7 +87,16 @@ def register_mixins(*mixins):
       lst.append(mixin)
       tmp[st] = lst
    for k, v in tmp.iteritems():
-      SchemaTypesRegistry.instance.set_schema_type_property(k, "mixins", v)
+      mixins = SchemaTypesRegistry.instance.get_schema_type_property(k, "mixins")
+      if mixins is None:
+         mixins = []
+      changed = False
+      for mixin in v:
+         if not mixin in mixins:
+            mixins.append(mixin)
+            changed = True
+      if changed:
+         SchemaTypesRegistry.instance.set_schema_type_property(k, "mixins", mixins)
 
 
 def get_registered_mixins(name):
@@ -160,6 +169,19 @@ def check(d, schema_type):
          schema_type.validate(copy(d))
       else:
          get_schema_type(schema_type).validate(copy(d))
+      return True
+   except:
+      return False
+
+
+def is_compatible(d, schema_type):
+   if not isinstance(schema_type, (basestring, TypeValidator)):
+      raise Exception("Expected a string or a das.schematypes.TypeValidator instance as second argument") 
+   try:
+      if isinstance(schema_type, TypeValidator):
+         schema_type.is_compatible(copy(d))
+      else:
+         get_schema_type(schema_type).is_compatible(copy(d))
       return True
    except:
       return False

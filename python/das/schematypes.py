@@ -24,12 +24,22 @@ class TypeValidator(object):
    def _validate(self, value, key=None, index=None):
       raise ValidationError("'_validate' method is not implemented")
 
+   def _is_compatible(self, value, key=None, index=None):
+      try:
+         self._validate(value, key=key, index=index)
+         return True
+      except:
+         return False
+
    def _decode(self, encoding):
       if self.description is not None:
          self.description = das.decode(self.description, encoding)
       if self.default is not None:
          self.default = das.decode(self.default, encoding)
       return self
+
+   def is_compatible(self, value, key=None, index=None):
+      return self._is_compatible(value, key=key, index=index)
 
    def validate(self, value, key=None, index=None):
       mixins = (None if not das.has_bound_mixins(value) else das.get_bound_mixins(value))
