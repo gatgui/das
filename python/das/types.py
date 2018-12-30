@@ -526,16 +526,22 @@ class Struct(TypeBase):
       if hasattr(self.__class__, k):
          raise ReservedNameError(k)
       elif hasattr(self._dict, k):
-         if "_" + k in self.__dict__:
-            raise ReservedNameError(k)
-         msg = "[das] %s's '%s(...)' method conflicts with data field '%s', use '_%s(...)' to call it instead" % (type(self).__name__, k, k, k)
-         st = self._get_schema_type()
-         if st is not None:
-            n = das.get_schema_type_name(st)
-            if n:
-               msg = "[%s] %s" % (n, msg)
-         das.print_once(msg)
-         self.__dict__["_" + k] = getattr(self._dict, k)
+         k2 = "_" + k
+         if hasattr(self, k2):
+            # don't need to create forwarding attribute (set __getattr__)
+            return
+         if k2 in self.__dict__:
+            if self.__dict__[k2] != getattr(self._dict, k):
+               raise ReservedNameError(k)
+         else:
+            msg = "[das] %s's '%s(...)' method conflicts with data field '%s', use '_%s(...)' to call it instead" % (type(self).__name__, k, k, k)
+            st = self._get_schema_type()
+            if st is not None:
+               n = das.get_schema_type_name(st)
+               if n:
+                  msg = "[%s] %s" % (n, msg)
+            das.print_once(msg)
+            self.__dict__[k2] = getattr(self._dict, k)
 
    def _itervalues(self):
       for v in self._dict.itervalues():
