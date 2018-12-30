@@ -69,12 +69,23 @@ class TypeValidator(object):
 
 
 class Boolean(TypeValidator):
+   TrueExp = re.compile(r"^(1|yes|on|true)$", re.IGNORECASE)
+   FalseExp = re.compile(r"^(0|no|off|false)$", re.IGNORECASE)
+
    def __init__(self, default=None, description=None, editable=True, hidden=False):
       super(Boolean, self).__init__(default=(False if default is None else default), description=description, editable=editable, hidden=hidden)
 
    def _validate_self(self, value):
       if not isinstance(value, bool):
-         raise ValidationError("Expected a boolean value, got %s" % type(value).__name__)
+         if isinstance(value, basestring):
+            if self.TrueExp.match(value):
+               return True
+            elif self.FalseExp.match(value):
+               return False
+            else:
+               raise ValidationError("String as boolean must match either '%s' or '%s'" % (self.TrueExp.pattern[2:-2], self.FalseExp.pattern[2:-2]))
+         else:
+            raise ValidationError("Expected a boolean or string value, got %s" % type(value).__name__)
       return value
 
    def _validate(self, value, key=None, index=None):
