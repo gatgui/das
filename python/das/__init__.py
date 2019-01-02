@@ -76,57 +76,65 @@ def get_schema_type_name(typ):
 def add_schema_type(name, typ):
    return SchemaTypesRegistry.instance.add_schema_type(name, typ)
 
+# These 2 classes are meant to be used in conjonction to make_simple_type
+class one_of(object):
+   def __init__(self, *types):
+      super(one_of, self).__init__()
+      self.types = types
 
-# This class is meant to be used in conjonction to make_simple_type
-class none_or_type(object):
+class none_or(one_of):
    def __init__(self, typ):
-      super(none_or_type, self).__init__()
-      self.type = typ
+      super(none_or, self).__init__(None, typ)
 
 def make_simple_type(typ):
-   if isinstance(typ, none_or_type):
-      return schematypes.Or(schematypes.Empty(), make_simple_type(typ.type))
-   else:
-      if isinstance(typ, dict):
-         n = len(typ)
-         if n == 0:
-            raise Exception("'dict' execpted to have length at least 1")
-         stringkeys = True
-         for k in typ.keys():
-            if not isinstance(k, basestring):
-               stringkeys = False
-               break
-         if stringkeys:
-            t = schematypes.Struct()
-            for k, v in typ.iteritems():
-               t[k] = make_simple_type(v)
-            return t
-         else:
-            if n != 1:
-               raise Exception("'dict' execpted to have length 1 or only string keys")
-            kt, vt = typ.items()[0]
-            return schematypes.Dict(ktype=make_simple_type(kt), vtype=make_simple_type(vt))
-      elif isinstance(typ, list):
-         if len(typ) != 1:
-            raise Exception("'list' execpted to have length 1")
-         return schematypes.Sequence(make_simple_type(typ[0]))
-      elif isinstance(typ, set):
-         if len(typ) != 1:
-            raise Exception("'set' execpted to have length 1")
-         return schematypes.Set(make_simple_type(typ.copy().pop()))
-      elif isinstance(typ, tuple):
-         tpl = map(lambda x: make_simple_type(x), typ)
-         return schematypes.Tuple(*tpl)
-      elif issubclass(typ, basestring):
-         return schematypes.String()
-      elif typ in (int, long):
-         return schematypes.Integer()
-      elif typ in (float,):
-         return schematypes.Real()
-      elif typ in (bool,):
-         return schematypes.Boolean()
+   if typ is None:
+      return schematypes.Empty()
+   elif isinstance(typ, one_of):
+      otypes = map(make_simple_type, typ.types)
+      return schematypes.Or(*otypes)
+   elif isinstance(typ, dict):
+      n = len(typ)
+      if n == 0:
+         raise Exception("'dict' execpted to have length at least 1")
+      stringkeys = True
+      for k in typ.keys():
+         if not isinstance(k, basestring):
+            stringkeys = False
+            break
+      if stringkeys:
+         t = schematypes.Struct()
+         for k, v in typ.iteritems():
+            t[k] = make_simple_type(v)
+         return t
       else:
-         raise Exception("Unsupported simple type '%s'" % typ.__name__)
+         if n != 1:
+            raise Exception("'dict' execpted to have length 1 or only string keys")
+         kt, vt = typ.items()[0]
+         return schematypes.Dict(ktype=make_simple_type(kt), vtype=make_simple_type(vt))
+   elif isinstance(typ, list):
+      if len(typ) != 1:
+         raise Exception("'list' execpted to have length 1")
+      return schematypes.Sequence(make_simple_type(typ[0]))
+   elif isinstance(typ, set):
+      if len(typ) != 1:
+         raise Exception("'set' execpted to have length 1")
+      return schematypes.Set(make_simple_type(typ.copy().pop()))
+   elif isinstance(typ, tuple):
+      tpl = map(lambda x: make_simple_type(x), typ)
+      return schematypes.Tuple(*tpl)
+   # Other accepted values are only class
+   if not type(typ) is type:
+      raise Exception("'%s' is not a type" % typ)
+   elif issubclass(typ, basestring):
+      return schematypes.String()
+   elif typ in (int, long):
+      return schematypes.Integer()
+   elif typ in (float,):
+      return schematypes.Real()
+   elif typ in (bool,):
+      return schematypes.Boolean()
+   else:
+      raise Exception("Unsupported simple type '%s'" % typ.__name__)
 
 
 def register_mixins(*mixins):
