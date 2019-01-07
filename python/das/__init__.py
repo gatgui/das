@@ -76,7 +76,7 @@ def get_schema_type_name(typ):
 def add_schema_type(name, typ):
    return SchemaTypesRegistry.instance.add_schema_type(name, typ)
 
-# These 2 classes are meant to be used in conjonction to make_simple_type
+# These 2 classes are meant to be used in conjonction to define_inline_type
 class one_of(object):
    def __init__(self, *types):
       super(one_of, self).__init__()
@@ -86,11 +86,11 @@ class none_or(one_of):
    def __init__(self, typ):
       super(none_or, self).__init__(None, typ)
 
-def make_simple_type(typ):
+def define_inline_type(typ):
    if typ is None:
       return schematypes.Empty()
    elif isinstance(typ, one_of):
-      otypes = map(make_simple_type, typ.types)
+      otypes = map(define_inline_type, typ.types)
       return schematypes.Or(*otypes)
    elif isinstance(typ, dict):
       n = len(typ)
@@ -104,23 +104,23 @@ def make_simple_type(typ):
       if stringkeys:
          t = schematypes.Struct()
          for k, v in typ.iteritems():
-            t[k] = make_simple_type(v)
+            t[k] = define_inline_type(v)
          return t
       else:
          if n != 1:
             raise Exception("'dict' execpted to have length 1 or only string keys")
          kt, vt = typ.items()[0]
-         return schematypes.Dict(ktype=make_simple_type(kt), vtype=make_simple_type(vt))
+         return schematypes.Dict(ktype=define_inline_type(kt), vtype=define_inline_type(vt))
    elif isinstance(typ, list):
       if len(typ) != 1:
          raise Exception("'list' execpted to have length 1")
-      return schematypes.Sequence(make_simple_type(typ[0]))
+      return schematypes.Sequence(define_inline_type(typ[0]))
    elif isinstance(typ, set):
       if len(typ) != 1:
          raise Exception("'set' execpted to have length 1")
-      return schematypes.Set(make_simple_type(typ.copy().pop()))
+      return schematypes.Set(define_inline_type(typ.copy().pop()))
    elif isinstance(typ, tuple):
-      tpl = map(lambda x: make_simple_type(x), typ)
+      tpl = map(lambda x: define_inline_type(x), typ)
       return schematypes.Tuple(*tpl)
    # Other accepted values are only class
    if not type(typ) is type:
