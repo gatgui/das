@@ -3,7 +3,7 @@ import re
 import sys
 import datetime
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 __verbose__ = False
 try:
    __verbose__ = (int(os.environ.get("DAS_VERBOSE", "0")) != 0)
