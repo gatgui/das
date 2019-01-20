@@ -3,7 +3,7 @@ import re
 import sys
 import datetime
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 __verbose__ = False
 try:
    __verbose__ = (int(os.environ.get("DAS_VERBOSE", "0")) != 0)
@@ -75,6 +75,66 @@ def get_schema_type_name(typ):
 
 def add_schema_type(name, typ):
    return SchemaTypesRegistry.instance.add_schema_type(name, typ)
+
+# These 2 classes are meant to be used in conjonction to define_inline_type
+class one_of(object):
+   def __init__(self, *types):
+      super(one_of, self).__init__()
+      self.types = types
+
+class none_or(one_of):
+   def __init__(self, typ):
+      super(none_or, self).__init__(None, typ)
+
+def define_inline_type(typ):
+   if typ is None:
+      return schematypes.Empty()
+   elif isinstance(typ, one_of):
+      otypes = map(define_inline_type, typ.types)
+      return schematypes.Or(*otypes)
+   elif isinstance(typ, dict):
+      n = len(typ)
+      if n == 0:
+         raise Exception("'dict' execpted to have length at least 1")
+      stringkeys = True
+      for k in typ.keys():
+         if not isinstance(k, basestring):
+            stringkeys = False
+            break
+      if stringkeys:
+         t = schematypes.Struct()
+         for k, v in typ.iteritems():
+            t[k] = define_inline_type(v)
+         return t
+      else:
+         if n != 1:
+            raise Exception("'dict' execpted to have length 1 or only string keys")
+         kt, vt = typ.items()[0]
+         return schematypes.Dict(ktype=define_inline_type(kt), vtype=define_inline_type(vt))
+   elif isinstance(typ, list):
+      if len(typ) != 1:
+         raise Exception("'list' execpted to have length 1")
+      return schematypes.Sequence(define_inline_type(typ[0]))
+   elif isinstance(typ, set):
+      if len(typ) != 1:
+         raise Exception("'set' execpted to have length 1")
+      return schematypes.Set(define_inline_type(typ.copy().pop()))
+   elif isinstance(typ, tuple):
+      tpl = map(lambda x: define_inline_type(x), typ)
+      return schematypes.Tuple(*tpl)
+   # Other accepted values are only class
+   if not type(typ) is type:
+      raise Exception("'%s' is not a type" % typ)
+   elif issubclass(typ, basestring):
+      return schematypes.String()
+   elif typ in (int, long):
+      return schematypes.Integer()
+   elif typ in (float,):
+      return schematypes.Real()
+   elif typ in (bool,):
+      return schematypes.Boolean()
+   else:
+      raise Exception("Unsupported simple type '%s'" % typ.__name__)
 
 
 def register_mixins(*mixins):
@@ -425,8 +485,11 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
       stream.write("{\n")
       n = len(d)
       i = 0
-      keys = [k for k in d]
-      keys.sort()
+      try:
+         keys = d.ordered_keys()
+      except:
+         keys = [k for k in d]
+         keys.sort()
       for k in keys:
          # We assume string keys are 'ascii'
          if isinstance(k, unicode):
