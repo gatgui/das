@@ -485,8 +485,11 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
       stream.write("{\n")
       n = len(d)
       i = 0
-      keys = [k for k in d]
-      keys.sort()
+      try:
+         keys = d.ordered_keys()
+      except:
+         keys = [k for k in d]
+         keys.sort()
       for k in keys:
          # We assume string keys are 'ascii'
          if isinstance(k, unicode):

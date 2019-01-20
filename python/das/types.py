@@ -543,6 +543,9 @@ class Struct(TypeBase):
             das.print_once(msg)
             self.__dict__[k2] = getattr(self._dict, k)
 
+   def ordered_keys(self):
+      return filter(lambda x: x in self, self._get_schema_type().ordered_keys())
+
    def _itervalues(self):
       for v in self._dict.itervalues():
          yield TypeBase.TransferGlobalValidator(self, v)
