@@ -434,7 +434,9 @@ def read(path, schema_type=None, ignore_meta=False, strict_schema=None, **funcs)
 
 
 def copy(d, deep=True):
-   if isinstance(d, list):
+   if isinstance(d, TypeValidator):
+      return d.copy()
+   elif isinstance(d, list):
       if deep:
          rv = d.__class__([copy(x, deep=True) for x in d])
       else:
@@ -485,13 +487,18 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
       stream.write("{\n")
       n = len(d)
       i = 0
+      _keys = [k for k in d]
       try:
          keys = d.ordered_keys()
          # Just in case we get empty key list, make sure we have something
          if not keys:
             keys = [k for k in d]
+         else:
+            ekeys = list(set(_keys).difference(keys))
+            ekeys.sort()
+            keys += ekeys
       except:
-         keys = [k for k in d]
+         keys = _keys
          keys.sort()
       for k in keys:
          # We assume string keys are 'ascii'
