@@ -64,6 +64,9 @@ class TypeValidator(object):
    def make(self, *args, **kwargs):
       return self._validate(args[0])
 
+   def copy(self):
+      return TypeValidator(default=self.default, description=self.description, editable=self.editable, hidden=self.hidden)
+
    def __str__(self):
       return self.__repr__()
 
@@ -100,6 +103,9 @@ class Boolean(TypeValidator):
       if self.description:
          s += "%sdescription=%s" % (sep, repr(self.description))
       return s + ")"
+
+   def copy(self):
+      return Boolean(default=self.default, description=self.description, editable=self.editable, hidden=self.hidden)
 
 
 class Integer(TypeValidator):
@@ -163,6 +169,9 @@ class Integer(TypeValidator):
          s += "%sdescription=%s" % (sep, repr(self.description))
       return s + ")"
 
+   def copy(self):
+      return Integer(default=self.default, min=self.min, max=self.max, enum=self.enum, description=self.description, editable=self.editable, hidden=self.hidden)
+
 
 class Real(TypeValidator):
    def __init__(self, default=None, min=None, max=None, description=None, editable=True, hidden=False):
@@ -197,6 +206,10 @@ class Real(TypeValidator):
       if self.description:
          s += "%sdescription=%s" % (sep, repr(self.description))
       return s + ")"
+
+   def copy(self):
+      return Real(default=self.default, min=self.min, max=self.max, description=self.description, editable=self.editable, hidden=self.hidden)
+
 
 
 class String(TypeValidator):
@@ -268,6 +281,9 @@ class String(TypeValidator):
          s += "%sdescription=%s" % (sep, repr(self.description))
       return s + ")"
 
+   def copy(self):
+      return String(default=self.default, choices=self.choices, matches=self.matches, strict=self.strict, description=self.description, editable=self.editable, hidden=self.hidden)
+
 
 class Set(TypeValidator):
    def __init__(self, type, default=None, description=None, editable=True, hidden=False):
@@ -311,6 +327,9 @@ class Set(TypeValidator):
       if self.description:
          s += ", description=%s" % repr(self.description)
       return s + ")"
+
+   def copy(self):
+      return Set(self.type.copy(), default=self.default, description=self.description, editable=self.editable, hidden=self.hidden)
 
 
 class Sequence(TypeValidator):
@@ -375,6 +394,9 @@ class Sequence(TypeValidator):
          s += "%sdescription=%s" % (sep, repr(self.description))
       return s + ")"
 
+   def copy(self):
+      return Sequence(self.type.copy(), default=self.default, size=self.size, min_size=self.min_size, max_size=self.max_size, description=self.description, editable=self.editable, hidden=self.hidden)
+
 
 class Tuple(TypeValidator):
    def __init__(self, *args, **kwargs):
@@ -430,6 +452,14 @@ class Tuple(TypeValidator):
       if self.description:
          s += "%sdescription=%s" % (sep, repr(self.description))
       return s + ")"
+
+   def copy(self):
+      args = [t.copy() for t in self.types]
+      kwargs = {"default": self.default,
+                "description": self.description,
+                "editable": self.editable,
+                "hidden": self.hidden}
+      return Tuple(*args, **kwargs)
 
 
 class Struct(TypeValidator, dict):
@@ -555,6 +585,13 @@ class Struct(TypeValidator, dict):
          s += "%s__description__=%s" % (sep, repr(self.description))
       return s + ")"
 
+   def copy(self):
+      kwargs = {}
+      for k, v in self.iteritems():
+         kwargs[k] = v.copy()
+      return Struct(__description__=self.description, __editable__=self.editable,
+                    __hidden__=self.hidden, __order__=self.__dict__["_order"], **kwargs)
+
 
 class StaticDict(Struct):
    def __init__(self, __description__=None, __editable__=True, __hidden__=False, __order__=None, **kwargs):
@@ -624,6 +661,14 @@ class Dict(TypeValidator):
          s += ", __description__=%s" % repr(self.description)
       return s + ")"
 
+   def copy(self):
+      kwargs = {}
+      for k, v in self.vtypeOverrides.iteritems():
+         kwargs[k] = v.copy()
+      return Dict(self.ktype.copy(), self.vtype.copy(),
+                  __default__=self.default, __description__=self.description, __editable__=self.editable,
+                  __hidden__=self.hidden, **kwargs)
+
 
 class DynamicDict(Dict):
    def __init__(self, ktype, vtype, __default__=None, __description__=None, __editable__=True, __hidden__=False, **kwargs):
@@ -692,6 +737,9 @@ class Class(TypeValidator):
       s += ")"
       return s
 
+   def copy(self):
+      return Class(self.klass, default=self.default, description=self.description, editable=self.editable, hidden=self.hidden)
+
 
 class Or(TypeValidator):
    def __init__(self, *types, **kwargs):
@@ -739,6 +787,14 @@ class Or(TypeValidator):
          s += ", description=%s" % repr(self.description)
       return s + ")"
 
+   def copy(self):
+      types = [t.copy() for t in self.types]
+      kwargs = {"default": self.default,
+                "description": self.description,
+                "editable": self.editable,
+                "hidden": self.hidden}
+      return Or(*types, **kwargs)
+
 
 class Optional(TypeValidator):
    def __init__(self, type, description=None, editable=True, hidden=False):
@@ -764,6 +820,9 @@ class Optional(TypeValidator):
 
    def __repr__(self):
       return "Optional(type=%s)" % self.type
+
+   def copy(self):
+      return Optional(self.type.copy(), description=self.description, editable=self.editable, hidden=self.hidden)
 
 
 class Deprecated(Optional):
@@ -794,6 +853,9 @@ class Deprecated(Optional):
    def __repr__(self):
       return "Deprecated(type=%s)" % self.type
 
+   def copy(self):
+      return Deprecated(self.type.copy(), message=self.message, description=self.description, editable=self.editable, hidden=self.hidden)
+
 
 class Empty(TypeValidator):
    def __init__(self, description=None, editable=True, hidden=False):
@@ -813,6 +875,9 @@ class Empty(TypeValidator):
    def __repr__(self):
       return "Empty()"
 
+   def copy(self):
+      return Empty(description=self.description, editable=self.editable, hidden=self.hidden)
+
 
 class Alias(TypeValidator):
    def __init__(self, name, description=None, editable=True, hidden=False):
@@ -830,6 +895,9 @@ class Alias(TypeValidator):
 
    def __repr__(self):
       return "Alias(%s)" % repr(self.name)
+
+   def copy(self):
+      return Alias(self.name, description=self.description, editable=self.editable, hidden=self.hidden)
 
 
 class SchemaType(TypeValidator):
@@ -865,3 +933,6 @@ class SchemaType(TypeValidator):
       if self.default is not None:
          s += ", default=%s" % str(self.default)
       return s + ")"
+
+   def copy(self):
+      return SchemaType(self.name, default=self.default, description=self.description, editable=self.editable)

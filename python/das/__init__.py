@@ -487,6 +487,9 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
       i = 0
       try:
          keys = d.ordered_keys()
+         # Just in case we get empty key list, make sure we have something
+         if not keys:
+            keys = [k for k in d]
       except:
          keys = [k for k in d]
          keys.sort()
