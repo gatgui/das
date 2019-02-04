@@ -463,7 +463,7 @@ class Tuple(TypeValidator):
 
 
 class Struct(TypeValidator, dict):
-   UseDefaultForMissingFields = False
+   CompatibilityMode = False
 
    def __init__(self, __description__=None, __editable__=True, __hidden__=False, __order__=None, **kwargs):
       # MRO: TypeValidator, dict, object
@@ -503,13 +503,13 @@ class Struct(TypeValidator, dict):
             continue
          if not k in value and not isinstance(v, Optional):
             allfound = False
-            if self.UseDefaultForMissingFields:
+            if self.CompatibilityMode:
                # das.print_once("[das] Use default value for field '%s'" % k)
                value[k] = v.make_default()
             else:
                raise ValidationError("Missing key '%s'" % k)
-      # Ignore new keys only if all base keys are fullfilled (forward compatibility)
-      if not allfound:
+      # Ignore new keys only in compatibility mode if all base keys are fullfilled (forward compatibility)
+      if not self.CompatibilityMode or not allfound:
          for k, _ in value.iteritems():
             if not k in self:
                raise ValidationError("Unknown key '%s'" % k)
@@ -756,6 +756,15 @@ class Or(TypeValidator):
       self.types = types
 
    def _validate_self(self, value):
+      # even in compat mode, look for an exact match first
+      if Struct.CompatibilityMode:
+         Struct.CompatibilityMode = False
+         for typ in self.types:
+            try:
+               return typ._validate_self(value)
+            except ValidationError, e:
+               continue
+         Struct.CompatibilityMode = True
       for typ in self.types:
          try:
             return typ._validate_self(value)
@@ -765,6 +774,14 @@ class Or(TypeValidator):
       return None
 
    def _validate(self, value, key=None, index=None):
+      if Struct.CompatibilityMode:
+         Struct.CompatibilityMode = False
+         for typ in self.types:
+            try:
+               return typ.validate(value, key=key, index=index)
+            except ValidationError, e:
+               continue
+         Struct.CompatibilityMode = True
       for typ in self.types:
          try:
             return typ.validate(value, key=key, index=index)

@@ -359,10 +359,10 @@ def read_string(s, schema_type=None, encoding=None, strict_schema=True, **funcs)
       return rv
    else:
       try:
-         schematypes.Struct.UseDefaultForMissingFields = (True if not strict_schema else False)
+         schematypes.Struct.CompatibilityMode = (True if not strict_schema else False)
          return sch.validate(rv)
       finally:
-         schematypes.Struct.UseDefaultForMissingFields = False
+         schematypes.Struct.CompatibilityMode = False
 
 
 # returns: -2 if version check could not be performed
@@ -421,6 +421,8 @@ def read(path, schema_type=None, ignore_meta=False, strict_schema=None, **funcs)
                elif compat == 0:
                   if __verbose__:
                      print_once("[das] Warning: '%s' data was saved using a newer version of the schema, you may loose information in the process" % schema_type)
+                  if strict_schema is None:
+                     strict_schema = False
 
    encoding = md.get("encoding", None)
    if encoding is None:
