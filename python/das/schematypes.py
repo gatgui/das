@@ -477,14 +477,14 @@ class Struct(TypeValidator, dict):
 
       super(Struct, self).__init__(default=None, description=__description__, editable=__editable__, hidden=__hidden__, **kwargs)
 
+      keys = [k for k, v in self.items() if not isinstance(v, Alias)]
       if __order__ is not None:
-         keys = self.keys()
          __order__ = filter(lambda x: x in keys, __order__)
          for n in keys:
             if not n in __order__:
                __order__.append(n)
       else:
-         __order__ = sorted(self.keys())
+         __order__ = sorted(keys)
       self.__dict__["_order"] = __order__
 
       # As some fields were removed from kwargs to avoid conflict with
@@ -496,16 +496,23 @@ class Struct(TypeValidator, dict):
    def _validate_self(self, value):
       if not isinstance(value, (dict, das.types.Struct)):
          raise ValidationError("Expected a dict value, got %s" % type(value).__name__)
+      allfound = True
       for k, v in self.iteritems():
          # Don't check aliases
          if isinstance(v, Alias):
             continue
          if not k in value and not isinstance(v, Optional):
+            allfound = False
             if self.UseDefaultForMissingFields:
                # das.print_once("[das] Use default value for field '%s'" % k)
                value[k] = v.make_default()
             else:
                raise ValidationError("Missing key '%s'" % k)
+      # Ignore new keys only if all base keys are fullfilled (forward compatibility)
+      if not allfound:
+         for k, _ in value.iteritems():
+            if not k in self:
+               raise ValidationError("Unknown key '%s'" % k)
       return value
 
    def _validate(self, value, key=None, index=None):
