@@ -1,0 +1,8 @@
+# schema_type: compatibility.SomeType
+# schema_version: 1.2
+# version: 0.5.0
+{
+   "field2": "hello",
+   "field3": -1,
+   "field4": False
+}

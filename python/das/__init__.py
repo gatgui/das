@@ -3,7 +3,7 @@ import re
 import sys
 import datetime
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"
 __verbose__ = False
 try:
    __verbose__ = (int(os.environ.get("DAS_VERBOSE", "0")) != 0)
@@ -359,10 +359,10 @@ def read_string(s, schema_type=None, encoding=None, strict_schema=True, **funcs)
       return rv
    else:
       try:
-         schematypes.Struct.UseDefaultForMissingFields = (True if not strict_schema else False)
+         schematypes.Struct.CompatibilityMode = (True if not strict_schema else False)
          return sch.validate(rv)
       finally:
-         schematypes.Struct.UseDefaultForMissingFields = False
+         schematypes.Struct.CompatibilityMode = False
 
 
 # returns: -2 if version check could not be performed
@@ -421,6 +421,8 @@ def read(path, schema_type=None, ignore_meta=False, strict_schema=None, **funcs)
                elif compat == 0:
                   if __verbose__:
                      print_once("[das] Warning: '%s' data was saved using a newer version of the schema, you may loose information in the process" % schema_type)
+                  if strict_schema is None:
+                     strict_schema = False
 
    encoding = md.get("encoding", None)
    if encoding is None:
@@ -434,7 +436,9 @@ def read(path, schema_type=None, ignore_meta=False, strict_schema=None, **funcs)
 
 
 def copy(d, deep=True):
-   if isinstance(d, list):
+   if isinstance(d, TypeValidator):
+      return d.copy()
+   elif isinstance(d, list):
       if deep:
          rv = d.__class__([copy(x, deep=True) for x in d])
       else:
@@ -485,10 +489,18 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
       stream.write("{\n")
       n = len(d)
       i = 0
+      _keys = [k for k in d]
       try:
          keys = d.ordered_keys()
+         # Just in case we get empty key list, make sure we have something
+         if not keys:
+            keys = [k for k in d]
+         else:
+            ekeys = list(set(_keys).difference(keys))
+            ekeys.sort()
+            keys += ekeys
       except:
-         keys = [k for k in d]
+         keys = _keys
          keys.sort()
       for k in keys:
          # We assume string keys are 'ascii'

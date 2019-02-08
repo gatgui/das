@@ -18,6 +18,7 @@ class TestCase(unittest.TestCase):
       cls.TooNew = cls.TestDir + "/toonew.compat"
       cls.Older = cls.TestDir + "/older.compat"
       cls.Newer = cls.TestDir + "/newer.compat"
+      cls.Newer2 = cls.TestDir + "/newer2.compat"
       cls.OutputFile = cls.TestDir + "/out.compat"
       cls.NoInf = cls.TestDir + "/noinf.compat"
       os.environ["DAS_SCHEMA_PATH"] = cls.TestDir
@@ -50,6 +51,10 @@ class TestCase(unittest.TestCase):
       das.write(r, self.OutputFile)
       self.assertEqual(das.read(self.Newer), das.read(self.OutputFile))
       self.assertNotEqual(das.read(self.Newer, schema_type=None, ignore_meta=True), das.read(self.OutputFile, schema_type=None, ignore_meta=True))
+
+   def testNewer2(self):
+      with self.assertRaises(das.ValidationError):
+         das.read(self.Newer2, strict_schema=False)
 
    def testTooNew(self):
       with self.assertRaises(das.VersionError):
