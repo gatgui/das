@@ -758,13 +758,17 @@ class Or(TypeValidator):
    def _validate_self(self, value):
       # even in compat mode, look for an exact match first
       if Struct.CompatibilityMode:
+         rv = None
          Struct.CompatibilityMode = False
          for typ in self.types:
             try:
-               return typ._validate_self(value)
+               rv = typ._validate_self(value)
+               break
             except ValidationError, e:
                continue
          Struct.CompatibilityMode = True
+         if rv is not None:
+            return rv
       for typ in self.types:
          try:
             return typ._validate_self(value)
@@ -775,13 +779,17 @@ class Or(TypeValidator):
 
    def _validate(self, value, key=None, index=None):
       if Struct.CompatibilityMode:
+         rv = None
          Struct.CompatibilityMode = False
          for typ in self.types:
             try:
-               return typ.validate(value, key=key, index=index)
+               rv = typ.validate(value, key=key, index=index)
+               break
             except ValidationError, e:
                continue
          Struct.CompatibilityMode = True
+         if rv is not None:
+            return rv
       for typ in self.types:
          try:
             return typ.validate(value, key=key, index=index)
