@@ -3,7 +3,7 @@ import re
 import sys
 import datetime
 
-__version__ = "0.9.1"
+__version__ = "0.9.2"
 __verbose__ = False
 try:
    __verbose__ = (int(os.environ.get("DAS_VERBOSE", "0")) != 0)
@@ -553,7 +553,20 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
    elif isinstance(d, str):
       try:
          d.decode("ascii")
-         stream.write("'%s'" % d)
+         # properly deal with multiline characters
+         # using repr here would solve the problem too but lead to less readable files
+         # -> line1\\nline1 -> eval -> line1\nline2
+         lines = d.split("\n")
+         nlines = len(lines)
+         if nlines > 1:
+            stream.write("'''")
+            for i in xrange(nlines):
+               stream.write(line)
+               if i + 1 < nlines:
+                  stream.write("\n")
+            stream.write("'''")
+         else:
+            stream.write("'%s'" % d)
       except Exception, e:
          if not encoding:
             raise Exception("Non-ascii string value found but no encoding provided (%s)." % e)
@@ -565,7 +578,18 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
    elif isinstance(d, unicode):
       try:
          s = d.encode("ascii")
-         stream.write("'%s'" % s)
+         # see comment above
+         lines = s.split("\n")
+         nlines = len(lines)
+         if nlines > 1:
+            stream.write("'''")
+            for i in xrange(nlines):
+               stream.write(line)
+               if i + 1 < nlines:
+                  stream.write("\n")
+            stream.write("'''")
+         else:
+            stream.write("'%s'" % s)
       except:
          stream.write(repr(d))
 
