@@ -1,0 +1,6 @@
+# encoding: utf8
+# version: 1.0
+# das_minimum_version: 0.9.2
+{
+   "MyStruct": Struct(comment=String())
+}

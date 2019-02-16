@@ -1,0 +1,7 @@
+# schema_type: testlooseread.MyStruct
+# schema_version: 1.0
+# version: 0.9.1
+{
+   "field0": {"value0": 1, "value1": 2},
+   "field1": {"value0": 4}
+}
