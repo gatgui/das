@@ -553,6 +553,14 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
    elif isinstance(d, str):
       try:
          d.decode("ascii")
+      except Exception, e:
+         if not encoding:
+            raise Exception("Non-ascii string value found but no encoding provided (%s)." % e)
+         try:
+            stream.write(repr(d.decode(encoding)))
+         except Exception, e:
+            raise Exception("Non-ascii string value cannot be decoded to '%s' (%s)." % (encoding, e))
+      else:
          # properly deal with multiline characters
          # using repr here would solve the problem too but lead to less readable files
          # -> line1\\nline1 -> eval -> line1\nline2
@@ -561,37 +569,31 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
          if nlines > 1:
             stream.write("'''")
             for i in xrange(nlines):
-               stream.write(line)
+               stream.write(lines[i])
                if i + 1 < nlines:
                   stream.write("\n")
             stream.write("'''")
          else:
             stream.write("'%s'" % d)
-      except Exception, e:
-         if not encoding:
-            raise Exception("Non-ascii string value found but no encoding provided (%s)." % e)
-         try:
-            stream.write(repr(d.decode(encoding)))
-         except Exception, e:
-            raise Exception("Non-ascii string value cannot be decoded to '%s' (%s)." % (encoding, e))
 
    elif isinstance(d, unicode):
       try:
          s = d.encode("ascii")
+      except:
+         stream.write(repr(d))
+      else:
          # see comment above
          lines = s.split("\n")
          nlines = len(lines)
          if nlines > 1:
             stream.write("'''")
             for i in xrange(nlines):
-               stream.write(line)
+               stream.write(lines[i])
                if i + 1 < nlines:
                   stream.write("\n")
             stream.write("'''")
          else:
             stream.write("'%s'" % s)
-      except:
-         stream.write(repr(d))
 
    else:
       # stream.write(str(d))
