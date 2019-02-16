@@ -1,0 +1,13 @@
+# encoding: utf8
+# version: 1.1
+# das_minimum_version: 0.5.0
+{
+   "MyStruct": Struct(field0=Or(Struct(value0=Integer(),
+                                       value1=Integer()),
+                                Integer(),
+                                String()),
+                      field1=Struct(value0=Integer(),
+                                    value1=Integer(),
+                                    __order__=["value0", "value1"]),
+                      __order__=["field0", "field1"])
+}
