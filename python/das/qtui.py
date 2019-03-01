@@ -738,7 +738,7 @@ if not NoUI:
          def textChanged(txt):
             # Convert text to a python value
             try:
-               val = eval(txt)
+               val = eval(txt, {}, {})
             except:
                val = txt
             # Create a new key
@@ -957,7 +957,7 @@ if not NoUI:
 
       def setMappingKeyModelData(self, widget, model, modelIndex):
          try:
-            key = eval(widget.text())
+            key = eval(widget.text(), {}, {})
          except:
             key = widget.text()
          item = modelIndex.internalPointer()
