@@ -574,7 +574,8 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
                   stream.write("\n")
             stream.write("'''")
          else:
-            stream.write("'%s'" % d)
+            # stream.write("'%s'" % d)
+            stream.write(repr(d))
 
    elif isinstance(d, unicode):
       try:
@@ -593,7 +594,8 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
                   stream.write("\n")
             stream.write("'''")
          else:
-            stream.write("'%s'" % s)
+            # stream.write("'%s'" % s)
+            stream.write(repr(s))
 
    else:
       # stream.write(str(d))
