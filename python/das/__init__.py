@@ -3,7 +3,7 @@ import re
 import sys
 import datetime
 
-__version__ = "0.9.3"
+__version__ = "0.9.4"
 __verbose__ = False
 try:
    __verbose__ = (int(os.environ.get("DAS_VERBOSE", "0")) != 0)
@@ -102,9 +102,8 @@ def define_inline_type(typ):
             stringkeys = False
             break
       if stringkeys:
-         t = schematypes.Struct()
-         for k, v in typ.iteritems():
-            t[k] = define_inline_type(v)
+         items = dict(map(lambda x: (x[0], define_inline_type(x[1])), typ.items()))
+         t = schematypes.Struct(**items)
          return t
       else:
          if n != 1:
