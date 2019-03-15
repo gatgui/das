@@ -79,12 +79,12 @@ if not NoUI:
       def matches(self, fullname):
          if self.partial:
             rv = True
-            for item in self.allowed:
+            for item in self.values:
                if item in fullname:
                   rv = False
                   break
          else:
-            rv = (fullname in self.allowed)
+            rv = (fullname in self.values)
          return ((not rv) if self.invert else rv)
 
    class FilterSet(FieldFilter):
