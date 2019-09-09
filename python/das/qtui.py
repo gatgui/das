@@ -270,7 +270,7 @@ if not NoUI:
                      return False
             elif isinstance(rt, das.schematypes.Class):
                return (hasattr(rt.klass, "string_to_value") and hasattr(rt.klass, "value_to_string"))
-            elif isinstance(rt, das.schematypes.Alias):
+            elif das.schematypes.Alias.Check(rt)::
                return False
             return True
 
@@ -378,7 +378,7 @@ if not NoUI:
 
          self.baseType = self.type
 
-         if isinstance(self.type, das.schematypes.Alias):
+         if das.schematypes.Alias.Check(self.type):
             # Shortcut
             self.typestr = "alias"
             self.data = None
@@ -439,7 +439,7 @@ if not NoUI:
                   self.typestr = "empty"
                elif isinstance(self.type, das.schematypes.Class):
                   self.typestr = self.class_name(self.type.klass)
-               elif isinstance(self.type, das.schematypes.Alias):
+               elif das.schematypes.Alias.Check(self.type):
                   self.typestr = "alias"
 
          if self.compound:
@@ -496,7 +496,7 @@ if not NoUI:
                   if optional:
                      self.resizable = True
                   if self.exists() and (showHidden or not t.hidden):
-                     if isinstance(t, das.schematypes.Alias):
+                     if das.schematypes.Alias.Check(t):
                         if hideAliases:
                            continue
                         v = None
@@ -1786,8 +1786,8 @@ if not NoUI:
                      return type_str(t.types[0])
                   elif isinstance(t, das.schematypes.Optional):
                      return type_str(t.type)
-                  elif isinstance(t, das.schematypes.Alias):
-                     return "alias '%s'" % t.name
+                  elif das.schematypes.Alias.Check(t)::
+                     return "alias '%s'" % das.schematypes.Alias.Name(t)
                   elif isinstance(t, das.schematypes.Set):
                      return "set {%s}" % type_str(t.type)
                   elif isinstance(t, das.schematypes.Sequence):

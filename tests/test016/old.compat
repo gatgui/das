@@ -1,0 +1,6 @@
+# schema_type: compatibility.SomeType
+# schema_version: 1.0
+# version: 0.9.4
+{
+   "oldField": ["hello", "world"]
+}
