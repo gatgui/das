@@ -270,7 +270,7 @@ if not NoUI:
                      return False
             elif isinstance(rt, das.schematypes.Class):
                return (hasattr(rt.klass, "string_to_value") and hasattr(rt.klass, "value_to_string"))
-            elif das.schematypes.Alias.Check(rt)::
+            elif das.schematypes.Alias.Check(rt):
                return False
             return True
 
@@ -1786,7 +1786,7 @@ if not NoUI:
                      return type_str(t.types[0])
                   elif isinstance(t, das.schematypes.Optional):
                      return type_str(t.type)
-                  elif das.schematypes.Alias.Check(t)::
+                  elif das.schematypes.Alias.Check(t):
                      return "alias '%s'" % das.schematypes.Alias.Name(t)
                   elif isinstance(t, das.schematypes.Set):
                      return "set {%s}" % type_str(t.type)
