@@ -477,7 +477,14 @@ class Struct(TypeValidator, dict):
 
       super(Struct, self).__init__(default=None, description=__description__, editable=__editable__, hidden=__hidden__, **kwargs)
 
-      keys = [k for k, v in self.items() if not isinstance(v, Alias)]
+      # Keep mapping of aliases
+      aliases = {}
+      for k, v in self.items():
+         aliasname = Alias.Name(v)
+         if aliasname is not None:
+            aliases[k] = aliasname
+
+      keys = [k for k, _ in self.items() if not k in aliases]
       if __order__ is not None:
          __order__ = filter(lambda x: x in keys, __order__)
          for n in keys:
@@ -485,6 +492,8 @@ class Struct(TypeValidator, dict):
                __order__.append(n)
       else:
          __order__ = sorted(keys)
+
+      self.__dict__["_aliases"] = aliases
       self.__dict__["_order"] = __order__
 
       # As some fields were removed from kwargs to avoid conflict with
@@ -497,17 +506,31 @@ class Struct(TypeValidator, dict):
       if not isinstance(value, (dict, das.types.Struct)):
          raise ValidationError("Expected a dict value, got %s" % type(value).__name__)
       allfound = True
+      aliasvalues = {}
+      for k, v in self.iteritems():
+         aliasname = self.__dict__["_aliases"].get(k, None)
+         if aliasname is not None and k in value:
+            if aliasname in aliasvalues:
+               if aliasvalues[aliasname] != value[k]:
+                  raise ValidationError("Conflicting alias values for '%s'" % aliasname)
+            else:
+               aliasvalues[aliasname] = value[k]
       for k, v in self.iteritems():
          # Don't check aliases
-         if isinstance(v, Alias):
+         if k in self.__dict__["_aliases"]:
             continue
-         if not k in value and not isinstance(v, Optional):
-            allfound = False
-            if self.CompatibilityMode:
-               # das.print_once("[das] Use default value for field '%s'" % k)
-               value[k] = v.make_default()
-            else:
-               raise ValidationError("Missing key '%s'" % k)
+         if not k in value:
+            if k in aliasvalues:
+               value[k] = aliasvalues[k]
+            elif not isinstance(v, Optional):
+               allfound = False
+               if self.CompatibilityMode:
+                  # das.print_once("[das] Use default value for field '%s'" % k)
+                  value[k] = v.make_default()
+               else:
+                  raise ValidationError("Missing key '%s'" % k)
+         elif k in aliasvalues and value[k] != aliasvalues[k]:
+            raise ValidationError("Conflicting alias values for '%s'" % k)
       # Ignore new keys only in compatibility mode if all base keys are fullfilled (forward compatibility)
       if not self.CompatibilityMode or not allfound:
          for k, _ in value.iteritems():
@@ -522,11 +545,15 @@ class Struct(TypeValidator, dict):
             # return das.adapt_value(value)
             raise ValidationError("Invalid key '%s'" % key)
          else:
-            if isinstance(vtype, Alias):
-               vtype = self[vtype.name]
+            deprecated = isinstance(vtype, Deprecated)
+            aliasname = Alias.Name(vtype)
+            if aliasname is not None:
+               vtype = self[aliasname]
             vv = vtype.validate(value)
-            if vv is not None and isinstance(vtype, Deprecated):
+            if vv is not None and deprecated:
                message = ("[das] Field %s is deprecated" % repr(key) if not vtype.message else vtype.message)
+               if aliasname is not None:
+                  message += ", use %s instead" % aliasname
                das.print_once(message) 
             return vv
       else:
@@ -535,11 +562,17 @@ class Struct(TypeValidator, dict):
          # don't set schema type just yet
          for k, v in self.iteritems():
             # don't add aliases to dictionary
-            if isinstance(v, Alias):
+            deprecated = isinstance(v, Deprecated)
+            aliasname = Alias.Name(v)
+            if aliasname is not None:
+               # Issue warning on deprecated field
+               if deprecated:
+                  message = "[das] Field %s is deprecated, use %s instead" % (repr(k), repr(aliasname))
+                  das.print_once(message)
                continue
             try:
                vv = v.validate(value[k])
-               if vv is not None and isinstance(v, Deprecated):
+               if vv is not None and deprecated:
                   message = ("[das] Field %s is deprecated" % repr(k) if not v.message else v.message)
                   das.print_once(message)
                rv[k] = vv
@@ -912,6 +945,19 @@ class Empty(TypeValidator):
 
 
 class Alias(TypeValidator):
+   @staticmethod
+   def Check(t):
+      return (isinstance(t, Alias) or (isinstance(t, Deprecated) and isinstance(t.type, Alias)))
+
+   @staticmethod
+   def Name(t):
+      if isinstance(t, Alias):
+         return t.name
+      elif isinstance(t, Deprecated) and isinstance(t.type, Alias):
+         return t.type.name
+      else:
+         return None
+
    def __init__(self, name, description=None, editable=True, hidden=False):
       super(Alias, self).__init__(description=description, editable=editable, hidden=hidden)
       self.name = name

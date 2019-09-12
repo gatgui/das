@@ -1,0 +1,7 @@
+# name: compatibility
+# version: 1.1
+# das_minimum_version: 0.9.5
+{
+   "SomeType": Struct(oldField=Deprecated(Alias("newField")),
+                      newField=Sequence(String()))
+}

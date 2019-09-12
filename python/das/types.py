@@ -518,8 +518,12 @@ class Struct(TypeBase):
    def _get_alias(self, k):
       st = self._get_schema_type()
       if st is not None and st.has_key(k):
-         if isinstance(st[k], das.schematypes.Alias):
-            return st[k].name
+         aliasname = das.schematypes.Alias.Name(st[k])
+         if aliasname is not None:
+            if isinstance(st[k], das.schematypes.Deprecated):
+               message = ("[das] Field %s is deprecated, use %s instead" % (repr(k), repr(aliasname)))
+               das.print_once(message)
+            return aliasname
       return k
 
    def _check_reserved(self, k):
