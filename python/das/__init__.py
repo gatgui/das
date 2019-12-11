@@ -475,6 +475,37 @@ def copy(d, deep=True):
    return rv
 
 
+def _get_sorted_keys(d):
+   _keys = [k for k in d]
+   try:
+      keys = d.ordered_keys()
+      # Just in case we get empty key list, make sure we have something
+      if not keys:
+         keys = [k for k in d]
+      else:
+         ekeys = list(set(_keys).difference(keys))
+         ekeys.sort()
+         keys += ekeys
+   except:
+      keys = _keys
+      keys.sort()
+
+   for k in keys:
+      # We assume string keys are 'ascii'
+      if isinstance(k, unicode):
+         try:
+            k = k.encode("ascii")
+         except:
+            raise Exception("Non-ascii keys are not supported!")
+      elif isinstance(k, str):
+         try:
+            k.decode("ascii")
+         except:
+            raise Exception("Non-ascii keys are not supported!")
+
+   return keys
+
+
 def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encoding=None):
    if stream is None:
       stream = sys.stdout
@@ -488,31 +519,8 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
       stream.write("{\n")
       n = len(d)
       i = 0
-      _keys = [k for k in d]
-      try:
-         keys = d.ordered_keys()
-         # Just in case we get empty key list, make sure we have something
-         if not keys:
-            keys = [k for k in d]
-         else:
-            ekeys = list(set(_keys).difference(keys))
-            ekeys.sort()
-            keys += ekeys
-      except:
-         keys = _keys
-         keys.sort()
+      keys = _get_sorted_keys(d)
       for k in keys:
-         # We assume string keys are 'ascii'
-         if isinstance(k, unicode):
-            try:
-               k = k.encode("ascii")
-            except:
-               raise Exception("Non-ascii keys are not supported!")
-         elif isinstance(k, str):
-            try:
-               k.decode("ascii")
-            except:
-               raise Exception("Non-ascii keys are not supported!")
          stream.write("%s%s%s: " % (tindent, indent, repr(k)))
          v = d[k]
          pprint(v, stream, indent=indent, depth=depth+1, inline=True, eof=False, encoding=encoding)
@@ -604,6 +612,182 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
       stream.write("\n")
 
 
+class _CSVHeader(object):
+   def __init__(self, name, column):
+      super(_CSVHeader, self).__init__()
+      self.__column = column
+      self.__name = name
+      self.__data = []
+
+   def column(self):
+      return self.__column
+
+   def name(self):
+      return self.__name
+
+   def add_data(self, data):
+      self.__data.append(data)
+
+   def data(self):
+      return self.__data[:]
+
+   def get_row(self, data):
+      if data not in self.__data:
+         return -1
+
+      c = 0
+      for d in self.__data:
+         if d == data:
+            return c
+
+         c += d.count()
+
+      return -1
+
+   def row_count(self):
+      rc = 0
+      for d in self.__data:
+         rc += d.count()
+
+      return rc
+
+
+class _CSVValue(object):
+   def __init__(self, value, header, valuetype=None, parent=None):
+      super(_CSVValue, self).__init__()
+      self.__children = []
+      self.__header = header
+      self.__parent = parent
+      self.__valuetype = valuetype
+      self.__value = value
+
+      if parent:
+         parent.__children.append(self)
+
+   def header(self):
+      return self.__header
+
+   def value(self):
+      return self.__value
+
+   def valuetype(self):
+      return self.__valuetype
+
+   def parent(self):
+      return self.__parent
+
+   def children(self):
+      return self.__children[:]
+
+   def row(self):
+      if not self.__parent:
+         return self.__header.get_row(self)
+
+      return self.__parent.get_row(self)
+
+   def get_row(self, child):
+      if child not in self.__children:
+         raise Exception("'%s' is not a child of '%s'" % (child.value(), self.value()))
+
+      cr = self.row()
+      header_count = {}
+      for c in self.__children:
+         h = c.header()
+         if h not in header_count:
+            header_count[h] = cr
+
+         if c == child:
+            return header_count[h]
+
+         header_count[h] += c.count()
+
+   def count(self):
+      if not self.__children:
+         return 1
+
+      header_count = {}
+      for c in self.__children:
+         h = c.header()
+         if h not in header_count:
+            header_count[h] = 0
+
+         header_count[h] += c.count()
+
+      return max(header_count.values())
+
+
+def _get_header(key, headers):
+   header = None
+   for h in headers:
+      if key == h.name():
+         header = h
+         break
+
+   if not header:
+      header = _CSVHeader(key, len(headers))
+      headers.append(header)
+
+   return header
+
+
+def _dump_csv_data(k, d, valuetype, headers, parent=None):
+   if isinstance(valuetype, schematypes.SchemaType):
+      valuetype = get_schema_type(valuetype.name)
+
+   if isinstance(valuetype, schematypes.Optional):
+      valuetype = valuetype.type
+
+   if isinstance(d, Struct):
+      if len(d) == 0:
+         return 0
+
+      ckeys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
+
+      for ck in ckeys:
+         _dump_csv_data(k + "." + ck, d[ck], valuetype.get(ck), headers, parent=parent)
+
+   elif isinstance(d, dict):
+      if len(d) == 0:
+         return 0
+
+      ckeys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
+      key_header = _get_header(k + "{key}", headers)
+
+      vk = k + "{value}"
+      for ck in ckeys:
+         kv = _CSVValue(ck, key_header, parent=parent)
+         key_header.add_data(kv)
+         _dump_csv_data(vk, d[ck], valuetype.vtype, headers, parent=kv)
+
+   elif isinstance(d, (list, set, tuple)):
+      if len(d) == 0:
+         return 0
+
+      index_header = _get_header(k + "[index]", headers)
+      vk = k + "{value}"
+      i = 0
+      for v in d:
+         index = _CSVValue(str(i), index_header, parent=parent)
+         index_header.add_data(index)
+         vt = None
+         if isinstance(valuetype, (schematypes.Sequence, schematypes.Set)):
+            vt = valuetype.type
+         elif isinstance(valuetype, schematypes.Tuple):
+            vt = valuetype.types[i]
+         else:
+            raise Exception("Unexpected value type '%s'" % valuetype)
+
+         _dump_csv_data(vk, v, vt, headers, parent=index)
+         i += 1
+
+   # scalar
+   else:
+      header = _get_header(k, headers)
+
+      cv = _CSVValue(valuetype.value_to_string(d), header, valuetype=valuetype, parent=parent)
+      header.add_data(cv)
+
+
 def write(d, path, indent="  ", encoding=None):
    d._validate()
 
@@ -625,6 +809,53 @@ def write(d, path, indent="  ", encoding=None):
          if sn and sn.version is not None:
             f.write("# schema_version: %s\n" % sn.version)
       pprint(d, stream=f, indent=indent, encoding=encoding)
+
+
+def write_csv(d, path, encoding=None, delimiter="\t", newline="\n"):
+   d._validate()
+
+   schema_type = d._get_schema_type()
+   if not schema_type:
+      raise Exception("Cannot export a csv file from unschemed data")
+
+   header_schema = _CSVHeader("<schematype>", 0)
+   schem_val = _CSVValue(get_schema_type_name(schema_type), header_schema)
+   header_schema.add_data(schem_val)
+
+   headers = [header_schema]
+
+   keys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
+
+   for k in keys:
+      _dump_csv_data(k, d[k], schema_type[k], headers)
+
+   with open(path, "wb") as f:
+      f.write(delimiter.join(map(lambda x: x.name(), headers)))
+      row_counts = max(map(lambda x: x.row_count(), headers))
+
+      column_counts = len(headers)
+      lines = map(lambda y: map(lambda x: "", range(column_counts)), range(row_counts))
+
+      for header in headers:
+         for data in header.data():
+            vv = data.value()
+
+            # TODO : find better way
+            if "\"" in data.value():
+               vv = vv.replace("\"", "\\\"")
+
+            sr = data.row()
+            er = sr + data.count()
+            c = header.column()
+
+            for r in range(sr, er):
+               if lines[r][c] != "":
+                  raise Exception("Invalid index. There is a data at [%s][%s] already" % (r, c))
+               lines[r][c] = vv
+
+      for r in lines:
+         f.write(newline)
+         f.write(delimiter.join(r))
 
 
 def generate_empty_schema(path, name=None, version=None, author=None):

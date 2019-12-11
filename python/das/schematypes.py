@@ -3,6 +3,7 @@ import das
 import imp
 
 
+# TODO : implement value_to_string, string_to_value of all types
 class ValidationError(Exception):
    def __init__(self, msg):
       super(ValidationError, self).__init__(msg)
@@ -17,6 +18,12 @@ class TypeValidator(object):
       self.description = ("" if description is None else description)
       self.editable = editable
       self.hidden = hidden
+
+   def value_to_string(self, v):
+      raise RuntimeError("'value_to_string' method is not implemented")
+
+   def string_to_value(self, v):
+      raise RuntimeError("'string_to_value' method is not implemented")
 
    def _validate_self(self, value):
       raise ValidationError("'_validate_self' method is not implemented")
@@ -94,6 +101,12 @@ class Boolean(TypeValidator):
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
 
+   def value_to_string(self, v):
+      return "true" if self._validate(v) else "false"
+
+   def string_to_value(self, v):
+      return self._validate(v != "false")
+
    def __repr__(self):
       s = "Boolean("
       sep = ""
@@ -150,6 +163,12 @@ class Integer(TypeValidator):
          self.enumvals = set(self.enum.values())
       return self
 
+   def value_to_string(self, v):
+      return str(self._validate(v))
+
+   def string_to_value(self, v):
+      return self._validate(int(v))
+
    def __repr__(self):
       s = "Integer("
       sep = ""
@@ -190,6 +209,12 @@ class Real(TypeValidator):
 
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
+
+   def value_to_string(self, v):
+      return str(self._validate(v))
+
+   def string_to_value(self, v):
+      return self._validate(float(v))
 
    def __repr__(self):
       s = "Real("
@@ -252,6 +277,12 @@ class String(TypeValidator):
       if self.matches:
          self.matches = re.compile(das.decode(self.matches.pattern, encoding))
       return self
+
+   def value_to_string(self, v):
+      return str(self._validate(v))
+
+   def string_to_value(self, v):
+      return self._validate(v)
 
    def __repr__(self):
       s = "String("
@@ -831,6 +862,20 @@ class Or(TypeValidator):
       raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(value).__name__)
       return None
 
+   def value_to_string(self, v):
+      for typ in self.types:
+         try:
+            return typ.value_to_string(v)
+         except:
+            continue
+
+   def string_to_value(self, v):
+      for typ in self.types:
+         try:
+            return typ.string_to_value(v)
+         except:
+            continue
+
    def _decode(self, encoding):
       super(Or, self)._decode(encoding)
       self.types = tuple(map(lambda x: das.decode(x, encoding), self.types))
@@ -882,6 +927,12 @@ class Optional(TypeValidator):
 
    def make(self, *args, **kwargs):
       return self.type.make(*args, **kwargs)
+
+   def value_to_string(self, v):
+      return self.type.value_to_string(v)
+
+   def string_to_value(self, v):
+      return self.type.string_to_value(v)
 
    def __repr__(self):
       return "Optional(type=%s)" % self.type
@@ -936,6 +987,17 @@ class Empty(TypeValidator):
 
    def make_default(self):
       return None
+
+   def value_to_string(self, v):
+      self._validate(v)
+
+      return ""
+
+   def string_to_value(self, v):
+      if v:
+         raise ValidationError("The value is not empty")
+
+      return self._validate(None)
 
    def __repr__(self):
       return "Empty()"
