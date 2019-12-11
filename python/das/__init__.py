@@ -764,7 +764,7 @@ def _dump_csv_data(k, d, valuetype, headers, parent=None):
          return 0
 
       index_header = _get_header(k + "[index]", headers)
-      vk = k + "{value}"
+      vk = k + "[value]"
       i = 0
       for v in d:
          index = _CSVValue(str(i), index_header, parent=parent)
