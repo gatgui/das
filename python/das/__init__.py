@@ -435,8 +435,9 @@ def read(path, schema_type=None, ignore_meta=False, strict_schema=None, **funcs)
 
 
 class _PlaceHolder(object):
-   def __init__(self, *args, **kargs):
-      super(_PlaceHolder, self).__init__()
+   def __init__(self, is_optional=False):
+      object.__init__(self)
+      self.optional = is_optional
 
    def __repr__(self):
       return "__NULL__"
@@ -458,14 +459,111 @@ class _PlaceHolder(object):
 
       return isinstance(data, _PlaceHolder)
 
+   @staticmethod
+   def make_place_holder(st, is_optional=False):
+      if isinstance(st, (schematypes.Struct, schematypes.Dict)):
+         return _PlaceHolderDict(is_optional=is_optional)
+
+      elif isinstance(st, schematypes.Sequence):
+         return _PlaceHolderList(is_optional=is_optional)
+
+      return _PlaceHolder(is_optional=is_optional)
+
+   @staticmethod
+   def finalize(data):
+      if isinstance(data, (dict)):
+         pop_list = []
+         new_dict = {}
+
+         for k, v in data.items():
+            if isinstance(v, _PlaceHolderDict):
+               if not v and v.optional:
+                  pop_list.append(k)
+                  continue
+
+               new_dict[k] = v.copy()
+
+            elif isinstance(v, _PlaceHolderList):
+               if not v and v.optional:
+                  pop_list.append(k)
+                  continue
+
+               new_dict[k] = v[:]
+
+            elif isinstance(v, _PlaceHolder):
+               if v.optional:
+                  pop_list.append(k)
+                  continue
+
+               new_dict[k] = v
+
+            else:
+               new_dict[k] = v
+
+         for k, v in new_dict.items():
+            _PlaceHolder.finalize(v)
+            data[k] = v
+
+         for k in pop_list:
+            data.pop(k)
+
+      elif isinstance(data, (list, tuple, set)):
+         pop_list = []
+         new_list = {}
+
+         for i, v in enumerate(data):
+            if isinstance(v, _PlaceHolderDict):
+               if not v and v.optional:
+                  pop_list.append(i)
+                  continue
+
+               new_list[i] = v.copy()
+
+            elif isinstance(v, _PlaceHolderList):
+               if not v and v.optional:
+                  pop_list.append(i)
+                  continue
+
+               new_list[i] = v[:]
+
+            elif isinstance(v, _PlaceHolder):
+               if v.optional:
+                  pop_list.append(i)
+                  continue
+
+               new_list[i] = v
+
+            else:
+               new_list[i] = v
+
+         for i, v in new_list.items():
+            _PlaceHolder.finalize(v)
+            data[i] = v
+
+         for i in sorted(pop_list, reverse=True):
+            data.pop(i)
+
+
+class _PlaceHolderDict(dict, _PlaceHolder):
+   def __init__(self, is_optional=False):
+      dict.__init__(self)
+      _PlaceHolder.__init__(self, is_optional=is_optional)
+
+
+class _PlaceHolderList(list, _PlaceHolder):
+   def __init__(self, is_optional=False):
+      list.__init__(self)
+      _PlaceHolder.__init__(self, is_optional=is_optional)
+
 
 def _get_value_type(parent, key):
    if key == "{value}":
-      return _get_org_type(parent.vtype)
-   elif key == "[value]":
-      return _get_org_type(parent.type)
+      return parent.vtype
 
-   return _get_org_type(parent[key])
+   elif key == "[value]":
+      return parent.type
+
+   return parent[key]
 
 
 def _get_org_type(st):
@@ -476,16 +574,6 @@ def _get_org_type(st):
       st = st.type
 
    return st
-
-
-def _make_place_holder(st):
-   if isinstance(st, (schematypes.Struct, schematypes.Dict)):
-      return {}
-
-   elif isinstance(st, schematypes.Sequence):
-      return []
-
-   return _PlaceHolder()
 
 
 def _read_csv(value, row, header, headers, schematype, data, csv):
@@ -511,6 +599,7 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
    found = True
 
    parent_header = ""
+   is_optional = False
 
    while (True):
       creatable = True
@@ -525,6 +614,10 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
          break
 
       st = _get_value_type(st, cur_key)
+      if isinstance(st, schematypes.Optional):
+         is_optional = True
+
+      st = _get_org_type(st)
 
       if cur_key == "{value}":
          creatable = False
@@ -556,7 +649,7 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
       if not creatable:
          parent = parent[key]
       else:
-         parent[key] = parent.get(key, _make_place_holder(st))
+         parent[key] = parent.get(key, _PlaceHolder.make_place_holder(st, is_optional=is_optional))
          parent = parent[key]
 
    if not found:
@@ -564,13 +657,13 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
 
    if re_d_key.search(header):
       if value != "":
-         parent[value] = _make_place_holder(_get_org_type(st.vtype))
+         parent[value] = _PlaceHolder.make_place_holder(_get_org_type(st.vtype), is_optional=is_optional)
 
       return
 
    if re_a_index.search(header):
       if value != "":
-         parent.append(_make_place_holder(_get_org_type(st.type)))
+         parent.append(_PlaceHolder.make_place_holder(_get_org_type(st.type), is_optional=is_optional))
 
       return
 
@@ -581,6 +674,10 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
    value = value.replace('\\"', '"')
 
    if not value:
+      if is_optional:
+         p = _PlaceHolder(is_optional=is_optional)
+         return
+
       try:
          value = st.string_to_value(value)
       except:
@@ -637,8 +734,10 @@ def read_csv(csv_path, delimiter="\t", newline="\n", schema_type=None):
       for r in range(row_size):
          _read_csv(csv_table[r][c], r, header, headers, schema_type, read_data, csv_table)
 
+   _PlaceHolder.finalize(read_data)
+
    if _PlaceHolder.is_place_holder(read_data):
-      raise Exception("Parsing '%s' was uncompleted")
+      raise Exception("Parsing '%s' was uncompleted" % csv_path)
 
    return schema_type.validate(read_data)
 
