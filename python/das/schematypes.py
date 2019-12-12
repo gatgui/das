@@ -105,7 +105,12 @@ class Boolean(TypeValidator):
       return "true" if self._validate(v) else "false"
 
    def string_to_value(self, v):
-      return self._validate(v != "false")
+      if v == "true":
+         self._validate(True)
+      elif v == "false":
+         self._validate(False)
+
+      return self._validate(v)
 
    def __repr__(self):
       s = "Boolean("
