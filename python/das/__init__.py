@@ -434,6 +434,206 @@ def read(path, schema_type=None, ignore_meta=False, strict_schema=None, **funcs)
    return read_string(src, schema_type=schema_type, encoding=encoding, strict_schema=strict_schema, **funcs)
 
 
+class _PlaceHolder(object):
+   def __init__(self, *args, **kargs):
+      super(_PlaceHolder, self).__init__()
+
+   def __repr__(self):
+      return "__NULL__"
+
+   @staticmethod
+   def is_place_holder(data):
+      if isinstance(data, (dict)):
+         for k, v in data.items():
+            if _PlaceHolder.is_place_holder(k):
+               return True
+
+            if _PlaceHolder.is_place_holder(v):
+               return True
+
+      elif isinstance(data, (list, tuple, set)):
+         for v in data:
+            if _PlaceHolder.is_place_holder(v):
+               return True
+
+      return isinstance(data, _PlaceHolder)
+
+
+def _get_value_type(parent, key):
+   if key == "{value}":
+      return _get_org_type(parent.vtype)
+   elif key == "[value]":
+      return _get_org_type(parent.type)
+
+   return _get_org_type(parent[key])
+
+
+def _get_org_type(st):
+   while (isinstance(st, schematypes.SchemaType)):
+      st = get_schema_type(st.name)
+
+   if isinstance(st, schematypes.Optional):
+      st = st.type
+
+   return st
+
+
+def _make_place_holder(st):
+   if isinstance(st, (schematypes.Struct, schematypes.Dict)):
+      return {}
+
+   elif isinstance(st, schematypes.Sequence):
+      return []
+
+   return _PlaceHolder()
+
+
+def _read_csv(value, row, header, headers, schematype, data, csv):
+   re_d_key = re.compile("[{]key[}]$")
+   re_a_index = re.compile("[[]index[]]$")
+   re_dot = re.compile("[.]")
+   re_tkn = re.compile("[[{][^]}{[]+[]}]")
+   st = schematype
+
+   def _get_header_column(header):
+      for i, ph in enumerate(headers):
+         if ph == header:
+            return i
+
+   keys = []
+   for sh in re_dot.split(header):
+      pure_name = re_tkn.sub("", sh)
+      keys.append(pure_name)
+      keys += re_tkn.findall(sh)
+
+   parent = data
+   key = keys[0]
+   found = True
+
+   parent_header = ""
+
+   while (True):
+      creatable = True
+      cur_key = keys.pop(0)
+      cur_header = cur_key
+
+      # {key} and [index] should be only at the end of header
+      if cur_key == "{key}":
+         break
+
+      elif cur_key == "[index]":
+         break
+
+      st = _get_value_type(st, cur_key)
+
+      if cur_key == "{value}":
+         creatable = False
+         kv = csv[row][_get_header_column(parent_header + "{key}")]
+         if kv == "":
+            found = False
+            break
+
+         key = kv
+
+      elif cur_key == "[value]":
+         creatable = False
+         iv = csv[row][_get_header_column(parent_header + "[index]")]
+         if iv == "":
+            found = False
+            break
+
+         key = int(iv)
+
+      else:
+         key = cur_key
+         cur_header = ("." + cur_key) if parent_header else cur_key
+
+      parent_header += cur_header
+
+      if not keys:
+         break
+
+      if not creatable:
+         parent = parent[key]
+      else:
+         parent[key] = parent.get(key, _make_place_holder(st))
+         parent = parent[key]
+
+   if not found:
+      return
+
+   if re_d_key.search(header):
+      if value != "":
+         parent[value] = _make_place_holder(_get_org_type(st.vtype))
+
+      return
+
+   if re_a_index.search(header):
+      if value != "":
+         parent.append(_make_place_holder(_get_org_type(st.type)))
+
+      return
+
+   if key in parent and not isinstance(parent[key], _PlaceHolder):
+      return
+
+   parent[key] = st.string_to_value(value.replace('\\"', '"'))
+
+
+def read_csv(csv_path, delimiter="\t", newline="\n", schema_type=None):
+   re_metadata = re.compile("^[<](.*)[>]$")
+   re_strip = re.compile(newline + "$")
+   re_delimiter = re.compile(delimiter)
+
+   if not os.path.isfile(csv_path):
+      return None
+
+   with open(csv_path, "r") as f:
+      lines = map(lambda x: re_strip.sub("", x), f.readlines())
+
+   if len(lines) == 0:
+      return None
+
+   headers = re_delimiter.split(lines.pop(0))
+   csv_table = []
+   col_size = len(headers)
+   row_size = len(lines)
+
+   for l in lines:
+      col_datas = re_delimiter.split(l)
+      if col_size != len(col_datas):
+         raise Exception("Parsing '%s' was failed" % (csv_path))
+
+      csv_table.append(col_datas)
+
+   start_column = 0
+
+   mts = {}
+   for header in headers:
+      hr = re_metadata.search(header)
+      if not hr:
+         break
+
+      mts[hr.group(1)] = csv_table[0][start_column]
+      start_column += 1
+
+   if not schema_type:
+      schema_type = mts.get("schematype", None)
+
+   schema_type = get_schema_type(schema_type)
+   read_data = {}
+
+   for c in range(start_column, col_size):
+      header = headers[c]
+      for r in range(row_size):
+         _read_csv(csv_table[r][c], r, header, headers, schema_type, read_data, csv_table)
+
+   if _PlaceHolder.is_place_holder(read_data):
+      raise Exception("Parsing '%s' was uncompleted")
+
+   return schema_type.validate(read_data)
+
+
 def copy(d, deep=True):
    if isinstance(d, TypeValidator):
       return d.copy()
@@ -738,18 +938,12 @@ def _dump_csv_data(k, d, valuetype, headers, parent=None):
       valuetype = valuetype.type
 
    if isinstance(d, Struct):
-      if len(d) == 0:
-         return 0
-
       ckeys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
 
       for ck in ckeys:
          _dump_csv_data(k + "." + ck, d[ck], valuetype.get(ck), headers, parent=parent)
 
    elif isinstance(d, dict):
-      if len(d) == 0:
-         return 0
-
       ckeys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
       key_header = _get_header(k + "{key}", headers)
 
@@ -760,9 +954,6 @@ def _dump_csv_data(k, d, valuetype, headers, parent=None):
          _dump_csv_data(vk, d[ck], valuetype.vtype, headers, parent=kv)
 
    elif isinstance(d, (list, set, tuple)):
-      if len(d) == 0:
-         return 0
-
       index_header = _get_header(k + "[index]", headers)
       vk = k + "[value]"
       i = 0
