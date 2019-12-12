@@ -739,7 +739,7 @@ def read_csv(csv_path, delimiter="\t", newline="\n", schema_type=None):
    if _PlaceHolder.is_place_holder(read_data):
       raise Exception("Parsing '%s' was uncompleted" % csv_path)
 
-   return schema_type.validate(read_data)
+   return schema_type.partial_make(**read_data)
 
 
 def copy(d, deep=True):
@@ -1046,12 +1046,18 @@ def _dump_csv_data(k, d, valuetype, headers, parent=None):
       valuetype = valuetype.type
 
    if isinstance(d, Struct):
+      if not d:
+         return
+
       ckeys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
 
       for ck in ckeys:
          _dump_csv_data(k + "." + ck, d[ck], valuetype.get(ck), headers, parent=parent)
 
    elif isinstance(d, dict):
+      if not d:
+         return
+
       ckeys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
       key_header = _get_header(k + "{key}", headers)
 
@@ -1062,6 +1068,9 @@ def _dump_csv_data(k, d, valuetype, headers, parent=None):
          _dump_csv_data(vk, d[ck], valuetype.vtype, headers, parent=kv)
 
    elif isinstance(d, (list, set, tuple)):
+      if not d:
+         return
+
       index_header = _get_header(k + "[index]", headers)
       vk = k + "[value]"
       i = 0
