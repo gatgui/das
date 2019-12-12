@@ -3,7 +3,6 @@ import das
 import imp
 
 
-# TODO : implement value_to_string, string_to_value of all types
 class ValidationError(Exception):
    def __init__(self, msg):
       super(ValidationError, self).__init__(msg)
@@ -20,10 +19,10 @@ class TypeValidator(object):
       self.hidden = hidden
 
    def value_to_string(self, v):
-      raise RuntimeError("'value_to_string' method is not implemented")
+      return repr(self._validate(v))
 
    def string_to_value(self, v):
-      raise RuntimeError("'string_to_value' method is not implemented")
+      return self._validate(eval(v))
 
    def _validate_self(self, value):
       raise ValidationError("'_validate_self' method is not implemented")
