@@ -577,7 +577,16 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
    if key in parent and not isinstance(parent[key], _PlaceHolder):
       return
 
-   parent[key] = st.string_to_value(value.replace('\\"', '"'))
+   # TODO : find better way
+   value = value.replace('\\"', '"')
+
+   if not value:
+      try:
+         value = st.string_to_value(value)
+      except:
+         return
+
+   parent[key] = st.string_to_value(value)
 
 
 def read_csv(csv_path, delimiter="\t", newline="\n", schema_type=None):
