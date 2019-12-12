@@ -71,6 +71,9 @@ class TypeValidator(object):
    def make(self, *args, **kwargs):
       return self._validate(args[0])
 
+   def partial_make(self, args):
+      return self._validate(args)
+
    def copy(self):
       return TypeValidator(default=self.default, description=self.description, editable=self.editable, hidden=self.hidden)
 
@@ -356,6 +359,14 @@ class Set(TypeValidator):
    def make(self, *args, **kwargs):
       return self._validate(args)
 
+   def partial_make(self, args):
+      if not isinstance(args, (list, set, tuple)):
+         raise ValidationError("Expected a sequence value, got %s" % type(args).__name__)
+
+      rv = das.types.Set(map(lambda x: self.type.partial_make(x), args))
+      rv._set_schema_type(self)
+      return rv
+
    def __repr__(self):
       s = "Set(type=%s" % self.type
       if self.default:
@@ -413,6 +424,14 @@ class Sequence(TypeValidator):
 
    def make(self, *args, **kwargs):
       return self._validate(args)
+
+   def partial_make(self, args):
+      if not isinstance(args, (list, set, tuple)):
+         raise ValidationError("Expected a sequence value, got %s" % type(args).__name__)
+
+      rv = das.types.Sequence(map(lambda x: self.type.partial_make(x), args))
+      rv._set_schema_type(self)
+      return rv
 
    def __repr__(self):
       s = "Sequence(type=%s" % self.type
@@ -475,6 +494,20 @@ class Tuple(TypeValidator):
 
    def make(self, *args, **kwargs):
       return self._validate(args)
+
+   def partial_make(self, args):
+      if not isinstance(args, (list, set, tuple)):
+         raise ValidationError("Expected a sequence value, got %s" % type(args).__name__)
+
+      if len(args) != len(self.types):
+         raise ValidationError("Expected a tuple of size %d, got %d" % (len(self.types), len(args)))
+
+      rvs = []
+      for i, arg in enumerate(args):
+         rvs.append(self.types[i].partial_make(arg))
+      rv = das.types.Tuple(rvs)
+      rv._set_schema_type(self)
+      return rv
 
    def __repr__(self):
       s = "Tuple("
@@ -645,6 +678,16 @@ class Struct(TypeValidator, dict):
          setattr(rv, k, v)
       return rv
 
+   def partial_make(self, args):
+      if not isinstance(args, dict):
+         raise ValidationError("Expected a dict value, got %s" % type(args).__name__)
+
+      rv = self.make_default()
+      for k, v in args.iteritems():
+         rv[k] = self[k].partial_make(v)
+
+      return rv
+
    def __hash__(self):
       return object.__hash__(self)
 
@@ -726,6 +769,17 @@ class Dict(TypeValidator):
 
    def make(self, *args, **kwargs):
       return self._validate(kwargs)
+
+   def partial_make(self, args):
+      if not isinstance(args, dict):
+         raise ValidationError("Expected a dict value, got %s" % type(args).__name__)
+
+      rv = das.types.Dict()
+
+      for k, v in args.iteritems():
+         rv[self.ktype.validate(k)] = self.vtype.partial_make(v)
+      rv._set_schema_type(self)
+      return rv
 
    def __repr__(self):
       s = "Dict(ktype=%s, vtype=%s" % (self.ktype, self.vtype)
@@ -894,6 +948,15 @@ class Or(TypeValidator):
    def make(self, *args, **kwargs):
       return self.types[0].make(*args, **kwargs)
 
+   def partial_make(self, args):
+      for typ in self.types:
+         try:
+            return typ.partial_make(args)
+         except:
+            continue
+
+      raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(args).__name__)
+
    def __repr__(self):
       s = "Or(%s" % ", ".join(map(str, self.types))
       if self.default is not None:
@@ -932,6 +995,9 @@ class Optional(TypeValidator):
 
    def make(self, *args, **kwargs):
       return self.type.make(*args, **kwargs)
+
+   def partial_make(self, args):
+      return self.type.partial_make(args)
 
    def value_to_string(self, v):
       return self.type.value_to_string(v)
@@ -1072,6 +1138,10 @@ class SchemaType(TypeValidator):
    def make(self, *args, **kwargs):
       st = das.get_schema_type(self.name)
       return st.make(*args, **kwargs)
+
+   def partial_make(self, args):
+      st = das.get_schema_type(self.name)
+      return st.partial_make(args)
 
    def __repr__(self):
       s = "SchemaType('%s'" % self.name

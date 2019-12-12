@@ -739,7 +739,7 @@ def read_csv(csv_path, delimiter="\t", newline="\n", schema_type=None):
    if _PlaceHolder.is_place_holder(read_data):
       raise Exception("Parsing '%s' was uncompleted" % csv_path)
 
-   return schema_type.partial_make(**read_data)
+   return schema_type.partial_make(read_data)
 
 
 def copy(d, deep=True):
