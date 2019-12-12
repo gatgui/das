@@ -434,7 +434,7 @@ def read(path, schema_type=None, ignore_meta=False, strict_schema=None, **funcs)
    return read_string(src, schema_type=schema_type, encoding=encoding, strict_schema=strict_schema, **funcs)
 
 
-class _PlaceHolder(object):
+class _Placeholder(object):
    def __init__(self, is_optional=False):
       object.__init__(self)
       self.optional = is_optional
@@ -446,28 +446,28 @@ class _PlaceHolder(object):
    def is_place_holder(data):
       if isinstance(data, (dict)):
          for k, v in data.items():
-            if _PlaceHolder.is_place_holder(k):
+            if _Placeholder.is_place_holder(k):
                return True
 
-            if _PlaceHolder.is_place_holder(v):
+            if _Placeholder.is_place_holder(v):
                return True
 
       elif isinstance(data, (list, tuple, set)):
          for v in data:
-            if _PlaceHolder.is_place_holder(v):
+            if _Placeholder.is_place_holder(v):
                return True
 
-      return isinstance(data, _PlaceHolder)
+      return isinstance(data, _Placeholder)
 
    @staticmethod
    def make_place_holder(st, is_optional=False):
       if isinstance(st, (schematypes.Struct, schematypes.Dict)):
-         return _PlaceHolderDict(is_optional=is_optional)
+         return _PlaceholderDict(is_optional=is_optional)
 
       elif isinstance(st, schematypes.Sequence):
-         return _PlaceHolderList(is_optional=is_optional)
+         return _PlaceholderList(is_optional=is_optional)
 
-      return _PlaceHolder(is_optional=is_optional)
+      return _Placeholder(is_optional=is_optional)
 
    @staticmethod
    def finalize(data):
@@ -476,21 +476,21 @@ class _PlaceHolder(object):
          new_dict = {}
 
          for k, v in data.items():
-            if isinstance(v, _PlaceHolderDict):
+            if isinstance(v, _PlaceholderDict):
                if not v and v.optional:
                   pop_list.append(k)
                   continue
 
                new_dict[k] = v.copy()
 
-            elif isinstance(v, _PlaceHolderList):
+            elif isinstance(v, _PlaceholderList):
                if not v and v.optional:
                   pop_list.append(k)
                   continue
 
                new_dict[k] = v[:]
 
-            elif isinstance(v, _PlaceHolder):
+            elif isinstance(v, _Placeholder):
                if v.optional:
                   pop_list.append(k)
                   continue
@@ -501,7 +501,7 @@ class _PlaceHolder(object):
                new_dict[k] = v
 
          for k, v in new_dict.items():
-            _PlaceHolder.finalize(v)
+            _Placeholder.finalize(v)
             data[k] = v
 
          for k in pop_list:
@@ -512,21 +512,21 @@ class _PlaceHolder(object):
          new_list = {}
 
          for i, v in enumerate(data):
-            if isinstance(v, _PlaceHolderDict):
+            if isinstance(v, _PlaceholderDict):
                if not v and v.optional:
                   pop_list.append(i)
                   continue
 
                new_list[i] = v.copy()
 
-            elif isinstance(v, _PlaceHolderList):
+            elif isinstance(v, _PlaceholderList):
                if not v and v.optional:
                   pop_list.append(i)
                   continue
 
                new_list[i] = v[:]
 
-            elif isinstance(v, _PlaceHolder):
+            elif isinstance(v, _Placeholder):
                if v.optional:
                   pop_list.append(i)
                   continue
@@ -537,23 +537,23 @@ class _PlaceHolder(object):
                new_list[i] = v
 
          for i, v in new_list.items():
-            _PlaceHolder.finalize(v)
+            _Placeholder.finalize(v)
             data[i] = v
 
          for i in sorted(pop_list, reverse=True):
             data.pop(i)
 
 
-class _PlaceHolderDict(dict, _PlaceHolder):
+class _PlaceholderDict(dict, _Placeholder):
    def __init__(self, is_optional=False):
       dict.__init__(self)
-      _PlaceHolder.__init__(self, is_optional=is_optional)
+      _Placeholder.__init__(self, is_optional=is_optional)
 
 
-class _PlaceHolderList(list, _PlaceHolder):
+class _PlaceholderList(list, _Placeholder):
    def __init__(self, is_optional=False):
       list.__init__(self)
-      _PlaceHolder.__init__(self, is_optional=is_optional)
+      _Placeholder.__init__(self, is_optional=is_optional)
 
 
 def _get_value_type(parent, key):
@@ -649,7 +649,7 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
       if not creatable:
          parent = parent[key]
       else:
-         parent[key] = parent.get(key, _PlaceHolder.make_place_holder(st, is_optional=is_optional))
+         parent[key] = parent.get(key, _Placeholder.make_place_holder(st, is_optional=is_optional))
          parent = parent[key]
 
    if not found:
@@ -657,17 +657,17 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
 
    if re_d_key.search(header):
       if value != "":
-         parent[value] = _PlaceHolder.make_place_holder(_get_org_type(st.vtype), is_optional=is_optional)
+         parent[value] = _Placeholder.make_place_holder(_get_org_type(st.vtype), is_optional=is_optional)
 
       return
 
    if re_a_index.search(header):
       if value != "":
-         parent.append(_PlaceHolder.make_place_holder(_get_org_type(st.type), is_optional=is_optional))
+         parent.append(_Placeholder.make_place_holder(_get_org_type(st.type), is_optional=is_optional))
 
       return
 
-   if key in parent and not isinstance(parent[key], _PlaceHolder):
+   if key in parent and not isinstance(parent[key], _Placeholder):
       return
 
    # TODO : find better way
@@ -675,7 +675,7 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
 
    if not value:
       if is_optional:
-         p = _PlaceHolder(is_optional=is_optional)
+         p = _Placeholder(is_optional=is_optional)
          return
 
       try:
@@ -734,9 +734,9 @@ def read_csv(csv_path, delimiter="\t", newline="\n", schema_type=None):
       for r in range(row_size):
          _read_csv(csv_table[r][c], r, header, headers, schema_type, read_data, csv_table)
 
-   _PlaceHolder.finalize(read_data)
+   _Placeholder.finalize(read_data)
 
-   if _PlaceHolder.is_place_holder(read_data):
+   if _Placeholder.is_place_holder(read_data):
       raise Exception("Parsing '%s' was uncompleted" % csv_path)
 
    return schema_type.partial_make(read_data)
