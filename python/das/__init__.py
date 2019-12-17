@@ -573,6 +573,9 @@ def _get_org_type(st):
    if isinstance(st, schematypes.Optional):
       st = st.type
 
+   while (isinstance(st, schematypes.SchemaType)):
+      st = get_schema_type(st.name)
+
    return st
 
 
@@ -1105,11 +1108,7 @@ def _dump_csv_data(k, d, valuetype, headers, parent=None, prefix=None):
    if prefix is None:
       prefix = ""
 
-   if isinstance(valuetype, schematypes.SchemaType):
-      valuetype = get_schema_type(valuetype.name)
-
-   if isinstance(valuetype, schematypes.Optional):
-      valuetype = valuetype.type
+   valuetype = _get_org_type(valuetype)
 
    if isinstance(d, Struct):
       if not d:
