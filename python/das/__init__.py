@@ -921,11 +921,15 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
 
 
 class _CSVHeader(object):
-   def __init__(self, name, column):
+   def __init__(self, name, column, fill=True):
       super(_CSVHeader, self).__init__()
       self.__column = column
       self.__name = name
       self.__data = []
+      self.__fill = fill
+
+   def fill(self):
+      return False
 
    def column(self):
       return self.__column
@@ -1119,23 +1123,39 @@ def write(d, path, indent="  ", encoding=None):
       pprint(d, stream=f, indent=indent, encoding=encoding)
 
 
-def write_csv(d, path, encoding=None, delimiter="\t", newline="\n"):
-   d._validate()
+def write_csv(data, path, encoding=None, delimiter="\t", newline="\n"):
+   data_list = []
 
-   schema_type = d._get_schema_type()
-   if not schema_type:
-      raise Exception("Cannot export a csv file from unschemed data")
+   if isinstance(data, types.TypeBase):
+      if not data._get_schema_type():
+            raise Exception("Cannot export a csv file from unschemed data")
 
-   header_schema = _CSVHeader("<schematype>", 0)
-   schem_val = _CSVValue(get_schema_type_name(schema_type), header_schema)
-   header_schema.add_data(schem_val)
+      data_list = [data]
 
+   elif isinstance(data, (set, list)):
+      for d in data:
+         if not isinstance(d, types.TypeBase):
+            raise Exception("Invalid data given. Must be a instance of das.types.TypeBase")
+         if not d._get_schema_type():
+            raise Exception("Cannot export a csv file from unschemed data")
+
+         data_list.append(d)
+
+   header_schema = _CSVHeader("<schematype>", 0, fill=False)
    headers = [header_schema]
 
-   keys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
+   for d in data_list:
+      d._validate()
 
-   for k in keys:
-      _dump_csv_data(k, d[k], schema_type[k], headers)
+      schema_type = d._get_schema_type()
+
+      schem_val = _CSVValue(get_schema_type_name(schema_type), header_schema)
+      header_schema.add_data(schem_val)
+
+      keys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
+
+      for k in keys:
+         _dump_csv_data(k, d[k], schema_type[k], headers, parent=schem_val)
 
    with open(path, "wb") as f:
       f.write(delimiter.join(map(lambda x: x.name(), headers)))
@@ -1145,15 +1165,15 @@ def write_csv(d, path, encoding=None, delimiter="\t", newline="\n"):
       lines = map(lambda y: map(lambda x: "", range(column_counts)), range(row_counts))
 
       for header in headers:
-         for data in header.data():
-            vv = data.value()
+         for hd in header.data():
+            vv = hd.value()
 
             # TODO : find better way
-            if "\"" in data.value():
+            if "\"" in hd.value():
                vv = vv.replace("\"", "\\\"")
 
-            sr = data.row()
-            er = sr + data.count()
+            sr = hd.row()
+            er = sr + (hd.count() if header.fill() else 1)
             c = header.column()
 
             for r in range(sr, er):
