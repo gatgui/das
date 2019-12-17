@@ -583,11 +583,6 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
    re_tkn = re.compile("[[{][^]}{[]+[]}]")
    st = schematype
 
-   def _get_header_column(header):
-      for i, ph in enumerate(headers):
-         if ph == header:
-            return i
-
    keys = []
    for sh in re_dot.split(header):
       pure_name = re_tkn.sub("", sh)
@@ -621,7 +616,7 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
 
       if cur_key == "{value}":
          creatable = False
-         kv = csv[row][_get_header_column(parent_header + "{key}")]
+         kv = csv[row][headers[parent_header + "{key}"]]
          if kv == "":
             found = False
             break
@@ -630,7 +625,7 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
 
       elif cur_key == "[value]":
          creatable = False
-         iv = csv[row][_get_header_column(parent_header + "[index]")]
+         iv = csv[row][headers[parent_header + "[index]"]]
          if iv == "":
             found = False
             break
@@ -686,9 +681,10 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
    parent[key] = st.string_to_value(value)
 
 
-def read_csv(csv_path, delimiter="\t", newline="\n", schema_type=None):
+def read_csv(csv_path, delimiter="\t", newline="\n"):
    re_metadata = re.compile("^[<](.*)[>]$")
    re_strip = re.compile(newline + "$")
+   re_alias = re.compile("[ ]+as[ ]+([^ ]+)[ ]*$")
    re_delimiter = re.compile(delimiter)
 
    if not os.path.isfile(csv_path):
@@ -712,34 +708,86 @@ def read_csv(csv_path, delimiter="\t", newline="\n", schema_type=None):
 
       csv_table.append(col_datas)
 
-   start_column = 0
-
    mts = {}
+   contents = []
+   alias_map = {}
+   column_map = {}
+   header_map = {}
+   regex_map = {}
+
+   # read metadata
+   column = 0
    for header in headers:
       hr = re_metadata.search(header)
       if not hr:
          break
 
-      mts[hr.group(1)] = csv_table[0][start_column]
-      start_column += 1
+      mtn = hr.group(1)
+      if mtn == "schematype":
+         cur = None
+         for r in range(row_size):
+            tv = csv_table[r][column]
 
-   if not schema_type:
-      schema_type = mts.get("schematype", None)
+            if tv:
+               alr = re_alias.search(tv)
+               tv = re_alias.sub("", tv)
+               if alr:
+                  if tv in alias_map and alr.group(1) != alias_map[tv]:
+                     raise Exception("Parsing '%s' was failed. Two different aliases were set of '%s'" % (csv_path, tv))
 
-   schema_type = get_schema_type(schema_type)
-   read_data = {}
+                  alias_map[tv] = alr.group(1)
 
-   for c in range(start_column, col_size):
-      header = headers[c]
-      for r in range(row_size):
-         _read_csv(csv_table[r][c], r, header, headers, schema_type, read_data, csv_table)
+               if tv not in column_map:
+                  column_map[tv] = list()
 
-   _Placeholder.finalize(read_data)
+               cur = {"type": tv, "start": r, "end": r}
+               contents.append(cur)
 
-   if _Placeholder.is_place_holder(read_data):
-      raise Exception("Parsing '%s' was uncompleted" % csv_path)
+            elif cur is not None:
+               cur["end"] = r
 
-   return schema_type.partial_make(read_data)
+      else:
+         mts[hr.group(1)] = csv_table[0][column]
+
+      column += 1
+
+   # get content column range
+   for k, cln_list in column_map.items():
+      als = alias_map.get(k, k)
+      regex = re.compile("^" + als.replace(".", "[.]") + "[.]")
+
+      regex_map[k] = regex
+      con_headers = {}
+      header_map[k] = con_headers
+
+      for c in range(column, col_size):
+         if regex.search(headers[c]):
+            con_headers[regex.sub("", headers[c])] = c
+            cln_list.append(c)
+
+   results = []
+
+   for content in contents:
+      typ = content["type"]
+      row_start = content["start"]
+      row_end = content["end"]
+      regex = regex_map[typ]
+      schema_type = get_schema_type(typ)
+      con_headers = header_map[typ]
+      read_data = {}
+      for c in column_map[typ]:
+         header = regex.sub("", headers[c])
+         for r in range(row_start, row_end + 1):
+            _read_csv(csv_table[r][c], r, header, con_headers, schema_type, read_data, csv_table)
+
+      _Placeholder.finalize(read_data)
+
+      if _Placeholder.is_place_holder(read_data):
+         raise Exception("Parsing '%s' was uncompleted" % csv_path)
+
+      results.append(schema_type.partial_make(read_data))
+
+   return results
 
 
 def copy(d, deep=True):
@@ -929,7 +977,7 @@ class _CSVHeader(object):
       self.__fill = fill
 
    def fill(self):
-      return False
+      return self.__fill
 
    def column(self):
       return self.__column
@@ -1042,7 +1090,10 @@ def _get_header(key, headers):
    return header
 
 
-def _dump_csv_data(k, d, valuetype, headers, parent=None):
+def _dump_csv_data(k, d, valuetype, headers, parent=None, prefix=None):
+   if prefix is None:
+      prefix = ""
+
    if isinstance(valuetype, schematypes.SchemaType):
       valuetype = get_schema_type(valuetype.name)
 
@@ -1056,26 +1107,26 @@ def _dump_csv_data(k, d, valuetype, headers, parent=None):
       ckeys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
 
       for ck in ckeys:
-         _dump_csv_data(k + "." + ck, d[ck], valuetype.get(ck), headers, parent=parent)
+         _dump_csv_data(k + "." + ck, d[ck], valuetype.get(ck), headers, parent=parent, prefix=prefix)
 
    elif isinstance(d, dict):
       if not d:
          return
 
       ckeys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
-      key_header = _get_header(k + "{key}", headers)
+      key_header = _get_header(prefix + k + "{key}", headers)
 
       vk = k + "{value}"
       for ck in ckeys:
          kv = _CSVValue(ck, key_header, parent=parent)
          key_header.add_data(kv)
-         _dump_csv_data(vk, d[ck], valuetype.vtype, headers, parent=kv)
+         _dump_csv_data(vk, d[ck], valuetype.vtype, headers, parent=kv, prefix=prefix)
 
    elif isinstance(d, (list, set, tuple)):
       if not d:
          return
 
-      index_header = _get_header(k + "[index]", headers)
+      index_header = _get_header(prefix + k + "[index]", headers)
       vk = k + "[value]"
       i = 0
       for v in d:
@@ -1089,12 +1140,12 @@ def _dump_csv_data(k, d, valuetype, headers, parent=None):
          else:
             raise Exception("Unexpected value type '%s'" % valuetype)
 
-         _dump_csv_data(vk, v, vt, headers, parent=index)
+         _dump_csv_data(vk, v, vt, headers, parent=index, prefix=prefix)
          i += 1
 
    # scalar
    else:
-      header = _get_header(k, headers)
+      header = _get_header(prefix + k, headers)
 
       cv = _CSVValue(valuetype.value_to_string(d), header, valuetype=valuetype, parent=parent)
       header.add_data(cv)
@@ -1123,7 +1174,7 @@ def write(d, path, indent="  ", encoding=None):
       pprint(d, stream=f, indent=indent, encoding=encoding)
 
 
-def write_csv(data, path, encoding=None, delimiter="\t", newline="\n"):
+def write_csv(data, path, alias=None, encoding=None, delimiter="\t", newline="\n"):
    data_list = []
 
    if isinstance(data, types.TypeBase):
@@ -1141,21 +1192,33 @@ def write_csv(data, path, encoding=None, delimiter="\t", newline="\n"):
 
          data_list.append(d)
 
+   if alias is None:
+      alias = {}
+
    header_schema = _CSVHeader("<schematype>", 0, fill=False)
    headers = [header_schema]
 
+   alias_defined = set()
    for d in data_list:
       d._validate()
 
       schema_type = d._get_schema_type()
+      schema_type_name = get_schema_type_name(schema_type)
+      type_value = schema_type_name
 
-      schem_val = _CSVValue(get_schema_type_name(schema_type), header_schema)
+      prefix = alias.get(schema_type_name, schema_type_name)
+      if prefix != schema_type_name and prefix not in alias_defined:
+         alias_defined.add(prefix)
+         type_value = schema_type_name + " as " + prefix
+      prefix += "."
+
+      schem_val = _CSVValue(type_value, header_schema)
       header_schema.add_data(schem_val)
 
       keys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
 
       for k in keys:
-         _dump_csv_data(k, d[k], schema_type[k], headers, parent=schem_val)
+         _dump_csv_data(k, d[k], schema_type[k], headers, parent=schem_val, prefix=prefix)
 
    with open(path, "wb") as f:
       f.write(delimiter.join(map(lambda x: x.name(), headers)))
