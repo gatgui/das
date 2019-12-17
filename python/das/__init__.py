@@ -681,32 +681,15 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
    parent[key] = st.string_to_value(value)
 
 
-def read_csv(csv_path, delimiter="\t", newline="\n"):
-   re_metadata = re.compile("^[<](.*)[>]$")
-   re_strip = re.compile(newline + "$")
-   re_alias = re.compile("[ ]+as[ ]+([^ ]+)[ ]*$")
-   re_delimiter = re.compile(delimiter)
+def read_csv_table(csv_table):
+   data_table = csv_table[:]
 
-   if not os.path.isfile(csv_path):
-      return None
-
-   with open(csv_path, "r") as f:
-      lines = map(lambda x: re_strip.sub("", x), f.readlines())
-
-   if len(lines) == 0:
-      return None
-
-   headers = re_delimiter.split(lines.pop(0))
-   csv_table = []
+   headers = data_table.pop(0)
    col_size = len(headers)
-   row_size = len(lines)
+   row_size = len(data_table)
 
-   for l in lines:
-      col_datas = re_delimiter.split(l)
-      if col_size != len(col_datas):
-         raise Exception("Parsing '%s' was failed" % (csv_path))
-
-      csv_table.append(col_datas)
+   re_metadata = re.compile("^[<](.*)[>]$")
+   re_alias = re.compile("[ ]+as[ ]+([^ ]+)[ ]*$")
 
    mts = {}
    contents = []
@@ -726,14 +709,14 @@ def read_csv(csv_path, delimiter="\t", newline="\n"):
       if mtn == "schematype":
          cur = None
          for r in range(row_size):
-            tv = csv_table[r][column]
+            tv = data_table[r][column]
 
             if tv:
                alr = re_alias.search(tv)
                tv = re_alias.sub("", tv)
                if alr:
                   if tv in alias_map and alr.group(1) != alias_map[tv]:
-                     raise Exception("Parsing '%s' was failed. Two different aliases were set of '%s'" % (csv_path, tv))
+                     raise Exception("Two different aliases were set of '%s'" % (tv))
 
                   alias_map[tv] = alr.group(1)
 
@@ -747,7 +730,7 @@ def read_csv(csv_path, delimiter="\t", newline="\n"):
                cur["end"] = r
 
       else:
-         mts[hr.group(1)] = csv_table[0][column]
+         mts[hr.group(1)] = data_table[0][column]
 
       column += 1
 
@@ -778,16 +761,44 @@ def read_csv(csv_path, delimiter="\t", newline="\n"):
       for c in column_map[typ]:
          header = regex.sub("", headers[c])
          for r in range(row_start, row_end + 1):
-            _read_csv(csv_table[r][c], r, header, con_headers, schema_type, read_data, csv_table)
+            _read_csv(data_table[r][c], r, header, con_headers, schema_type, read_data, data_table)
 
       _Placeholder.finalize(read_data)
 
       if _Placeholder.is_place_holder(read_data):
-         raise Exception("Parsing '%s' was uncompleted" % csv_path)
+         raise Exception("Parsing uncompleted")
 
       results.append(schema_type.partial_make(read_data))
 
    return results
+
+
+def read_csv(csv_path, delimiter="\t", newline="\n"):
+   re_metadata = re.compile("^[<](.*)[>]$")
+   re_strip = re.compile(newline + "$")
+   re_alias = re.compile("[ ]+as[ ]+([^ ]+)[ ]*$")
+   re_delimiter = re.compile(delimiter)
+
+   if not os.path.isfile(csv_path):
+      return []
+
+   with open(csv_path, "r") as f:
+      lines = map(lambda x: re_strip.sub("", x), f.readlines())
+
+   if len(lines) == 0:
+      return []
+
+   csv_table = []
+   col_size = len(re_delimiter.split(lines[0]))
+
+   for l in lines:
+      col_datas = re_delimiter.split(l)
+      if col_size != len(col_datas):
+         raise Exception("Parsing '%s' was failed" % (csv_path))
+
+      csv_table.append(col_datas)
+
+   return read_csv_table(csv_table)
 
 
 def copy(d, deep=True):
