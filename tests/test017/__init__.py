@@ -15,9 +15,9 @@ class TestCase(unittest.TestCase):
    @classmethod
    def setUpClass(cls):
       cls.TestDir = os.path.abspath(os.path.dirname(__file__))
-      cls.HomerInput = cls.TestDir + "/homer.simpson"
+      cls.HomerInput = cls.TestDir + "/homer.person"
       cls.HomerOutput = cls.TestDir + "/homer.csv"
-      cls.SimpsonsInput = cls.TestDir + "/simpsons.simpson"
+      cls.SimpsonsInput = cls.TestDir + "/simpsons.family"
       cls.SimpsonsOutput = cls.TestDir + "/simpsons.csv"
       cls.MultipleOutput = cls.TestDir + "/multiple.csv"
       os.environ["DAS_SCHEMA_PATH"] = cls.TestDir
