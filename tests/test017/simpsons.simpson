@@ -1,0 +1,93 @@
+# encoding: utf8
+# version: 0.10.0
+# author: sol
+# date: 2019/12/17 16:53:06
+# schema_type: csv.Family
+# schema_version: 1.0
+{
+  'children': [
+    {
+      'name': {
+        'given': 'bart',
+        'family': 'simpson'
+      },
+      'age': 10L,
+      'gender': 'male'
+    },
+    {
+      'name': {
+        'given': 'lisa',
+        'family': 'simpson'
+      },
+      'gender': 'female'
+    },
+    {
+      'name': {
+        'given': 'Maggie',
+        'family': 'simpson'
+      },
+      'age': 1L,
+      'gender': 'female'
+    }
+  ],
+  'father': {
+    'name': {
+      'given': 'homer',
+      'family': 'simpson'
+    },
+    'age': 38L,
+    'gender': 'male'
+  },
+  'grandparents': {
+    'father': {
+      'name': {
+        'given': 'abraham',
+        'family': 'simpson'
+      },
+      'age': 80L,
+      'gender': 'male'
+    }
+  },
+  'intermediate': [
+    {
+      'data': {
+        'name': {
+          'given': 'patty',
+          'family': 'bouvier'
+        },
+        'gender': 'female'
+      },
+      'relation': 'aunt'
+    },
+    {
+      'data': {
+        'name': {
+          'given': 'selma',
+          'family': 'bouvier'
+        },
+        'gender': 'female'
+      },
+      'relation': 'aunt'
+    }
+  ],
+  'mother': {
+    'name': {
+      'given': 'marge',
+      'family': 'simpson'
+    },
+    'gender': 'female',
+    'family': [
+      {
+        'data': {
+          'name': {
+            'given': 'jacqueline',
+            'family': 'bouvier'
+          },
+          'gender': 'female'
+        },
+        'relation': 'parent'
+      }
+    ]
+  },
+  'name': 'simpson'
+}
