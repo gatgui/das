@@ -3,7 +3,7 @@ import re
 import sys
 import datetime
 
-__version__ = "0.9.5"
+__version__ = "0.10.0"
 __verbose__ = False
 try:
    __verbose__ = (int(os.environ.get("DAS_VERBOSE", "0")) != 0)
@@ -434,6 +434,376 @@ def read(path, schema_type=None, ignore_meta=False, strict_schema=None, **funcs)
    return read_string(src, schema_type=schema_type, encoding=encoding, strict_schema=strict_schema, **funcs)
 
 
+class _Placeholder(object):
+   def __init__(self, is_optional=False):
+      object.__init__(self)
+      self.optional = is_optional
+
+   def __repr__(self):
+      return "__NULL__"
+
+   @staticmethod
+   def is_place_holder(data):
+      if isinstance(data, (dict)):
+         for k, v in data.items():
+            if _Placeholder.is_place_holder(k):
+               return True
+
+            if _Placeholder.is_place_holder(v):
+               return True
+
+      elif isinstance(data, (list, tuple, set)):
+         for v in data:
+            if _Placeholder.is_place_holder(v):
+               return True
+
+      return isinstance(data, _Placeholder)
+
+   @staticmethod
+   def make_place_holder(st, is_optional=False):
+      if isinstance(st, (schematypes.Struct, schematypes.Dict)):
+         return _PlaceholderDict(is_optional=is_optional)
+
+      elif isinstance(st, schematypes.Sequence):
+         return _PlaceholderList(is_optional=is_optional)
+
+      return _Placeholder(is_optional=is_optional)
+
+   @staticmethod
+   def finalize(data):
+      if isinstance(data, (dict)):
+         pop_list = []
+         new_dict = {}
+
+         for k, v in data.items():
+            if isinstance(v, _PlaceholderDict):
+               if not v and v.optional:
+                  pop_list.append(k)
+                  continue
+
+               new_dict[k] = v.copy()
+
+            elif isinstance(v, _PlaceholderList):
+               if not v and v.optional:
+                  pop_list.append(k)
+                  continue
+
+               new_dict[k] = v[:]
+
+            elif isinstance(v, _Placeholder):
+               if v.optional:
+                  pop_list.append(k)
+                  continue
+
+               new_dict[k] = v
+
+            else:
+               new_dict[k] = v
+
+         for k, v in new_dict.items():
+            _Placeholder.finalize(v)
+            data[k] = v
+
+         for k in pop_list:
+            data.pop(k)
+
+      elif isinstance(data, (list, tuple, set)):
+         pop_list = []
+         new_list = {}
+
+         for i, v in enumerate(data):
+            if isinstance(v, _PlaceholderDict):
+               if not v and v.optional:
+                  pop_list.append(i)
+                  continue
+
+               new_list[i] = v.copy()
+
+            elif isinstance(v, _PlaceholderList):
+               if not v and v.optional:
+                  pop_list.append(i)
+                  continue
+
+               new_list[i] = v[:]
+
+            elif isinstance(v, _Placeholder):
+               if v.optional:
+                  pop_list.append(i)
+                  continue
+
+               new_list[i] = v
+
+            else:
+               new_list[i] = v
+
+         for i, v in new_list.items():
+            _Placeholder.finalize(v)
+            data[i] = v
+
+         for i in sorted(pop_list, reverse=True):
+            data.pop(i)
+
+
+class _PlaceholderDict(dict, _Placeholder):
+   def __init__(self, is_optional=False):
+      dict.__init__(self)
+      _Placeholder.__init__(self, is_optional=is_optional)
+
+
+class _PlaceholderList(list, _Placeholder):
+   def __init__(self, is_optional=False):
+      list.__init__(self)
+      _Placeholder.__init__(self, is_optional=is_optional)
+
+
+def _get_value_type(parent, key):
+   if key == "{value}":
+      return parent.vtype
+
+   elif key == "[value]":
+      return parent.type
+
+   return parent[key]
+
+
+def _get_org_type(st):
+   while (isinstance(st, schematypes.SchemaType)):
+      st = get_schema_type(st.name)
+
+   if isinstance(st, schematypes.Optional):
+      st = st.type
+
+   while (isinstance(st, schematypes.SchemaType)):
+      st = get_schema_type(st.name)
+
+   return st
+
+
+def _read_csv(value, row, header, headers, schematype, data, csv):
+   re_d_key = re.compile("[{]key[}]$")
+   re_a_index = re.compile("[[]index[]]$")
+   re_dot = re.compile("[.]")
+   re_tkn = re.compile("[[{][^]}{[]+[]}]")
+   st = schematype
+
+   keys = []
+   for sh in re_dot.split(header):
+      pure_name = re_tkn.sub("", sh)
+      keys.append(pure_name)
+      keys += re_tkn.findall(sh)
+
+   parent = data
+   key = keys[0]
+   found = True
+
+   parent_header = ""
+   is_optional = False
+
+   while (True):
+      creatable = True
+      cur_key = keys.pop(0)
+      cur_header = cur_key
+
+      # {key} and [index] should be only at the end of header
+      if cur_key == "{key}":
+         break
+
+      elif cur_key == "[index]":
+         break
+
+      st = _get_value_type(st, cur_key)
+      if isinstance(st, schematypes.Optional):
+         is_optional = True
+
+      st = _get_org_type(st)
+
+      if cur_key == "{value}":
+         creatable = False
+         kv = csv[row][headers[parent_header + "{key}"]]
+         if kv == "":
+            found = False
+            break
+
+         key = kv
+
+      elif cur_key == "[value]":
+         creatable = False
+         iv = csv[row][headers[parent_header + "[index]"]]
+         if iv == "":
+            found = False
+            break
+
+         key = int(iv)
+
+      else:
+         key = cur_key
+         cur_header = ("." + cur_key) if parent_header else cur_key
+
+      parent_header += cur_header
+
+      if not keys:
+         break
+
+      if not creatable:
+         parent = parent[key]
+      else:
+         parent[key] = parent.get(key, _Placeholder.make_place_holder(st, is_optional=is_optional))
+         parent = parent[key]
+
+   if not found:
+      return
+
+   if re_d_key.search(header):
+      if value != "":
+         parent[value] = _Placeholder.make_place_holder(_get_org_type(st.vtype), is_optional=is_optional)
+
+      return
+
+   if re_a_index.search(header):
+      if value != "":
+         parent.append(_Placeholder.make_place_holder(_get_org_type(st.type), is_optional=is_optional))
+
+      return
+
+   if key in parent and not isinstance(parent[key], _Placeholder):
+      return
+
+   # TODO : find better way
+   value = value.replace('\\"', '"')
+
+   if not value:
+      if is_optional:
+         p = _Placeholder(is_optional=is_optional)
+         return
+
+      try:
+         value = st.string_to_value(value)
+      except:
+         return
+
+   parent[key] = st.string_to_value(value)
+
+
+def read_csv_table(csv_table):
+   data_table = csv_table[:]
+
+   headers = data_table.pop(0)
+   col_size = len(headers)
+   row_size = len(data_table)
+
+   re_metadata = re.compile("^[<](.*)[>]$")
+   re_alias = re.compile("[ ]+as[ ]+([^ ]+)[ ]*$")
+
+   mts = {}
+   contents = []
+   alias_map = {}
+   column_map = {}
+   header_map = {}
+   regex_map = {}
+
+   # read metadata
+   column = 0
+   for header in headers:
+      hr = re_metadata.search(header)
+      if not hr:
+         break
+
+      mtn = hr.group(1)
+      if mtn == "schematype":
+         cur = None
+         for r in range(row_size):
+            tv = data_table[r][column]
+
+            if tv:
+               alr = re_alias.search(tv)
+               tv = re_alias.sub("", tv)
+               if alr:
+                  if tv in alias_map and alr.group(1) != alias_map[tv]:
+                     raise Exception("Two different aliases were set of '%s'" % (tv))
+
+                  alias_map[tv] = alr.group(1)
+
+               if tv not in column_map:
+                  column_map[tv] = list()
+
+               cur = {"type": tv, "start": r, "end": r}
+               contents.append(cur)
+
+            elif cur is not None:
+               cur["end"] = r
+
+      else:
+         mts[hr.group(1)] = data_table[0][column]
+
+      column += 1
+
+   # get content column range
+   for k, cln_list in column_map.items():
+      als = alias_map.get(k, k)
+      regex = re.compile("^" + als.replace(".", "[.]") + "[.]")
+
+      regex_map[k] = regex
+      con_headers = {}
+      header_map[k] = con_headers
+
+      for c in range(column, col_size):
+         if regex.search(headers[c]):
+            con_headers[regex.sub("", headers[c])] = c
+            cln_list.append(c)
+
+   results = []
+
+   for content in contents:
+      typ = content["type"]
+      row_start = content["start"]
+      row_end = content["end"]
+      regex = regex_map[typ]
+      schema_type = get_schema_type(typ)
+      con_headers = header_map[typ]
+      read_data = {}
+      for c in column_map[typ]:
+         header = regex.sub("", headers[c])
+         for r in range(row_start, row_end + 1):
+            _read_csv(data_table[r][c], r, header, con_headers, schema_type, read_data, data_table)
+
+      _Placeholder.finalize(read_data)
+
+      if _Placeholder.is_place_holder(read_data):
+         raise Exception("Parsing uncompleted")
+
+      results.append(schema_type.partial_make(read_data))
+
+   return results
+
+
+def read_csv(csv_path, delimiter="\t", newline="\n"):
+   re_metadata = re.compile("^[<](.*)[>]$")
+   re_strip = re.compile(newline + "$")
+   re_alias = re.compile("[ ]+as[ ]+([^ ]+)[ ]*$")
+   re_delimiter = re.compile(delimiter)
+
+   if not os.path.isfile(csv_path):
+      return []
+
+   with open(csv_path, "r") as f:
+      lines = map(lambda x: re_strip.sub("", x), f.readlines())
+
+   if len(lines) == 0:
+      return []
+
+   csv_table = []
+   col_size = len(re_delimiter.split(lines[0]))
+
+   for l in lines:
+      col_datas = re_delimiter.split(l)
+      if col_size != len(col_datas):
+         raise Exception("Parsing '%s' was failed" % (csv_path))
+
+      csv_table.append(col_datas)
+
+   return read_csv_table(csv_table)
+
+
 def copy(d, deep=True):
    if isinstance(d, TypeValidator):
       return d.copy()
@@ -475,6 +845,37 @@ def copy(d, deep=True):
    return rv
 
 
+def _get_sorted_keys(d):
+   _keys = [k for k in d]
+   try:
+      keys = d.ordered_keys()
+      # Just in case we get empty key list, make sure we have something
+      if not keys:
+         keys = [k for k in d]
+      else:
+         ekeys = list(set(_keys).difference(keys))
+         ekeys.sort()
+         keys += ekeys
+   except:
+      keys = _keys
+      keys.sort()
+
+   for k in keys:
+      # We assume string keys are 'ascii'
+      if isinstance(k, unicode):
+         try:
+            k = k.encode("ascii")
+         except:
+            raise Exception("Non-ascii keys are not supported!")
+      elif isinstance(k, str):
+         try:
+            k.decode("ascii")
+         except:
+            raise Exception("Non-ascii keys are not supported!")
+
+   return keys
+
+
 def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encoding=None):
    if stream is None:
       stream = sys.stdout
@@ -488,31 +889,8 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
       stream.write("{\n")
       n = len(d)
       i = 0
-      _keys = [k for k in d]
-      try:
-         keys = d.ordered_keys()
-         # Just in case we get empty key list, make sure we have something
-         if not keys:
-            keys = [k for k in d]
-         else:
-            ekeys = list(set(_keys).difference(keys))
-            ekeys.sort()
-            keys += ekeys
-      except:
-         keys = _keys
-         keys.sort()
+      keys = _get_sorted_keys(d)
       for k in keys:
-         # We assume string keys are 'ascii'
-         if isinstance(k, unicode):
-            try:
-               k = k.encode("ascii")
-            except:
-               raise Exception("Non-ascii keys are not supported!")
-         elif isinstance(k, str):
-            try:
-               k.decode("ascii")
-            except:
-               raise Exception("Non-ascii keys are not supported!")
          stream.write("%s%s%s: " % (tindent, indent, repr(k)))
          v = d[k]
          pprint(v, stream, indent=indent, depth=depth+1, inline=True, eof=False, encoding=encoding)
@@ -604,6 +982,185 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
       stream.write("\n")
 
 
+class _CSVHeader(object):
+   def __init__(self, name, column, fill=True):
+      super(_CSVHeader, self).__init__()
+      self.__column = column
+      self.__name = name
+      self.__data = []
+      self.__fill = fill
+
+   def fill(self):
+      return self.__fill
+
+   def column(self):
+      return self.__column
+
+   def name(self):
+      return self.__name
+
+   def add_data(self, data):
+      self.__data.append(data)
+
+   def data(self):
+      return self.__data[:]
+
+   def get_row(self, data):
+      if data not in self.__data:
+         return -1
+
+      c = 0
+      for d in self.__data:
+         if d == data:
+            return c
+
+         c += d.count()
+
+      return -1
+
+   def row_count(self):
+      rc = 0
+      for d in self.__data:
+         rc += d.count()
+
+      return rc
+
+
+class _CSVValue(object):
+   def __init__(self, value, header, valuetype=None, parent=None):
+      super(_CSVValue, self).__init__()
+      self.__children = []
+      self.__header = header
+      self.__parent = parent
+      self.__valuetype = valuetype
+      self.__value = value
+
+      if parent:
+         parent.__children.append(self)
+
+   def header(self):
+      return self.__header
+
+   def value(self):
+      return self.__value
+
+   def valuetype(self):
+      return self.__valuetype
+
+   def parent(self):
+      return self.__parent
+
+   def children(self):
+      return self.__children[:]
+
+   def row(self):
+      if not self.__parent:
+         return self.__header.get_row(self)
+
+      return self.__parent.get_row(self)
+
+   def get_row(self, child):
+      if child not in self.__children:
+         raise Exception("'%s' is not a child of '%s'" % (child.value(), self.value()))
+
+      cr = self.row()
+      header_count = {}
+      for c in self.__children:
+         h = c.header()
+         if h not in header_count:
+            header_count[h] = cr
+
+         if c == child:
+            return header_count[h]
+
+         header_count[h] += c.count()
+
+   def count(self):
+      if not self.__children:
+         return 1
+
+      header_count = {}
+      for c in self.__children:
+         h = c.header()
+         if h not in header_count:
+            header_count[h] = 0
+
+         header_count[h] += c.count()
+
+      return max(header_count.values())
+
+
+def _get_header(key, headers):
+   header = None
+   for h in headers:
+      if key == h.name():
+         header = h
+         break
+
+   if not header:
+      header = _CSVHeader(key, len(headers))
+      headers.append(header)
+
+   return header
+
+
+def _dump_csv_data(k, d, valuetype, headers, parent=None, prefix=None):
+   if prefix is None:
+      prefix = ""
+
+   valuetype = _get_org_type(valuetype)
+
+   if isinstance(d, Struct):
+      if not d:
+         return
+
+      ckeys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
+
+      for ck in ckeys:
+         _dump_csv_data(k + "." + ck, d[ck], valuetype.get(ck), headers, parent=parent, prefix=prefix)
+
+   elif isinstance(d, dict):
+      if not d:
+         return
+
+      ckeys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
+      key_header = _get_header(prefix + k + "{key}", headers)
+
+      vk = k + "{value}"
+      for ck in ckeys:
+         kv = _CSVValue(ck, key_header, parent=parent)
+         key_header.add_data(kv)
+         _dump_csv_data(vk, d[ck], valuetype.vtype, headers, parent=kv, prefix=prefix)
+
+   elif isinstance(d, (list, set, tuple)):
+      if not d:
+         return
+
+      index_header = _get_header(prefix + k + "[index]", headers)
+      vk = k + "[value]"
+      i = 0
+      for v in d:
+         index = _CSVValue(str(i), index_header, parent=parent)
+         index_header.add_data(index)
+         vt = None
+         if isinstance(valuetype, (schematypes.Sequence, schematypes.Set)):
+            vt = valuetype.type
+         elif isinstance(valuetype, schematypes.Tuple):
+            vt = valuetype.types[i]
+         else:
+            raise Exception("Unexpected value type '%s'" % valuetype)
+
+         _dump_csv_data(vk, v, vt, headers, parent=index, prefix=prefix)
+         i += 1
+
+   # scalar
+   else:
+      header = _get_header(prefix + k, headers)
+
+      cv = _CSVValue(valuetype.value_to_string(d), header, valuetype=valuetype, parent=parent)
+      header.add_data(cv)
+
+
 def write(d, path, indent="  ", encoding=None):
    d._validate()
 
@@ -625,6 +1182,81 @@ def write(d, path, indent="  ", encoding=None):
          if sn and sn.version is not None:
             f.write("# schema_version: %s\n" % sn.version)
       pprint(d, stream=f, indent=indent, encoding=encoding)
+
+
+def write_csv(data, path, alias=None, encoding=None, delimiter="\t", newline="\n"):
+   data_list = []
+
+   if isinstance(data, types.TypeBase):
+      if not data._get_schema_type():
+            raise Exception("Cannot export a csv file from unschemed data")
+
+      data_list = [data]
+
+   elif isinstance(data, (set, list)):
+      for d in data:
+         if not isinstance(d, types.TypeBase):
+            raise Exception("Invalid data given. Must be a instance of das.types.TypeBase")
+         if not d._get_schema_type():
+            raise Exception("Cannot export a csv file from unschemed data")
+
+         data_list.append(d)
+
+   if alias is None:
+      alias = {}
+
+   header_schema = _CSVHeader("<schematype>", 0, fill=False)
+   headers = [header_schema]
+
+   alias_defined = set()
+   for d in data_list:
+      d._validate()
+
+      schema_type = d._get_schema_type()
+      schema_type_name = get_schema_type_name(schema_type)
+      type_value = schema_type_name
+
+      prefix = alias.get(schema_type_name, schema_type_name)
+      if prefix != schema_type_name and prefix not in alias_defined:
+         alias_defined.add(prefix)
+         type_value = schema_type_name + " as " + prefix
+      prefix += "."
+
+      schem_val = _CSVValue(type_value, header_schema)
+      header_schema.add_data(schem_val)
+
+      keys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
+
+      for k in keys:
+         _dump_csv_data(k, d[k], schema_type[k], headers, parent=schem_val, prefix=prefix)
+
+   with open(path, "wb") as f:
+      f.write(delimiter.join(map(lambda x: x.name(), headers)))
+      row_counts = max(map(lambda x: x.row_count(), headers))
+
+      column_counts = len(headers)
+      lines = map(lambda y: map(lambda x: "", range(column_counts)), range(row_counts))
+
+      for header in headers:
+         for hd in header.data():
+            vv = hd.value()
+
+            # TODO : find better way
+            if "\"" in hd.value():
+               vv = vv.replace("\"", "\\\"")
+
+            sr = hd.row()
+            er = sr + (hd.count() if header.fill() else 1)
+            c = header.column()
+
+            for r in range(sr, er):
+               if lines[r][c] != "":
+                  raise Exception("Invalid index. There is a data at [%s][%s] already" % (r, c))
+               lines[r][c] = vv
+
+      for r in lines:
+         f.write(newline)
+         f.write(delimiter.join(r))
 
 
 def generate_empty_schema(path, name=None, version=None, author=None):
