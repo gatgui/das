@@ -4,6 +4,8 @@ import excons
 
 env = excons.MakeBaseEnv()
 
+env.SConscript("Qute/SConstruct")
+
 version = None
 
 sys.path.insert(0, os.getcwd() + "/python")
@@ -26,7 +28,7 @@ prjs = [
 
 excons.DeclareTargets(env, prjs)
 
-targets = {"das": Glob(excons.OutputBaseDirectory() + "/python/*"),
+targets = {"das": Glob(excons.OutputBaseDirectory() + "/python/das"),
            "bin": Glob(excons.OutputBaseDirectory() + "/bin/*")}
 ecodirs = {"das": "/python",
            "bin": "/bin"}
