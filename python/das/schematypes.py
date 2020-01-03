@@ -343,7 +343,7 @@ class Set(TypeValidator):
          for item in value:
             try:
                tmp[i] = self.type.validate(item)
-            except ValidationError, e:
+            except ValidationError as e:
                raise ValidationError("Invalid set element: %s" % e)
             i += 1
          rv = das.types.Set(tmp)
@@ -410,7 +410,7 @@ class Sequence(TypeValidator):
          for index, item in enumerate(value):
             try:
                tmp[index] = self.type.validate(item)
-            except ValidationError, e:
+            except ValidationError as e:
                raise ValidationError("Invalid sequence element: %s" % e)
          rv = das.types.Sequence(tmp)
          rv._set_schema_type(self)
@@ -475,7 +475,7 @@ class Tuple(TypeValidator):
          for i in xrange(n):
             try:
                tmp[i] = self.types[i].validate(value[i])
-            except ValidationError, e:
+            except ValidationError as e:
                raise ValidationError("Invalid tuple element: %s" % e)
          rv = das.types.Tuple(tmp)
          rv._set_schema_type(self)
@@ -644,10 +644,10 @@ class Struct(TypeValidator, dict):
                   message = ("[das] Field %s is deprecated" % repr(k) if not v.message else v.message)
                   das.print_once(message)
                rv[k] = vv
-            except KeyError, e:
+            except KeyError as e:
                if not isinstance(v, Optional):
                   raise ValidationError("Invalid value for key '%s': %s" % (k, e))
-            except ValidationError, e:
+            except ValidationError as e:
                raise ValidationError("Invalid value for key '%s': %s" % (k, e))
          rv._set_schema_type(self)
          return rv
@@ -746,12 +746,12 @@ class Dict(TypeValidator):
          for k in value:
             try:
                ak = self.ktype.validate(k)
-            except ValidationError, e:
+            except ValidationError as e:
                raise ValidationError("Invalid key value '%s': %s" % (k, e))
             try:
                sk = str(ak)
                rv[ak] = self.vtypeOverrides.get(sk, self.vtype).validate(value[k])
-            except ValidationError, e:
+            except ValidationError as e:
                raise ValidationError("Invalid value for key '%s': %s" % (k, e))
          rv._set_schema_type(self)
          return rv
@@ -843,7 +843,7 @@ class Class(TypeValidator):
                newval = self.klass()
                newval.string_to_value(value)
                return newval
-            except Exception, e:
+            except Exception as e:
                raise ValidationError("Cannot instanciace class '%s' from string %s" % (self.klass.__name__, repr(value)))
          else:
             raise ValidationError("Expected a %s value, got %s" % (self.klass.__name__, type(value).__name__))
@@ -886,7 +886,7 @@ class Or(TypeValidator):
             try:
                rv = typ._validate_self(value)
                break
-            except ValidationError, e:
+            except ValidationError as e:
                continue
          Struct.CompatibilityMode = True
          if rv is not None:
@@ -894,7 +894,7 @@ class Or(TypeValidator):
       for typ in self.types:
          try:
             return typ._validate_self(value)
-         except ValidationError, e:
+         except ValidationError as e:
             continue
       raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(value).__name__)
       return None
@@ -907,7 +907,7 @@ class Or(TypeValidator):
             try:
                rv = typ.validate(value, key=key, index=index)
                break
-            except ValidationError, e:
+            except ValidationError as e:
                continue
          Struct.CompatibilityMode = True
          if rv is not None:
@@ -915,7 +915,7 @@ class Or(TypeValidator):
       for typ in self.types:
          try:
             return typ.validate(value, key=key, index=index)
-         except ValidationError, e:
+         except ValidationError as e:
             continue
       raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(value).__name__)
       return None

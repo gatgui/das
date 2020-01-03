@@ -93,7 +93,7 @@ class TypeBase(object):
          if hasattr(self, "_validate_globally"):
             try:
                self._validate_globally()
-            except Exception, e:
+            except Exception as e:
                # fn = ""
                # cm = self._validate_globally.im_class.__module__
                # if cm != "__main__":
@@ -225,7 +225,7 @@ class Set(TypeBase, set):
       super(Set, self).add(ae)
       try:
          self._gvalidate()
-      except Exception, e:
+      except Exception as e:
          self.remove(ae)
          raise e
 
@@ -241,7 +241,7 @@ class Set(TypeBase, set):
             added.add(item)
       try:
          self._gvalidate()
-      except Exception, e:
+      except Exception as e:
          for item in added:
             self.remove(item)
          raise e
@@ -267,7 +267,7 @@ class Dict(TypeBase, dict):
       super(Dict, self).__setitem__(k, self._adapt_value(v, key=k))
       try:
          self._gvalidate()
-      except Exception, e:
+      except Exception as e:
          if wasset:
             super(Dict, self).__setitem__(k, oldval)
          else:
@@ -315,7 +315,7 @@ class Dict(TypeBase, dict):
          self[k] = self._adapt_value(v, key=k)
       try:
          self._gvalidate()
-      except Exception, e:
+      except Exception as e:
          for k in remvals:
             del(self[k])
          for k, v in oldvals.iteritems():
@@ -377,7 +377,7 @@ class Struct(TypeBase):
          self._dict[k] = self._adapt_value(v, key=k)
          try:
             self._gvalidate()
-         except Exception, e:
+         except Exception as e:
             if wasset:
                self._dict[k] = oldval
             else:
@@ -390,7 +390,7 @@ class Struct(TypeBase):
       del(self._dict[k])
       try:
          self._gvalidate()
-      except Exception, e:
+      except Exception as e:
          # Note: del(self._dict[k]) will have raised an exception if k is not set
          #       if we reach here, k was set
          self._dict[k] = oldval
@@ -408,7 +408,7 @@ class Struct(TypeBase):
       self._dict.__setitem__(k, self._adapt_value(v, key=k))
       try:
          self._gvalidate()
-      except Exception, e:
+      except Exception as e:
          if wasset:
             self._dict[k] = oldval
          else:
@@ -421,7 +421,7 @@ class Struct(TypeBase):
       self._dict.__delitem__(k)
       try:
          self._gvalidate()
-      except Exception, e:
+      except Exception as e:
          # Note: same remark as in __delattr__
          self._dict[k] = oldval
          raise e
@@ -508,7 +508,7 @@ class Struct(TypeBase):
          self._dict[k] = self._adapt_value(v, key=k)
       try:
          self._gvalidate()
-      except Exception, e:
+      except Exception as e:
          for k in remvals:
             del(self._dict[k])
          for k, v in oldvals.iteritems():

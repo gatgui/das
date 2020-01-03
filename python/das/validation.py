@@ -61,7 +61,7 @@ class Schema(object):
          try:
             modname = os.path.splitext(os.path.basename(self.path))[0]
             mod = imp.load_source("das.schema.%s" % modname, pmp)
-         except Exception, e:
+         except Exception as e:
             import traceback
             print("[das] Failed to load schema module '%s' (%s)" % (pmp, e))
             traceback.print_exc()
@@ -126,7 +126,7 @@ class Schema(object):
       self.master_types = None
 
    def list_types(self, sort=True, masters_only=False):
-      rv = self.types.keys()
+      rv = list(self.types.keys())
       if masters_only and self.master_types is not None:
          rv = filter(lambda x: x in self.master_types, rv)
       if sort:
@@ -187,7 +187,7 @@ class SchemaLocation(object):
       self.schemas = {}
 
    def list_schemas(self, sort=True):
-      rv = self.schemas.keys()
+      rv = list(self.schemas.keys())
       if sort:
          rv.sort()
       return rv
@@ -368,7 +368,7 @@ class SchemaTypesRegistry(object):
             try:
                if not self._add_schema_type(k, v):
                   print("Failed to re register dynamically added type '%s' (already registered)" % k)
-            except Exception, e:
+            except Exception as e:
                print("Failed to re register dynamically added type '%s' (%s)" % (k, e))
 
       self._rebuild_cache()
@@ -397,7 +397,7 @@ class SchemaTypesRegistry(object):
 
    def list_schemas(self, sort=True):
       self.load_schemas()
-      rv = self.cache["name_to_schema"].keys()
+      rv = list(self.cache["name_to_schema"].keys())
       if sort:
          rv.sort()
       return rv
@@ -405,7 +405,7 @@ class SchemaTypesRegistry(object):
    def list_schema_types(self, schema=None, sort=True, masters_only=False):
       self.load_schemas()
       if schema is None:
-         rv = self.cache["name_to_type"].keys()
+         rv = list(self.cache["name_to_type"].keys())
       else:
          schema = self.cache["name_to_schema"].get(schema, None)
          if schema:

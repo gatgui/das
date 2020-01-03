@@ -31,7 +31,7 @@ if __name__ == "__main__":
          mod = imp.load_source(name, test+"/__init__.py")
          print("Add '%s' to test suite..." % name)
          suite.addTests(loader.loadTestsFromTestCase(mod.TestCase))
-      except Exception, e:
+      except Exception as e:
          print("Skipping '%s' (%s)" % (name, e))
 
    unittest.TextTestRunner(verbosity=3).run(suite)
