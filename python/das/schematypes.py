@@ -715,7 +715,7 @@ class Struct(TypeValidator, dict):
       return rv
 
    def conform(self, args, fill=False):
-      if not isinstance(args, dict):
+      if not isinstance(args, (dict, das.types.Struct)):
          raise ValidationError("Expected a dict value, got %s" % type(args).__name__)
 
       rv = type(args)()
@@ -821,7 +821,7 @@ class Dict(TypeValidator):
       return self._validate(kwargs)
 
    def conform(self, args, fill=False):
-      if not isinstance(args, dict):
+      if not isinstance(args, (dict, das.types.Struct)):
          raise ValidationError("Expected a dict value, got %s" % type(args).__name__)
 
       rv = dict()
