@@ -73,6 +73,9 @@ class TypeValidator(object):
    def partial_make(self, args):
       return self._validate(args)
 
+   def conform(self, args, fill=False):
+      return self.validate(args)
+
    def copy(self):
       return TypeValidator(default=self.default, description=self.description, editable=self.editable, hidden=self.hidden)
 
@@ -358,6 +361,16 @@ class Set(TypeValidator):
    def make(self, *args, **kwargs):
       return self._validate(args)
 
+   def conform(self, args, fill=False):
+      if not isinstance(args, (list, set, tuple)):
+         raise ValidationError("Expected a sequence value, got %s" % type(args).__name__)
+
+      rv = set()
+      for arg in args:
+         rv.add(self.type.conform(arg, fill=fill))
+
+      return self.validate(rv)
+
    def partial_make(self, args):
       if not isinstance(args, (list, set, tuple)):
          raise ValidationError("Expected a sequence value, got %s" % type(args).__name__)
@@ -423,6 +436,16 @@ class Sequence(TypeValidator):
 
    def make(self, *args, **kwargs):
       return self._validate(args)
+
+   def conform(self, args, fill=False):
+      if not isinstance(args, (list, set, tuple)):
+         raise ValidationError("Expected a sequence value, got %s" % type(args).__name__)
+
+      rv = list()
+      for arg in args:
+         rv.append(self.type.conform(arg, fill=fill))
+
+      return self.validate(rv)
 
    def partial_make(self, args):
       if not isinstance(args, (list, set, tuple)):
@@ -493,6 +516,20 @@ class Tuple(TypeValidator):
 
    def make(self, *args, **kwargs):
       return self._validate(args)
+
+   def conform(self, args, fill=False):
+      if not isinstance(args, (list, set, tuple)):
+         raise ValidationError("Expected a sequence value, got %s" % type(args).__name__)
+
+      if len(args) != len(self.types):
+         raise ValidationError("Expected a tuple of size %d, got %d" % (len(self.types), len(args)))
+
+      rv = list()
+
+      for i in range(len(args)):
+         rv.append(self.types[i].conform(args[i], fill=fill))
+
+      return self.validate(rv)
 
    def partial_make(self, args):
       if not isinstance(args, (list, set, tuple)):
@@ -677,6 +714,20 @@ class Struct(TypeValidator, dict):
          setattr(rv, k, v)
       return rv
 
+   def conform(self, args, fill=False):
+      if not isinstance(args, (dict, das.types.Struct)):
+         raise ValidationError("Expected a dict value, got %s" % type(args).__name__)
+
+      rv = type(args)()
+
+      for k in self:
+         if k in args:
+            rv[k] = self[k].conform(args[k], fill=fill)
+         elif fill:
+            rv[k] = self[k].make_default()
+
+      return self.validate(rv)
+
    def partial_make(self, args):
       if not isinstance(args, dict):
          raise ValidationError("Expected a dict value, got %s" % type(args).__name__)
@@ -768,6 +819,18 @@ class Dict(TypeValidator):
 
    def make(self, *args, **kwargs):
       return self._validate(kwargs)
+
+   def conform(self, args, fill=False):
+      if not isinstance(args, (dict, das.types.Struct)):
+         raise ValidationError("Expected a dict value, got %s" % type(args).__name__)
+
+      rv = dict()
+
+      for k, v in args.items():
+         k = self.ktype.conform(k, fill=fill)
+         rv[k] = self.vtype.conform(v, fill=fill)
+
+      return self.validate(rv)
 
    def partial_make(self, args):
       if not isinstance(args, dict):
@@ -947,6 +1010,15 @@ class Or(TypeValidator):
    def make(self, *args, **kwargs):
       return self.types[0].make(*args, **kwargs)
 
+   def conform(self, args, fill=False):
+      for typ in self.types:
+         try:
+            return typ.conform(args, fill=fill)
+         except ValidationError, e:
+            continue
+
+      raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(args).__name__)
+
    def partial_make(self, args):
       for typ in self.types:
          try:
@@ -994,6 +1066,9 @@ class Optional(TypeValidator):
 
    def make(self, *args, **kwargs):
       return self.type.make(*args, **kwargs)
+
+   def conform(self, args, fill=False):
+      return self.type.conform(args, fill=fill)
 
    def partial_make(self, args):
       return self.type.partial_make(args)
@@ -1137,6 +1212,10 @@ class SchemaType(TypeValidator):
    def make(self, *args, **kwargs):
       st = das.get_schema_type(self.name)
       return st.make(*args, **kwargs)
+
+   def conform(self, args, fill=False):
+      st = das.get_schema_type(self.name)
+      return st.conform(args, fill=fill)
 
    def partial_make(self, args):
       st = das.get_schema_type(self.name)

@@ -138,7 +138,8 @@ def bind(mixins, instance, reset=False, verbose=False):
                print("[das] '%s' already bound" % addclass.__name__)
             return instance
 
-   klassname = "_".join([baseclass.__name__] + [x.__name__ for x in mixins])
+   klassname = "_".join([baseclass.__name__] + [x.__module__.split(".")[-1] + "_" + x.__name__ for x in mixins])
+
    klass = _DynamicClasses.get(klassname, (None, None, None))[0]
 
    if klass is None:
@@ -153,8 +154,9 @@ def bind(mixins, instance, reset=False, verbose=False):
                das.print_once("[das] Method '%s' from mixin '%s' is shadowed" % (n, mixin.__name__))
          bmeths = bmeths.union(fmeths)
 
-         cclassname = cclass.__name__ + "_" + mixin.__name__
+         cclassname = cclass.__name__ + "_" + mixin.__module__.split(".")[-1] + "_" + mixin.__name__
          klass = type(cclassname, (cclass, mixin), {})
+
          _DynamicClasses[cclassname] = (klass, cclass, mixin)
 
          # Also add class to the module the mixin is coming from

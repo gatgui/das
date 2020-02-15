@@ -1,0 +1,13 @@
+# name: conform
+# version: 1.0
+# das_minimum_version: 0.10.0
+{
+   "Name": Struct(given=String(),
+                  family=String(),
+                  __order__=["given", "family"]),
+   "NameDict": Dict(ktype=Integer(),
+                    vtype=SchemaType("Name")),
+   "Person": Struct(name=SchemaType("Name"),
+                    age=Integer()),
+   "PersonSeq": Sequence(SchemaType("Person"))
+}
