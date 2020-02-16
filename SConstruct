@@ -28,10 +28,4 @@ prjs = [
 
 excons.DeclareTargets(env, prjs)
 
-targets = {"das": Glob(excons.OutputBaseDirectory() + "/python/das"),
-           "bin": Glob(excons.OutputBaseDirectory() + "/bin/*")}
-ecodirs = {"das": "/python",
-           "bin": "/bin"}
-excons.EcosystemDist(env, "das.env", ecodirs, version=version, targets=targets)
-
-Default(["das"])
+excons.EcosystemDist(env, "das.env", {"das": excons.OutputBaseDirectory()}, version=version)

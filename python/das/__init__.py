@@ -211,6 +211,13 @@ def adapt_value(value, schema_type=None, key=None, index=None):
             return value
 
 
+def conform(value, schema_type, fill=False):
+   if not isinstance(schema_type, TypeValidator):
+      schema_type = get_schema_type(schema_type)
+
+   return schema_type.conform(value, fill=fill)
+
+
 def validate(d, schema_type):
    if not isinstance(schema_type, (basestring, TypeValidator)):
       raise Exception("Expected a string or a das.schematypes.TypeValidator instance as second argument")
