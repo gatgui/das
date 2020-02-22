@@ -1,0 +1,58 @@
+# encoding: utf8
+# version: 0.10.0
+# author: sol
+# date: 2019/12/17 16:53:06
+# schema_type: csv.Person
+# schema_version: 1.0
+{
+  'name': {
+    'given': 'homer',
+    'family': 'simpson'
+  },
+  'age': 38L,
+  'gender': 'male',
+  'family': [
+    {
+      'data': {
+        'name': {
+          'given': 'marge',
+          'family': 'simpson'
+        },
+        'gender': 'female'
+      },
+      'relation': 'spouse'
+    },
+    {
+      'data': {
+        'name': {
+          'given': 'bart',
+          'family': 'simpson'
+        },
+        'age': 10L,
+        'gender': 'male'
+      },
+      'relation': 'child'
+    },
+    {
+      'data': {
+        'name': {
+          'given': 'lisa',
+          'family': 'simpson'
+        },
+        'gender': 'female'
+      },
+      'relation': 'child'
+    },
+    {
+      'data': {
+        'name': {
+          'given': 'Maggie',
+          'family': 'simpson'
+        },
+        'age': 1L,
+        'gender': 'female'
+      },
+      'relation': 'child'
+    }
+  ]
+}

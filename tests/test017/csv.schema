@@ -1,0 +1,26 @@
+# name: csv
+# version: 1.0
+# das_minimum_version: 0.10.0
+{
+   "Name": Struct(given=String(),
+                  family=String(),
+                  __order__=["given", "family"]),
+   "Person": Struct(name=SchemaType("Name"),
+                    age=Optional(Integer()),
+                    gender=SchemaType("Gender"),
+                    family=Optional(Sequence(SchemaType("Relationship"))),
+                    __order__=["name", "age", "gender", "family"]),
+   "Gender": String(default="male",
+                    choices=["male", "female"]),
+   "Relationship": Struct(data=SchemaType("Person"),
+                          relation=String(default="spouse",
+                                          choices=["parent", "spouse", "child", "uncle", "aunt"])),
+   "Parent": String("father", choices=["father", "mother"]),
+   "Family": Struct(name=String(),
+                    father=Optional(SchemaType("Person")),
+                    mother=Optional(SchemaType("Person")),
+                    children=Sequence(SchemaType("Person")),
+                    grandparents=Dict(ktype=SchemaType("Parent"),
+                                      vtype=SchemaType("Person")),
+                    intermediate=Sequence(SchemaType("Relationship")))
+}

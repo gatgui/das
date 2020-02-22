@@ -4,6 +4,8 @@ import excons
 
 env = excons.MakeBaseEnv()
 
+env.SConscript("Qute/SConstruct")
+
 version = None
 
 sys.path.insert(0, os.getcwd() + "/python")
@@ -26,10 +28,4 @@ prjs = [
 
 excons.DeclareTargets(env, prjs)
 
-targets = {"das": Glob(excons.OutputBaseDirectory() + "/python/*"),
-           "bin": Glob(excons.OutputBaseDirectory() + "/bin/*")}
-ecodirs = {"das": "/python",
-           "bin": "/bin"}
-excons.EcosystemDist(env, "das.env", ecodirs, version=version, targets=targets)
-
-Default(["das"])
+excons.EcosystemDist(env, "das.env", {"das": excons.OutputBaseDirectory()}, version=version)
