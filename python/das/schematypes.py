@@ -1008,7 +1008,13 @@ class Or(TypeValidator):
       return super(Or, self).make_default()
 
    def make(self, *args, **kwargs):
-      return self.types[0].make(*args, **kwargs)
+      for typ in self.types:
+         try:
+            return typ.make(*args, **kwargs)
+         except ValidationError, e:
+            continue
+
+      raise ValidationError("Cannot make any of the allowed types from arguments (args=%s, kwargs=%s)" % (repr(args), repr(kwargs)))
 
    def conform(self, args, fill=False):
       for typ in self.types:
@@ -1017,7 +1023,7 @@ class Or(TypeValidator):
          except ValidationError, e:
             continue
 
-      raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(args).__name__)
+      raise ValidationError("Cannot conform to any of the allowed types from arguments (args=%s, kwargs=%s)" % (repr(args), repr(kwargs)))
 
    def partial_make(self, args):
       for typ in self.types:
