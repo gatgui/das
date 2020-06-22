@@ -1,4 +1,5 @@
 import das
+import traceback
 
 
 class ReservedNameError(Exception):
@@ -101,6 +102,7 @@ class TypeBase(object):
                # fn += self._validate_globally.im_class.__name__
                # fn += "._validate_globally"
                # raise das.ValidationError("'%s' failed (%s)" % (fn, e))
+               traceback.print_exc()
                raise das.ValidationError(str(e))
 
    def _get_schema_type(self):

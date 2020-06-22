@@ -1031,7 +1031,7 @@ class Or(TypeValidator):
    def __repr__(self):
       s = "Or(%s" % ", ".join(map(str, self.types))
       if self.default is not None:
-         s += ", default=%s" % self.default
+         s += ", default=%s" % repr(self.default)
       if self.description:
          s += ", description=%s" % repr(self.description)
       return s + ")"
