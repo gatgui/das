@@ -329,6 +329,9 @@ class Dict(TypeBase, dict):
    def __getitem__(self, k):
       return TypeBase.TransferGlobalValidator(self, super(Dict, self).__getitem__(self._adapt_key(k)))
 
+   # __delitem__?
+   # pop?
+
    def itervalues(self):
       for v in super(Dict, self).itervalues():
          yield TypeBase.TransferGlobalValidator(self, v)
@@ -389,16 +392,21 @@ class Struct(TypeBase):
             raise e
 
    def __delattr__(self, k):
+      _k = k
       k = self._get_alias(k)
       oldval = self._dict.get(k, None)
-      del(self._dict[k])
+      # this will fail if key doesn't exists, as expected
+      self._dict.__delitem__(k)
       try:
+         self._validate()
          self._gvalidate()
       except Exception, e:
          # Note: del(self._dict[k]) will have raised an exception if k is not set
          #       if we reach here, k was set
          self._dict[k] = oldval
-         raise e
+         emsg = "Cannot delete key %s as it would lead to the following validation error" % repr(_k)
+         emsg += "".join(map(lambda x: "\n  %s" % x, traceback.format_exc().split("\n")))
+         raise das.ValidationError(emsg)
 
    def __getitem__(self, k):
       k = self._get_alias(k)
@@ -420,15 +428,20 @@ class Struct(TypeBase):
          raise e
 
    def __delitem__(self, k):
+      _k = k
       k = self._get_alias(k)
       oldval = self._dict.get(k, None)
+      # this will fail if key doesn't exists, as expected
       self._dict.__delitem__(k)
       try:
+         self._validate()
          self._gvalidate()
       except Exception, e:
          # Note: same remark as in __delattr__
          self._dict[k] = oldval
-         raise e
+         emsg = "Cannot delete item %s as it would lead to the following validation error" % repr(_k)
+         emsg += "".join(map(lambda x: "\n  %s" % x, traceback.format_exc().split("\n")))
+         raise das.ValidationError(emsg)
 
    def __contains__(self, k):
       return self._dict.__contains__(self._get_alias(k))
@@ -462,6 +475,24 @@ class Struct(TypeBase):
 
    def __repr__(self):
       return self._dict.__repr__()
+
+   # Override of dict.pop
+   def _pop(self, k, *args):
+      _k = k
+      k = self._get_alias(k)
+      wasset = (k in self._dict)
+      oldval = self._dict.get(k, None)
+      retval = self._dict.pop(k, *args)
+      try:
+         self._validate()
+         self._gvalidate()
+      except Exception, e:
+         if wasset:
+            self._dict[k] = oldval
+         emsg = "Cannot pop key %s as it would lead to the following validation error" % repr(_k)
+         emsg += "".join(map(lambda x: "\n  %s" % x, traceback.format_exc().split("\n")))
+         raise das.ValidationError(emsg)
+      return retval
 
    # Override of dict.copy
    def _copy(self):
