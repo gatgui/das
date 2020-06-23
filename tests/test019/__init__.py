@@ -29,9 +29,15 @@ class TestCase(unittest.TestCase):
       del(os.environ["DAS_SCHEMA_PATH"])
 
    # Test functions
-   def testSwitch(self):
-      res1 = (1920, 1080)
-      res2 = {"base": (1920, 1080), "margins": {"10p": (1.1, 1.1)}, "defaultMargin": ""}
+   def testAssign1(self):
       obj = das.make_default("orswitch.Test")
-      obj.resolution = res2
-      obj.resolution = res1
+      obj.resolution = (1920, 1080)
+
+   def testAssign2(self):
+      obj = das.make_default("orswitch.Test")
+      obj.resolution = {"base": (1920, 1080), "margins": {"10p": (1.1, 1.1)}, "defaultMargin": ""}
+
+   def testAssign3(self):
+      obj = das.make_default("orswitch.Test")
+      with self.assertRaises(das.ValidationError):
+         obj.resolution = {"base": (1280, 720)}

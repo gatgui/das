@@ -954,12 +954,16 @@ class Or(TypeValidator):
          Struct.CompatibilityMode = True
          if rv is not None:
             return rv
+      emsgs = []
       for typ in self.types:
          try:
             return typ._validate_self(value)
          except ValidationError, e:
+            emsgs.append(str(e))
             continue
-      raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(value).__name__)
+      emsg = "Value of type %s doesn't match any of the allowed types" % type(value).__name__
+      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
+      raise ValidationError(emsg)
       return None
 
    def _validate(self, value, key=None, index=None):
@@ -975,12 +979,16 @@ class Or(TypeValidator):
          Struct.CompatibilityMode = True
          if rv is not None:
             return rv
+      emsgs = []
       for typ in self.types:
          try:
             return typ.validate(value, key=key, index=index)
          except ValidationError, e:
+            emsgs.append(str(e))
             continue
-      raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(value).__name__)
+      emsg = "Value of type %s doesn't match any of the allowed types" % type(value).__name__
+      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
+      raise ValidationError(emsg)
       return None
 
    def value_to_string(self, v):
@@ -989,6 +997,7 @@ class Or(TypeValidator):
             return typ.value_to_string(v)
          except:
             continue
+      return None
 
    def string_to_value(self, v):
       for typ in self.types:
@@ -996,6 +1005,7 @@ class Or(TypeValidator):
             return typ.string_to_value(v)
          except:
             continue
+      return None
 
    def _decode(self, encoding):
       super(Or, self)._decode(encoding)
@@ -1008,31 +1018,40 @@ class Or(TypeValidator):
       return super(Or, self).make_default()
 
    def make(self, *args, **kwargs):
+      emsgs = []
       for typ in self.types:
          try:
             return typ.make(*args, **kwargs)
          except ValidationError, e:
-            continue
+            emsgs.append(str(e))
 
-      raise ValidationError("Cannot make any of the allowed types from arguments (args=%s, kwargs=%s)" % (repr(args), repr(kwargs)))
+      emsg = "Cannot make any of the allowed types from arguments (args=%s, kwargs=%s)" % (repr(args), repr(kwargs))
+      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
+      raise ValidationError(emsg)
 
    def conform(self, args, fill=False):
+      emsgs = []
       for typ in self.types:
          try:
             return typ.conform(args, fill=fill)
          except ValidationError, e:
-            continue
+            emsgs.append(str(e))
 
-      raise ValidationError("Cannot conform to any of the allowed types from arguments (args=%s, kwargs=%s)" % (repr(args), repr(kwargs)))
+      emsg = "Cannot conform to any of the allowed types from arguments (args=%s, kwargs=%s)" % (repr(args), repr(kwargs))
+      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
+      raise ValidationError(emsg)
 
    def partial_make(self, args):
+      emsgs = []
       for typ in self.types:
          try:
             return typ.partial_make(args)
-         except:
-            continue
+         except Exception, e:
+            emsgs.append(str(e))
 
-      raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(args).__name__)
+      emsg = "Value of type %s doesn't match any of the allowed types" % type(args).__name__
+      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
+      raise ValidationError(emsg)
 
    def __repr__(self):
       s = "Or(%s" % ", ".join(map(str, self.types))

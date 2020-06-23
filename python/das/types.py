@@ -102,8 +102,10 @@ class TypeBase(object):
                # fn += self._validate_globally.im_class.__name__
                # fn += "._validate_globally"
                # raise das.ValidationError("'%s' failed (%s)" % (fn, e))
-               traceback.print_exc()
-               raise das.ValidationError(str(e))
+               emsg = "Global Validation Failed"
+               for l in traceback.format_exc().split("\n"):
+                  emsg += "\n  %s" % l.rstrip()
+               raise das.ValidationError(emsg)
 
    def _get_schema_type(self):
       return self.__dict__["_schema_type"]
