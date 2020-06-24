@@ -159,7 +159,7 @@ class Sequence(TypeBase, list):
          self._gvalidate()
       except Exception, e:
          super(Sequence, self).__setslice__(n, len(self), [])
-         raise e
+         raise das.ValidationError(traceback.format_exc())
       return self
 
    def __add__(self, y):
@@ -180,10 +180,10 @@ class Sequence(TypeBase, list):
       try:
          self._gvalidate()
       except Exception, e:
-         n = len(lst)
+         n = len(newvals)
          ii = (n+i if i < 0 else i)
          super(Sequence, self).__setslice__(ii, ii+n, oldvals)
-         raise e
+         raise das.ValidationError(traceback.format_exc())
 
    def insert(self, i, y):
       ii = (len(self)+i if i < 0 else i)
@@ -192,7 +192,7 @@ class Sequence(TypeBase, list):
          self._gvalidate()
       except Exception, e:
          super(Sequence, self).__setslice__(ii, ii+1, [])
-         raise e
+         raise das.ValidationError(traceback.format_exc())
 
    def append(self, y):
       n = len(self)
@@ -201,7 +201,7 @@ class Sequence(TypeBase, list):
          self._gvalidate()
       except Exception, e:
          super(Sequence, self).pop()
-         raise e
+         raise das.ValidationError(traceback.format_exc())
 
    def extend(self, y):
       n = len(self)
@@ -210,7 +210,7 @@ class Sequence(TypeBase, list):
          self._gvalidate()
       except Exception, e:
          super(Sequence, self).__setslice__(n, len(self), [])
-         raise e
+         raise das.ValidationError(traceback.format_exc())
 
    def pop(self, *args):
       n = len(self)
@@ -225,7 +225,7 @@ class Sequence(TypeBase, list):
             super(Sequence, self).insert(i, rv)
          else:
             super(Sequence, self).append(rv)
-         raise e
+         raise das.ValidationError(traceback.format_exc())
       return rv
 
    def __getitem__(self, i):
@@ -277,7 +277,7 @@ class Set(TypeBase, set):
          self._gvalidate()
       except Exception, e:
          self.remove(ae)
-         raise e
+         raise das.ValidationError(traceback.format_exc())
 
    def update(self, *args):
       added = set()
@@ -294,7 +294,7 @@ class Set(TypeBase, set):
       except Exception, e:
          for item in added:
             self.remove(item)
-         raise e
+         raise das.ValidationError(traceback.format_exc())
 
    def __iter__(self):
       for item in super(Set, self).__iter__():
@@ -322,7 +322,7 @@ class Dict(TypeBase, dict):
             super(Dict, self).__setitem__(k, oldval)
          else:
             del(self[k])
-         raise e
+         raise das.ValidationError(traceback.format_exc())
 
    def setdefault(self, *args):
       if len(args) >= 2:
@@ -370,7 +370,7 @@ class Dict(TypeBase, dict):
             del(self[k])
          for k, v in oldvals.iteritems():
             self[k] = v
-         raise e
+         raise das.ValidationError(traceback.format_exc())
 
    def __getitem__(self, k):
       return TypeBase.TransferGlobalValidator(self, super(Dict, self).__getitem__(self._adapt_key(k)))
@@ -435,7 +435,7 @@ class Struct(TypeBase):
                self._dict[k] = oldval
             else:
                del(self._dict[k])
-            raise e
+            raise das.ValidationError(traceback.format_exc())
 
    def __delattr__(self, k):
       _k = k
@@ -591,7 +591,9 @@ class Struct(TypeBase):
             del(self._dict[k])
          for k, v in oldvals.iteritems():
             self._dict[k] = v
-         raise e
+         emsg = "'update' failed as it would lead to the following validation error"
+         emsg += "".join(map(lambda x: "\n  %s" % x, traceback.format_exc().split("\n")))
+         raise das.ValidationError(emsg)
 
    def _get_alias(self, k):
       st = self._get_schema_type()
