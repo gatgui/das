@@ -83,7 +83,10 @@ class TypeBase(object):
       self._set_schema_type(schema_type)
 
    def _gvalidate(self):
-      if self._get_schema_type() is not None:
+      st = self._get_schema_type()
+      if st is not None:
+         # run self validation first (container validation)
+         st._validate_self(self)
          if hasattr(self, "_is_global_validation_enabled"):
             if not self._is_global_validation_enabled():
                # Skip global validaton
@@ -135,9 +138,10 @@ class Tuple(TypeBase, tuple):
 
    def __add__(self, y):
       n = len(self)
-      rv = super(Tuple, self).__add__(tuple([self._adapt_value(x, index=n+i) for i, x in enumerate(y)]))
-      self._gvalidate()
-      return self._wrap(rv)
+      tmp = super(Tuple, self).__add__(tuple([self._adapt_value(x, index=n+i) for i, x in enumerate(y)]))
+      rv = self._wrap(tmp)
+      rv._gvalidate()
+      return rv
 
    def __getitem__(self, i):
       return TypeBase.TransferGlobalValidator(self, super(Tuple, self).__getitem__(i))
@@ -150,37 +154,79 @@ class Sequence(TypeBase, list):
 
    def __iadd__(self, y):
       n = len(self)
-      rv = super(Sequence, self).__iadd__([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
-      self._gvalidate()
-      return self._wrap(rv)
+      super(Sequence, self).__iadd__([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
+      try:
+         self._gvalidate()
+      except Exception, e:
+         super(Sequence, self).__setslice__(n, len(self), [])
+         raise e
+      return self
 
    def __add__(self, y):
       n = len(self)
-      rv = super(Sequence, self).__add__([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
-      self._gvalidate()
-      return self._wrap(rv)
+      tmp = super(Sequence, self).__add__([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
+      rv = self._wrap(rv)
+      rv._gvalidate()
+      return rv
 
    def __setitem__(self, i, y):
       super(Sequence, self).__setitem__(i, self._adapt_value(y, index=i))
       self._gvalidate()
 
    def __setslice__(self, i, j, y):
-      super(Sequence, self).__setslice__(i, j, [self._adapt_value(x, index=i+k) for k, x in enumerate(y)])
-      self._gvalidate()
+      oldvals = super(Sequence, self).__getslice__(i, j)
+      newvals = [self._adapt_value(x, index=i+k) for k, x in enumerate(y)]
+      super(Sequence, self).__setslice__(i, j, newvals)
+      try:
+         self._gvalidate()
+      except Exception, e:
+         n = len(lst)
+         ii = (n+i if i < 0 else i)
+         super(Sequence, self).__setslice__(ii, ii+n, oldvals)
+         raise e
 
    def insert(self, i, y):
+      ii = (len(self)+i if i < 0 else i)
       super(Sequence, self).insert(i, self._adapt_value(y, index=i))
-      self._gvalidate()
+      try:
+         self._gvalidate()
+      except Exception, e:
+         super(Sequence, self).__setslice__(ii, ii+1, [])
+         raise e
 
    def append(self, y):
       n = len(self)
       super(Sequence, self).append(self._adapt_value(y, index=n))
-      self._gvalidate()
+      try:
+         self._gvalidate()
+      except Exception, e:
+         super(Sequence, self).pop()
+         raise e
 
    def extend(self, y):
       n = len(self)
       super(Sequence, self).extend([self._adapt_value(x, index=n+i) for i, x in enumerate(y)])
-      self._gvalidate()
+      try:
+         self._gvalidate()
+      except Exception, e:
+         super(Sequence, self).__setslice__(n, len(self), [])
+         raise e
+
+   def pop(self, *args):
+      n = len(self)
+      rv = super(Sequence, self).pop(*args)
+      try:
+         self._gvalidate()
+      except Exception, e:
+         if args:
+            i = args[0]
+            if i < 0:
+               i += n
+            super(Sequence, self).insert(i, rv)
+         else:
+            super(Sequence, self).append(rv)
+         raise e
+      return rv
 
    def __getitem__(self, i):
       return TypeBase.TransferGlobalValidator(self, super(Sequence, self).__getitem__(i))
@@ -398,7 +444,6 @@ class Struct(TypeBase):
       # this will fail if key doesn't exists, as expected
       self._dict.__delitem__(k)
       try:
-         self._validate()
          self._gvalidate()
       except Exception, e:
          # Note: del(self._dict[k]) will have raised an exception if k is not set
@@ -434,7 +479,6 @@ class Struct(TypeBase):
       # this will fail if key doesn't exists, as expected
       self._dict.__delitem__(k)
       try:
-         self._validate()
          self._gvalidate()
       except Exception, e:
          # Note: same remark as in __delattr__
@@ -484,7 +528,6 @@ class Struct(TypeBase):
       oldval = self._dict.get(k, None)
       retval = self._dict.pop(k, *args)
       try:
-         self._validate()
          self._gvalidate()
       except Exception, e:
          if wasset:
