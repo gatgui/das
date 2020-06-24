@@ -1,0 +1,16 @@
+# name: orswitch
+# version: 1.0
+# das_minimum_version: 0.10.1
+{
+   "Resolution": Tuple(Integer(default=1920, min=1),
+                       Integer(default=1080, min=1)),
+   "ResolutionScale": Tuple(Real(default=1.0, min=1.0),
+                            Real(default=1.0, min=1.0)),
+   "Test": Struct(resolution=Or(SchemaType("Resolution"),
+                                Struct(base=SchemaType("Resolution"),
+                                       margins=Dict(ktype=String(), vtype=SchemaType("ResolutionScale")),
+                                       defaultMargin=String())),
+                  defaultMargin=Deprecated(String(), hidden=True),
+                  resolutionsWithMargins=Deprecated(Dict(ktype=String(), vtype=SchemaType("Resolution")), hidden=True),
+                  marginPresets=Deprecated(Dict(ktype=String(), vtype=SchemaType("ResolutionScale")), hidden=True),)
+}
