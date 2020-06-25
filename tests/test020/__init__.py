@@ -198,3 +198,36 @@ class TestCase(unittest.TestCase):
 
       with self.assertRaises(das.ValidationError):
          dct.clear()
+
+   def testStruct(self):
+      t_struct = das.schematypes.Struct(
+         opt=das.schematypes.Optional(das.schematypes.Boolean()),
+         nopt=das.schematypes.Tuple(das.schematypes.Real(), das.schematypes.Real()))
+
+      st = t_struct.make_default()
+
+      with self.assertRaises(das.ValidationError):
+         st.pop("nopt")
+
+      st.opt = False
+
+      self.assertTrue(st.pop("opt") is False)
+
+      self.assertTrue(st.pop("opt", None) is None)
+
+      with self.assertRaises(das.ValidationError):
+         st.unknown = 2.0
+
+      self.assertTrue(st == {"nopt": (0, 0)})
+
+      with self.assertRaises(das.ValidationError):
+         st.clear()
+
+      with self.assertRaises(das.ValidationError):
+         st.popitem()
+
+      # doesn't work as expected
+      with self.assertRaises(das.ValidationError):
+         st.update(opt=True, extra=20.0)
+
+      self.assertTrue(st == {"nopt": (0, 0)})

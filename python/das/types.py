@@ -905,14 +905,16 @@ class Struct(TypeBase):
          self._dict[k] = self._adapt_value(v, key=k)
       try:
          self._gvalidate()
-      except Exception, e:
-         for k in remvals:
-            del(self._dict[k])
-         for k, v in oldvals.iteritems():
-            self._dict[k] = v
-         emsg = "'update' failed as it would lead to the following validation error"
-         emsg += "".join(map(lambda x: "\n  %s" % x, traceback.format_exc().split("\n")))
-         raise das.ValidationError(emsg)
+      except:
+         ec, ei, tb = sys.exc_info()
+         try:
+            for k in remvals:
+               del(self._dict[k])
+            for k, v in oldvals.iteritems():
+               self._dict[k] = v
+         except Exception, e:
+            print("das.types.Struct.update: Failed to recover struct data (%s)" % e)
+         raise ec, ei, tb
 
    def _get_alias(self, k):
       st = self._get_schema_type()
