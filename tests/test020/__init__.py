@@ -226,7 +226,6 @@ class TestCase(unittest.TestCase):
       with self.assertRaises(das.ValidationError):
          st.popitem()
 
-      # doesn't work as expected
       with self.assertRaises(das.ValidationError):
          st.update(opt=True, extra=20.0)
 

@@ -870,48 +870,37 @@ class Struct(TypeBase):
 
    # Override of dict.update
    def _update(self, *args, **kwargs):
-      oldvals = {}
-      remvals = set()
-      if len(args) == 1:
-         a0 = args[0]
-         if hasattr(a0, "keys"):
-            for k in a0.keys():
-               k = self._get_alias(k)
-               self._check_reserved(k)
-               if k in self._dict:
-                  oldvals[k] = self._dict[k]
-               else:
-                  remvals.add(k)
-               self._dict[k] = self._adapt_value(a0[k], key=k)
-         else:
-            for k, v in a0:
-               k = self._get_alias(k)
-               self._check_reserved(k)
-               if k in self._dict:
-                  oldvals[k] = self._dict[k]
-               else:
-                  remvals.add(k)
-               self._dict[k] = self._adapt_value(v, key=k)
-      elif len(args) > 1:
+      if len(args) > 1:
          raise Exception("update expected at most 1 arguments, got %d" % len(args))
-      for k, v in kwargs.iteritems():
-         k = self._get_alias(k)
-         self._check_reserved(k)
-         if k in self._dict:
-            if not k in oldvals:
-               oldvals[k] = self._dict[k]
-         else:
-            remvals.add(k)
-         self._dict[k] = self._adapt_value(v, key=k)
+
+      oldvals = self._dict.copy()
+
       try:
+         if len(args) == 1:
+            a0 = args[0]
+            if hasattr(a0, "keys"):
+               for k in a0.keys():
+                  k = self._get_alias(k)
+                  self._check_reserved(k)
+                  self._dict[k] = self._adapt_value(a0[k], key=k)
+            else:
+               for k, v in a0:
+                  k = self._get_alias(k)
+                  self._check_reserved(k)
+                  self._dict[k] = self._adapt_value(v, key=k)
+
+         for k, v in kwargs.iteritems():
+            k = self._get_alias(k)
+            self._check_reserved(k)
+            self._dict[k] = self._adapt_value(v, key=k)
+
          self._gvalidate()
+
       except:
          ec, ei, tb = sys.exc_info()
          try:
-            for k in remvals:
-               del(self._dict[k])
-            for k, v in oldvals.iteritems():
-               self._dict[k] = v
+            self._dict.clear()
+            self._dict.update(oldvals)
          except Exception, e:
             print("das.types.Struct.update: Failed to recover struct data (%s)" % e)
          raise ec, ei, tb
