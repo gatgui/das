@@ -88,18 +88,19 @@ def has_bound_mixins(instance):
    return (instance.__class__.__name__ in _DynamicClasses)
 
 
-def bind(mixins, instance, reset=False, verbose=False):
+def bind(mixins, instance, reset=False, verbose=False, force=False):
    if instance is None or not mixins:
       return instance
 
    if not isinstance(instance, das.types.TypeBase):
       raise BindError("Mixin can only be bound to das override types, got %s" % (type(instance).__name__))
 
-   st = instance._get_schema_type()
-   if st is None:
-      raise BindError("Mixim can only be bound to objects with a schema type")
-   else:
-      st = das.get_schema_type_name(st)
+   if not force:
+      st = instance._get_schema_type()
+      if st is None:
+         raise BindError("Mixin can only be bound to objects with a schema type")
+      else:
+         st = das.get_schema_type_name(st)
 
    if isinstance(mixins, (tuple, list, set)):
       for mixin in mixins:
@@ -113,12 +114,13 @@ def bind(mixins, instance, reset=False, verbose=False):
       else:
          raise BindError("'%s' must be a subclass of Mixin class" % mixins)
 
-   for mixin in mixins:
-      tst = mixin.get_schema_type()
-      if not das.has_schema_type(tst):
-         raise SchemaTypeError("Invalid schema type '%s' for mixin '%s'" % (st, mixin.__name__))
-      elif tst != st:
-         raise SchemaTypeError("Schema type mismatch for mixin '%s': Expected '%s', got '%s'" % (mixin.__name__, tst, st))
+   if not force:
+      for mixin in mixins:
+         tst = mixin.get_schema_type()
+         if not das.has_schema_type(tst):
+            raise SchemaTypeError("Invalid schema type '%s' for mixin '%s'" % (st, mixin.__name__))
+         elif tst != st:
+            raise SchemaTypeError("Schema type mismatch for mixin '%s': Expected '%s', got '%s'" % (mixin.__name__, tst, st))
 
    # Get the original class in use before any mixin were bound
    iclass = instance.__class__
