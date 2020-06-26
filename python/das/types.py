@@ -205,7 +205,6 @@ class Sequence(TypeBase, list):
       return TypeBase.TransferGlobalValidator(self, super(Sequence, self).__getitem__(i))
 
    def __delitem__(self, i):
-      # TODO: slice objects?
       ii = self._wrap_index(i, clamp=False)
       item = super(Sequence, self).__getitem__(ii)
       super(Sequence, self).__delitem__(i)
@@ -722,28 +721,31 @@ class Struct(TypeBase):
          self._dict[k] = self._adapt_value(v, key=k)
          try:
             self._gvalidate()
-         except Exception, e:
-            if wasset:
-               self._dict[k] = oldval
-            else:
-               del(self._dict[k])
-            raise das.ValidationError(traceback.format_exc())
+         except:
+            ec, ei, tb = sys.exc_info()
+            try:
+               if wasset:
+                  self._dict[k] = oldval
+               else:
+                  del(self._dict[k])
+            except Exception, e:
+               print("das.types.Struct.__setattr__: Failed to recover struct data (%s)" % e)
+            raise ec, ei, tb
 
    def __delattr__(self, k):
-      _k = k
       k = self._get_alias(k)
       oldval = self._dict.get(k, None)
-      # this will fail if key doesn't exists, as expected
       self._dict.__delitem__(k)
       try:
          self._gvalidate()
-      except Exception, e:
-         # Note: del(self._dict[k]) will have raised an exception if k is not set
-         #       if we reach here, k was set
-         self._dict[k] = oldval
-         emsg = "Cannot delete key %s as it would lead to the following validation error" % repr(_k)
-         emsg += "".join(map(lambda x: "\n  %s" % x, traceback.format_exc().split("\n")))
-         raise das.ValidationError(emsg)
+      except:
+         ec, ei, tb = sys.exc_info()
+         # Note: we can reach here only if k was a valid key (otherwise __delitem__(k) would fail)
+         try:
+            self._dict[k] = oldval
+         except Exception, e:
+            print("das.types.Struct.__delattr__: Failed to recover struct data (%s)" % e)
+         raise ec, ei, tb
 
    def __getitem__(self, k):
       k = self._get_alias(k)
@@ -757,30 +759,35 @@ class Struct(TypeBase):
       self._dict.__setitem__(k, self._adapt_value(v, key=k))
       try:
          self._gvalidate()
-      except Exception, e:
-         if wasset:
-            self._dict[k] = oldval
-         else:
-            del(self._dict[k])
-         raise e
+      except:
+         ec, ei, tb = sys.exc_info()
+         try:
+            if wasset:
+               self._dict[k] = oldval
+            else:
+               del(self._dict[k])
+         except Exception, e:
+            print("das.types.Struct.__setitem__: Failed to recover struct data (%s)" % e)
+         raise ec, ei, tb
 
    def __delitem__(self, k):
       _k = k
       k = self._get_alias(k)
       oldval = self._dict.get(k, None)
-      # this will fail if key doesn't exists, as expected
       self._dict.__delitem__(k)
       try:
          self._gvalidate()
-      except Exception, e:
-         # Note: same remark as in __delattr__
-         self._dict[k] = oldval
-         emsg = "Cannot delete item %s as it would lead to the following validation error" % repr(_k)
-         emsg += "".join(map(lambda x: "\n  %s" % x, traceback.format_exc().split("\n")))
-         raise das.ValidationError(emsg)
+      except:
+         ec, ei, tb = sys.exc_info()
+         # Note: we can reach here only if k was a valid key (otherwise __delitem__(k) would fail)
+         try:
+            self._dict[k] = oldval
+         except Exception, e:
+            print("das.types.Struct.__delitem__: Failed to recover struct data (%s)" % e)
+         raise ec, ei, tb
 
-   # def __contains__(self, k):
-   #    return self._dict.__contains__(self._get_alias(k))
+   def __contains__(self, k):
+      return self._dict.__contains__(self._get_alias(k))
 
    def __cmp__(self, oth):
       return self._dict.__cmp__(oth._dict if isinstance(oth, Struct) else oth)
@@ -811,6 +818,10 @@ class Struct(TypeBase):
 
    def __repr__(self):
       return self._dict.__repr__()
+
+   # Override of dict.has_key
+   def _has_key(self, k):
+      return self._dict.has_key(self._get_alias(k))
 
    # Override of dict.pop
    def _pop(self, k, *args):
