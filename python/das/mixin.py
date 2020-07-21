@@ -120,7 +120,9 @@ def bind(mixins, instance, reset=False, verbose=False, force=False):
          if not das.has_schema_type(tst):
             raise SchemaTypeError("Invalid schema type '%s' for mixin '%s'" % (st, mixin.__name__))
          elif tst != st:
-            raise SchemaTypeError("Schema type mismatch for mixin '%s': Expected '%s', got '%s'" % (mixin.__name__, tst, st))
+            # could be an extended type
+            if not hasattr(st, "_extends") or not st._extends(das.get_schema_type_name(st)):
+               raise SchemaTypeError("Schema type mismatch for mixin '%s': Expected '%s', got '%s'" % (mixin.__name__, tst, st))
 
    # Get the original class in use before any mixin were bound
    iclass = instance.__class__

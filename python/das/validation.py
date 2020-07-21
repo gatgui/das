@@ -98,9 +98,9 @@ class Schema(object):
             if das.__verbose__:
                das.print_once("[das] Warning: Schema '%s' defined in %s is unversioned" % (self.name, self.path))
 
-         das.schematypes.SchemaType.CurrentSchema = self.name
+         das.schematypes.TypeValidator.CurrentSchema = self.name
          rv = das.read_string(content, encoding=md.get("encoding", None), **eval_locals)
-         das.schematypes.SchemaType.CurrentSchema = ""
+         das.schematypes.TypeValidator.CurrentSchema = ""
          for typename, validator in rv.iteritems():
             k = "%s.%s" % (self.name, typename)
             if SchemaTypesRegistry.instance.has_schema_type(k):
@@ -355,7 +355,7 @@ class SchemaTypesRegistry(object):
          if force:
             forcelocations = set()
             for p in paths:
-               forcelocations.add(SchemaLocation(d, dont_load=True))
+               forcelocations.add(SchemaLocation(p, dont_load=True))
             for location in self.locations:
                if location in forcelocations:
                   location.load_schemas()

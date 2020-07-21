@@ -9,6 +9,8 @@ class ValidationError(Exception):
 
 
 class TypeValidator(object):
+   CurrentSchema = ""
+
    def __init__(self, default=None, description=None, editable=True, hidden=False, **kwargs):
       super(TypeValidator, self).__init__(**kwargs)
       self.default_validated = False
@@ -570,7 +572,7 @@ class Tuple(TypeValidator):
 class Struct(TypeValidator, dict):
    CompatibilityMode = False
 
-   def __init__(self, __description__=None, __editable__=True, __hidden__=False, __order__=None, **kwargs):
+   def __init__(self, __description__=None, __editable__=True, __hidden__=False, __order__=None, __extend__=None, **kwargs):
       # MRO: TypeValidator, dict, object
       removedValues = {}
       for name in ("default", "description", "editable", "hidden"):
@@ -589,8 +591,13 @@ class Struct(TypeValidator, dict):
          if aliasname is not None:
             aliases[k] = aliasname
 
+      self.__dict__["_aliases"] = aliases
+
+      # Build fields ordering
+      original_order = None
       keys = [k for k, _ in self.items() if not k in aliases]
       if __order__ is not None:
+         original_order = list(__order__)
          __order__ = filter(lambda x: x in keys, __order__)
          for n in keys:
             if not n in __order__:
@@ -598,8 +605,21 @@ class Struct(TypeValidator, dict):
       else:
          __order__ = sorted(keys)
 
-      self.__dict__["_aliases"] = aliases
+      self.__dict__["_original_order"] = original_order
       self.__dict__["_order"] = __order__
+
+      # Track schema to extend
+      extend = []
+      if isinstance(__extend__, (list, tuple, set)):
+         extend = list(__extend__)
+      elif isinstance(__extend__, dict):
+         extend = __extend__.keys()
+      elif __extend__:
+         extend = [__extend__]
+      extend = map(lambda x: "%s.%s" % (self.CurrentSchema, x) if not "." in str(x) else str(x), extend)
+
+      self.__dict__["_extend"] = extend
+      self.__dict__["_extended"] = [False] * len(self.__dict__["_extend"])
 
       # As some fields were removed from kwargs to avoid conflict with
       #   TypeValidator class initializer, add them back
@@ -607,7 +627,63 @@ class Struct(TypeValidator, dict):
       for name, value in removedValues.iteritems():
          self[name] = value
 
+   def _inherit(self, name):
+      print("_inherit: %s" % name)
+      st = das.get_schema_type(name)
+
+      # Check for Struct schema type
+      if not isinstance(st, Struct):
+         raise Exception("Cannot inherit from %s schema types %s ()" % (type(st).__name__, repr(name)))
+
+      # Check for conflicting fields
+      for k in st.ordered_keys():
+         if k in self:
+            # TODO: eventually check for matching types here before failing
+            raise Exception("Cannot inherit schema type %s (conflicting field %s)" % (repr(name), repr(k)))
+
+      # Check for conflicting aliases
+      aliases = self.__dict__["_aliases"].copy()
+      for n, a in st._aliases.iteritems():
+         if n in self.ordered_keys():
+            raise Exception("Cannot inherit schema type %s (alias %s -> %s conflicting with field)" % (repr(name), repr(n), repr(a)))
+         if n in aliases:
+            if aliases[n] != a:
+               raise Exception("Cannot inherit schema type %s (conflicting alias %s -> %s / %s)" % (repr(name), repr(n), repr(a), aliases[n]))
+         aliases[a] = n
+
+      # Merge fields
+      print("Current fields: %s" % self.ordered_keys())
+      for k in st.ordered_keys():
+         print("  Add field: %s" % k)
+         self[k] = st[k].copy()
+
+      # Update order
+      self.__dict__["_order"] = st._order + self.__dict__["_order"]
+      self.__dict__["_original_order"] = (st._original_order or []) + (self.__dict__["_original_order"] or [])
+
+      # Update alias
+      self.__dict__["_aliases"] = aliases
+
+      # Register and apply extra mixins
+      mixins = das.get_registered_mixins(name)
+      if mixins:
+         das.register_mixins(*mixins, schema_type=self)
+
+      print("=> %s" % self.ordered_keys())
+
+   def _extends(self, name):
+      print("extends: %s" % self.__dict__["_extend"])
+      print("check for: %s" % name)
+      return (name in self.__dict__["_extend"])
+
+   def _apply_extensions(self):
+      for idx in xrange(len(self.__dict__["_extend"])):
+         if not self.__dict__["_extended"][idx]:
+            self._inherit(self.__dict__["_extend"][idx])
+            self.__dict__["_extended"][idx] = True
+
    def _validate_self(self, value):
+      self._apply_extensions()
       if not isinstance(value, (dict, das.types.Struct)):
          raise ValidationError("Expected a dict value, got %s" % type(value).__name__)
       allfound = True
@@ -695,10 +771,28 @@ class Struct(TypeValidator, dict):
          self[k] = das.decode(self[k], encoding)
       return self
 
+   def inherit(self, name):
+      try:
+         idx = self.__dict__["_extend"].index(name)
+         if self.__dict__["_extended"][idx]:
+            return
+      except:
+         idx = -1
+
+      self._inherit(name)
+
+      if idx >= 0:
+         self.__dict__["_extended"][idx] = True
+      else:
+         self.__dict__["_extend"].append(name)
+         self.__dict__["_extended"].append(True)
+
    def ordered_keys(self):
       return self.__dict__["_order"]
 
    def make_default(self):
+      if not self.default_validated:
+         self._apply_extensions()
       if not self.default_validated and self.default is None:
          self.default = das.types.Struct()
          for k, t in self.iteritems():
@@ -750,6 +844,10 @@ class Struct(TypeValidator, dict):
          v = self[k]
          s += "%s%s=%s" % (sep, k, v)
          sep = ", "
+      if self.__dict__["_original_order"]:
+         s += "%s__order__=%s" % (sep, repr(self.__dict__["_original_order"]))
+      if self.__dict__["_extend"]:
+         s += "%s__extend__=%s" % (sep, repr(self.__dict__["_extend"]))
       if self.description:
          s += "%s__description__=%s" % (sep, repr(self.description))
       return s + ")"
@@ -759,7 +857,7 @@ class Struct(TypeValidator, dict):
       for k, v in self.iteritems():
          kwargs[k] = v.copy()
       return Struct(__description__=self.description, __editable__=self.editable,
-                    __hidden__=self.hidden, __order__=self.__dict__["_order"], **kwargs)
+                    __hidden__=self.hidden, __order__=self.__dict__["_original_order"], __extend__=self.__dict__["_extend"], **kwargs)
 
 
 class StaticDict(Struct):
@@ -1218,8 +1316,6 @@ class Alias(TypeValidator):
 
 
 class SchemaType(TypeValidator):
-   CurrentSchema = ""
-
    def __init__(self, name, default=None, description=None, editable=True, hidden=False):
       super(SchemaType, self).__init__(default=default, description=description, editable=editable, hidden=hidden)
       if not "." in name:

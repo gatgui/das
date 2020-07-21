@@ -3,7 +3,7 @@ import re
 import sys
 import datetime
 
-__version__ = "0.11.0"
+__version__ = "0.12.0"
 __verbose__ = False
 try:
    __verbose__ = (int(os.environ.get("DAS_VERBOSE", "0")) != 0)
@@ -136,15 +136,23 @@ def define_inline_type(typ):
       raise Exception("Unsupported simple type '%s'" % typ.__name__)
 
 
-def register_mixins(*mixins):
+def register_mixins(*mixins, **kwargs):
+   schema_type = kwargs.get("schema_type", None)
    if __verbose__:
-      print("[das] Register mixins: %s" % ", ".join(map(lambda x: x.__module__ + "." + x.__name__, mixins)))
+      print("[das] Register mixins: %s%s" % (", ".join(map(lambda x: x.__module__ + "." + x.__name__, mixins)), "" if schema_type is None else " (%s)" % repr(schema_type)))
    tmp = {}
-   for mixin in mixins:
-      st = mixin.get_schema_type()
-      lst = tmp.get(st, [])
-      lst.append(mixin)
-      tmp[st] = lst
+   if schema_type is not None:
+      if not isinstance(schema_type, basestring):
+         stn = get_schema_type_name(schema_type)
+      else:
+         stn = schema_type
+      tmp[stn] = mixins
+   else:
+      for mixin in mixins:
+         st = mixin.get_schema_type()
+         lst = tmp.get(st, [])
+         lst.append(mixin)
+         tmp[st] = lst
    for k, v in tmp.iteritems():
       mixins = SchemaTypesRegistry.instance.get_schema_type_property(k, "mixins")
       if mixins is None:

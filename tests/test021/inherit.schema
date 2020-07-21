@@ -1,0 +1,13 @@
+# name: inherit
+# version: 1.0
+# das_minimum_version: 0.12.0
+{
+   "Resolution": Struct(width=Integer(min=1, default=1920),
+                        height=Integer(min=1, default=1080)),
+
+   "Scale": Struct(x=Real(min=0.001, default=1.0),
+                   y=Real(min=0.001, default=1.0)),
+
+   "ScaledResolution": Struct(__extend__=["Resolution"],
+                              scale=SchemaType("Scale"))
+}
