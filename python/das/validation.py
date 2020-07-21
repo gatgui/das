@@ -9,12 +9,12 @@ import das
 
 class UnknownSchemaError(Exception):
    def __init__(self, name):
-      super(UnknownSchemaError, self).__init__("'%s' is not a known schema%s" % (name, " type" if "." in name else ""))
+      super(UnknownSchemaError, self).__init__("%s is not a known schema or schema type" % repr(name))
 
 
 class SchemaVersionError(das.VersionError):
    def __init__(self, name, current_version=None, required_version=None):
-      super(SchemaVersionError, self).__init__("Schema '%s'" % name, current_version, required_version)
+      super(SchemaVersionError, self).__init__("Schema %s" % repr(name), current_version, required_version)
 
 
 class Schema(object):
