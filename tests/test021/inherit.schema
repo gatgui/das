@@ -2,6 +2,8 @@
 # version: 1.0
 # das_minimum_version: 0.12.0
 {
+   "Margins": Struct(name=String()),
+
    "Resolution": Struct(width=Integer(min=1, default=1920),
                         height=Integer(min=1, default=1080)),
 
@@ -9,5 +11,12 @@
                    y=Real(min=0.001, default=1.0)),
 
    "ScaledResolution": Struct(__extend__=["Resolution"],
-                              scale=SchemaType("Scale"))
+                              scale=SchemaType("Scale")),
+
+   "Rect1": Struct(width=Integer(),
+                   height=Integer()),
+
+   "Rect2": Struct(w=Integer(),
+                   h=Integer(),
+                   width=Alias("w"))
 }

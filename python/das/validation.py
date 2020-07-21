@@ -277,6 +277,9 @@ class SchemaTypesRegistry(object):
       self.cache["name_to_schema"] = nts
       self.cache["name_to_type"] = ntt
       self.cache["type_to_name"] = ttn
+      for st in self.cache["type_to_name"]:
+         if isinstance(st, das.schematypes.Struct):
+            st._apply_extensions()
 
    def load_schemas(self, paths=None, incremental=False, force=False):
       incremental = (paths is not None)
@@ -460,9 +463,13 @@ class SchemaTypesRegistry(object):
          return False
 
    def set_schema_type_property(self, name, pname, pvalue):
-      props = self.properties.get(name, {})
-      props[pname] = pvalue
-      self.properties[name] = props
+      if not name:
+         return False
+      else:
+         props = self.properties.get(name, {})
+         props[pname] = pvalue
+         self.properties[name] = props
+         return True
 
    def get_schema_type_property(self, name, pname):
       return self.properties.get(name, {}).get(pname, None)

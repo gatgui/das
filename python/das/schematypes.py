@@ -628,7 +628,6 @@ class Struct(TypeValidator, dict):
          self[name] = value
 
    def _inherit(self, name):
-      print("_inherit: %s" % name)
       st = das.get_schema_type(name)
 
       # Check for Struct schema type
@@ -652,9 +651,7 @@ class Struct(TypeValidator, dict):
          aliases[a] = n
 
       # Merge fields
-      print("Current fields: %s" % self.ordered_keys())
       for k in st.ordered_keys():
-         print("  Add field: %s" % k)
          self[k] = st[k].copy()
 
       # Update order
@@ -669,11 +666,7 @@ class Struct(TypeValidator, dict):
       if mixins:
          das.register_mixins(*mixins, schema_type=self)
 
-      print("=> %s" % self.ordered_keys())
-
    def _extends(self, name):
-      print("extends: %s" % self.__dict__["_extend"])
-      print("check for: %s" % name)
       return (name in self.__dict__["_extend"])
 
    def _apply_extensions(self):
@@ -683,7 +676,7 @@ class Struct(TypeValidator, dict):
             self.__dict__["_extended"][idx] = True
 
    def _validate_self(self, value):
-      self._apply_extensions()
+      #self._apply_extensions()
       if not isinstance(value, (dict, das.types.Struct)):
          raise ValidationError("Expected a dict value, got %s" % type(value).__name__)
       allfound = True
@@ -791,8 +784,7 @@ class Struct(TypeValidator, dict):
       return self.__dict__["_order"]
 
    def make_default(self):
-      if not self.default_validated:
-         self._apply_extensions()
+      #self._apply_extensions()
       if not self.default_validated and self.default is None:
          self.default = das.types.Struct()
          for k, t in self.iteritems():

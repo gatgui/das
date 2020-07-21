@@ -30,10 +30,47 @@ class TestCase(unittest.TestCase):
       del(os.environ["DAS_SCHEMA_PATH"])
 
    # Test functions
-   def testInherit1(self):
+   def testInheritStatic(self):
       sr = das.make_default("inherit.ScaledResolution")
-      print(sr.pixel_count())
+      sr.width = 20
+      sr.height = 10
+      self.assertTrue(sr.pixel_count() == 200)
+      sr.scale = {"x": 2, "y": 1}
       sx = int(round(sr.width * sr.scale.x))
       sy = int(round(sr.height * sr.scale.y))
-      print(sx * sy)
-      print(sr.is_uniform())
+      self.assertTrue((sx * sy) == 400)
+      self.assertFalse(sr.scale.is_uniform())
+
+   def testInheritDynamic(self):
+      st = das.get_schema_type("inherit.Margins")
+      st.inherit("inherit.Resolution")
+      st.inherit("inherit.Scale")
+      # => this modifies the type itself
+      # _st = st.copy()
+      # das.add_schema_type("inherit.Margins2", _st)
+      # ml = das.get_registered_mixins("inherit.Margins")
+      # das.register_mixins(*ml, schema_type="inherit.Margins2")
+      # _st.inherit()
+      # -> das.copy_type("inherit.Margins", "Margins2")
+
+      sr = das.make_default("inherit.Margins")
+      sr.width = 20
+      sr.height = 10
+      sr.x = 2
+      sr.y = 1
+      sx = int(round(sr.width * sr.x))
+      sy = int(round(sr.height * sr.y))
+      self.assertTrue(sr.pixel_count() == 200)
+      self.assertTrue((sx * sy) == 400)
+      self.assertFalse(sr.is_uniform())
+
+   def testFieldConflict1(self):
+      st = das.get_schema_type("inherit.ScaledResolution")
+      with self.assertRaises(Exception):
+         st.inherit("inherit.Rect1")
+   
+   def testFieldConflict2(self):
+      st = das.get_schema_type("inherit.ScaledResolution")
+      with self.assertRaises(Exception):
+         st.inherit("inherit.Rect2")
+   
