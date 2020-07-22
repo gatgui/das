@@ -3,7 +3,7 @@ import re
 import sys
 import datetime
 
-__version__ = "0.11.1"
+__version__ = "0.12.0"
 __verbose__ = False
 try:
    __verbose__ = (int(os.environ.get("DAS_VERBOSE", "0")) != 0)
@@ -136,26 +136,64 @@ def define_inline_type(typ):
       raise Exception("Unsupported simple type '%s'" % typ.__name__)
 
 
-def register_mixins(*mixins):
+def register_mixins(*mixins, **kwargs):
+   schema_type = kwargs.get("schema_type", None)
    if __verbose__:
-      print("[das] Register mixins: %s" % ", ".join(map(lambda x: x.__module__ + "." + x.__name__, mixins)))
-   tmp = {}
-   for mixin in mixins:
-      st = mixin.get_schema_type()
-      lst = tmp.get(st, [])
-      lst.append(mixin)
-      tmp[st] = lst
-   for k, v in tmp.iteritems():
-      mixins = SchemaTypesRegistry.instance.get_schema_type_property(k, "mixins")
-      if mixins is None:
-         mixins = []
+      print("[das] Register mixins: %s%s" % (", ".join(map(lambda x: x.__module__ + "." + x.__name__, mixins)), "" if schema_type is None else " (%s)" % repr(schema_type)))
+
+   if schema_type is not None:
+      if isinstance(schema_type, basestring):
+         stn = schema_type
+         try:
+            schema_type = get_schema_type(schema_type)
+         except:
+            return
+      else:
+         if not isinstance(schema_type, TypeValidator):
+            return
+
+         stn = get_schema_type_name(schema_type) 
+
+      if stn:
+         _mixins = SchemaTypesRegistry.instance.get_schema_type_property(stn, "mixins")
+      else:
+         _mixins = schema_type.get_property("mixins", [])
+
+      if not _mixins:
+         _mixins = []
+
       changed = False
-      for mixin in v:
-         if not mixin in mixins:
-            mixins.append(mixin)
+
+      for mixin in mixins:
+         if not mixin in _mixins:
+            _mixins.append(mixin)
             changed = True
+
       if changed:
-         SchemaTypesRegistry.instance.set_schema_type_property(k, "mixins", mixins)
+         if stn:
+            SchemaTypesRegistry.instance.set_schema_type_property(stn, "mixins", mixins)
+         else:
+            schema_type.set_property("mixins", _mixins)
+
+   else:
+      tmp = {}
+      for mixin in mixins:
+         st = mixin.get_schema_type()
+         lst = tmp.get(st, [])
+         lst.append(mixin)
+         tmp[st] = lst
+
+      for k, v in tmp.iteritems():
+         mixins = SchemaTypesRegistry.instance.get_schema_type_property(k, "mixins")
+         if mixins is None:
+            mixins = []
+         changed = False
+         for mixin in v:
+            if not mixin in mixins:
+               mixins.append(mixin)
+               changed = True
+         if changed:
+            SchemaTypesRegistry.instance.set_schema_type_property(k, "mixins", mixins)
 
 
 def get_registered_mixins(name):
