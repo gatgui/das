@@ -13,7 +13,7 @@ class TestCase(unittest.TestCase):
    @classmethod
    def setUpClass(cls):
       cls.TestDir = os.path.abspath(os.path.dirname(__file__))
-      cls.Schema = cls.TestDir + "/inherit.schema"
+      cls.Schema = cls.TestDir + "/extend.schema"
       os.environ["DAS_SCHEMA_PATH"] = cls.TestDir
 
    def setUp(self):
@@ -31,7 +31,7 @@ class TestCase(unittest.TestCase):
 
    # Test functions
    def testInheritStatic(self):
-      sr = das.make_default("inherit.ScaledResolution")
+      sr = das.make_default("extend.ScaledResolution")
       sr.width = 20
       sr.height = 10
       self.assertTrue(sr.pixel_count() == 200)
@@ -42,18 +42,10 @@ class TestCase(unittest.TestCase):
       self.assertFalse(sr.scale.is_uniform())
 
    def testInheritDynamic(self):
-      st = das.get_schema_type("inherit.Margins")
-      st.inherit("inherit.Resolution")
-      st.inherit("inherit.Scale")
-      # => this modifies the type itself
-      # _st = st.copy()
-      # das.add_schema_type("inherit.Margins2", _st)
-      # ml = das.get_registered_mixins("inherit.Margins")
-      # das.register_mixins(*ml, schema_type="inherit.Margins2")
-      # _st.inherit()
-      # -> das.copy_type("inherit.Margins", "Margins2")
-
-      sr = das.make_default("inherit.Margins")
+      st = das.get_schema_type("extend.Margins").copy()
+      st.extend("extend.Resolution")
+      st.extend("extend.Scale")
+      sr = st.make_default()
       sr.width = 20
       sr.height = 10
       sr.x = 2
@@ -65,12 +57,12 @@ class TestCase(unittest.TestCase):
       self.assertFalse(sr.is_uniform())
 
    def testFieldConflict1(self):
-      st = das.get_schema_type("inherit.ScaledResolution")
+      st = das.get_schema_type("extend.ScaledResolution")
       with self.assertRaises(Exception):
-         st.inherit("inherit.Rect1")
+         st.inherit("extend.Rect1")
    
    def testFieldConflict2(self):
-      st = das.get_schema_type("inherit.ScaledResolution")
+      st = das.get_schema_type("extend.ScaledResolution")
       with self.assertRaises(Exception):
-         st.inherit("inherit.Rect2")
+         st.inherit("extend.Rect2")
    

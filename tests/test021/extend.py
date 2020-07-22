@@ -5,7 +5,7 @@ import math
 class Resolution(das.Mixin):
    @classmethod
    def get_schema_type(klass):
-      return "inherit.Resolution"
+      return "extend.Resolution"
 
    def __init__(self, *args, **kwargs):
       super(Resolution, self).__init__(*args, **kwargs)
@@ -17,7 +17,7 @@ class Resolution(das.Mixin):
 class Scale(das.Mixin):
    @classmethod
    def get_schema_type(klass):
-      return "inherit.Scale"
+      return "extend.Scale"
 
    def __init__(self, *args, **kwargs):
       super(Scale, self).__init__(*args, **kwargs)

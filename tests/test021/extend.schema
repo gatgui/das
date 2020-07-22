@@ -1,4 +1,4 @@
-# name: inherit
+# name: extend
 # version: 1.0
 # das_minimum_version: 0.12.0
 {
@@ -10,7 +10,7 @@
    "Scale": Struct(x=Real(min=0.001, default=1.0),
                    y=Real(min=0.001, default=1.0)),
 
-   "ScaledResolution": Struct(__extend__=["Resolution"],
+   "ScaledResolution": Struct(__extends__=["Resolution"],
                               scale=SchemaType("Scale")),
 
    "Rect1": Struct(width=Integer(),
