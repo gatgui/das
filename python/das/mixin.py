@@ -100,7 +100,7 @@ def bind(mixins, instance, reset=False, verbose=False, force=False):
       if st is None:
          raise BindError("Mixin can only be bound to objects with a schema type")
       else:
-         st = das.get_schema_type_name(st)
+         stn = das.get_schema_type_name(st)
 
    if isinstance(mixins, (tuple, list, set)):
       for mixin in mixins:
@@ -118,9 +118,10 @@ def bind(mixins, instance, reset=False, verbose=False, force=False):
       for mixin in mixins:
          tst = mixin.get_schema_type()
          if not das.has_schema_type(tst):
-            raise SchemaTypeError("Invalid schema type '%s' for mixin '%s'" % (st, mixin.__name__))
-         elif tst != st:
-            raise SchemaTypeError("Schema type mismatch for mixin '%s': Expected '%s', got '%s'" % (mixin.__name__, tst, st))
+            raise SchemaTypeError("Invalid schema type '%s' for mixin '%s'" % (stn, mixin.__name__))
+         elif tst != stn:
+            if not isinstance(st, das.schematypes.Struct) or not st.has_extension(tst):
+               raise SchemaTypeError("Schema type mismatch for mixin '%s': Expected '%s', got '%s'" % (mixin.__name__, tst, stn))
 
    # Get the original class in use before any mixin were bound
    iclass = instance.__class__
