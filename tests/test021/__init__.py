@@ -59,10 +59,10 @@ class TestCase(unittest.TestCase):
    def testFieldConflict1(self):
       st = das.get_schema_type("extend.ScaledResolution")
       with self.assertRaises(Exception):
-         st.inherit("extend.Rect1")
+         st.extend("extend.Rect1")
    
    def testFieldConflict2(self):
       st = das.get_schema_type("extend.ScaledResolution")
       with self.assertRaises(Exception):
-         st.inherit("extend.Rect2")
+         st.extend("extend.Rect2")
    
