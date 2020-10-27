@@ -559,7 +559,7 @@ if not NoUI:
          self.setWindowTitle("Create new value")
          self.excludes = excludes
          self.data = vtype.make_default()
-         self.editor = Editor(self.data, type=vtype, name=name, headers=[], parent=self)
+         self.editor = Editor(self.data, type=vtype, name=name, headers=None, parent=self)
          layout = QtWidgets.QVBoxLayout()
          self.okbtn = QtWidgets.QPushButton("Ok", self)
          self.okbtn.setEnabled(True if excludes is None else (self.data not in self.excludes))
@@ -1754,12 +1754,14 @@ if not NoUI:
                         lbl += " from '%s'" % pn
                      actionRemItem = menu.addAction(lbl)
                      actionRemItem.triggered.connect(self.makeOnRemOptionalItem(modelIndex))
+                     actionRemItem.setEnabled(item.editableType)
                      menu.addSeparator()
                elif item.typestr != "alias":
                   lbl = "Add '%s'" % item.name
                   if pn:
                      lbl += " to '%s'" % pn
                   actionAddItem = menu.addAction(lbl)
+                  actionAddItem.setEnabled(item.editableType)
                   actionAddItem.triggered.connect(self.makeOnAddOptionalItem(modelIndex))
                   menu.addSeparator()
 
@@ -1816,8 +1818,10 @@ if not NoUI:
                                  actionAddItem.triggered.connect(self.makeOnAddDictItem(index, ot.make_default()))
                            else:
                               actionAddItem = menu.addAction("Add to '%s'..." % ifn)
+                              actionAddItem.setEnabled(item.editableType)
                               actionAddItem.triggered.connect(self.makeOnAddDictItem(index))
                            actionClearItems = menu.addAction("Clear '%s'" % ifn)
+                           actionClearItems.setEnabled(item.editableType)
                            actionClearItems.triggered.connect(self.makeOnClearDictItems(index))
                      else:
                         if item.orderable:
@@ -1829,11 +1833,14 @@ if not NoUI:
                                  actionAddMenu = menu.addMenu("Add to '%s'" % ifn)
                                  for ot in vtypes:
                                     actionAddItem = actionAddMenu.addAction(type_str(ot))
+                                    actionAddItem.setEnabled(item.editableType)
                                     actionAddItem.triggered.connect(self.makeOnAddSeqItem(index, ot.make_default()))
                               else:
                                  actionAddItem = menu.addAction("Add to '%s'" % ifn)
+                                 actionAddItem.setEnabled(item.editableType)
                                  actionAddItem.triggered.connect(self.makeOnAddSeqItem(index))
                               actionClearItems = menu.addAction("Clear '%s'" % ifn)
+                              actionClearItems.setEnabled(item.editableType)
                               actionClearItems.triggered.connect(self.makeOnClearSeqItems(index))
                         else:
                            vtypes = []
@@ -1843,11 +1850,14 @@ if not NoUI:
                               actionAddMenu = menu.addMenu("Add to '%s'..." % ifn)
                               for ot in vtypes:
                                  actionAddItem = actionAddMenu.addAction(type_str(ot))
+                                 actionAddItem.setEnabled(item.editableType)
                                  actionAddItem.triggered.connect(self.makeOnAddSetItem(index, ot))
                            else:
                               actionAddItem = menu.addAction("Add to '%s'..." % ifn)
+                              actionAddItem.setEnabled(item.editableType)
                               actionAddItem.triggered.connect(self.makeOnAddSetItem(index))
                            actionClearItems = menu.addAction("Clear '%s'" % ifn)
+                           actionClearItems.setEnabled(item.editableType)
                            actionClearItems.triggered.connect(self.makeOnClearSetItems(index))
                   if actionAddItem:
                      menu.addSeparator()
@@ -1859,14 +1869,17 @@ if not NoUI:
                      if item.parent.mappingkeytype is not None:
                         #actionRemItem = menu.addAction("Remove Key%s" % ("s" if len(iipairs) > 1 else ""))
                         actionRemItem = menu.addAction("Remove")
+                        actionRemItem.setEnabled(item.editableType)
                         actionRemItem.triggered.connect(self.makeOnRemDictItems(indices))
                   else:
                      if item.parent.orderable:
                         if item.parent.resizable:
                            actionRemItem = menu.addAction("Remove")
+                           actionRemItem.setEnabled(item.editableType)
                            actionRemItem.triggered.connect(self.makeOnRemSeqItems(indices))
                      else:
                         actionRemItem = menu.addAction("Remove")
+                        actionRemItem.setEnabled(item.editableType)
                         actionRemItem.triggered.connect(self.makeOnRemSetItems(indices))
                   if actionRemItem:
                      menu.addSeparator()
