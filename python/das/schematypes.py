@@ -698,6 +698,10 @@ class Struct(TypeValidator, dict):
       if mixins:
          das.register_mixins(*mixins, schema_type=self)
 
+      # Reset default value
+      self.default_validated = False
+      self.default = None
+
    def _validate_self(self, value):
       if not isinstance(value, (dict, das.types.Struct)):
          raise ValidationError("Expected a dict value, got %s" % type(value).__name__)
@@ -865,6 +869,45 @@ class Struct(TypeValidator, dict):
       if self.description:
          s += "%s__description__=%s" % (sep, repr(self.description))
       return s + ")"
+
+   def _update_internals(self):
+      keys = [k for k, _ in self.items() if not k in self._aliases]
+      if self._original_order:
+         self._order = filter(lambda x: x in keys, self._original_order)
+         for n in keys:
+            if not n in self._original_order:
+               self._order.append(n)
+      else:
+         self._order = sorted(keys)
+
+      self.default_validated = False
+      self.default = None
+
+   def __setitem__(self, k, v):
+      super(Struct, self).__setitem__(k, v)
+      self._update_internals()
+
+   def __delitem__(self, k):
+      super(Struct, self).__delitem__(k)
+      self._update_internals()
+
+   def update(self, *args, **kwargs):
+      super(Struct, self).update(*args, **kwargs)
+      self._update_internals()
+
+   def pop(self, k, *args):
+      rv = super(Struct, self).pop(k, *args)
+      self._update_internals()
+      return rv
+
+   def popitem(self):
+      rv = super(Struct, self).popitem(self)
+      self._update_internals()
+      return rv
+
+   def clear(self):
+      super(Struct, self).clear()
+      self._update_internals()
 
    def copy(self):
       # self.load_extensions()
