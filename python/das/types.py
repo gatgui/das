@@ -921,9 +921,9 @@ class Struct(TypeBase):
       if st is not None and st.has_key(k):
          aliasname = das.schematypes.Alias.Name(st[k])
          if aliasname is not None:
-            if isinstance(st[k], das.schematypes.Deprecated):
-               message = ("[das] Field %s is deprecated, use %s instead" % (repr(k), repr(aliasname)))
-               das.print_once(message)
+            # if isinstance(st[k], das.schematypes.Deprecated):
+            #    message = ("[das] Field %s is deprecated, use %s instead" % (repr(k), repr(aliasname)))
+            #    das.print_once(message)
             return aliasname
       return k
 

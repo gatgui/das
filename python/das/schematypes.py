@@ -758,6 +758,7 @@ class Struct(TypeValidator, dict):
             return vv
       else:
          self._validate_self(value)
+         actualkeys = set([item for item in value])
          rv = das.types.Struct()
          # don't set schema type just yet
          for k, v in self.iteritems():
@@ -766,7 +767,7 @@ class Struct(TypeValidator, dict):
             aliasname = Alias.Name(v)
             if aliasname is not None:
                # Issue warning on deprecated field
-               if deprecated:
+               if deprecated and k in actualkeys:
                   message = "[das] Field %s is deprecated, use %s instead" % (repr(k), repr(aliasname))
                   das.print_once(message)
                continue
