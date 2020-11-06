@@ -45,6 +45,12 @@ class TypeValidator(object):
       if name in self._properties:
          del(self._properties[name])
 
+   def diff_type(self):
+      raise Exception("'diff_type' method is not implemented")
+
+   def diff(self, dst, dval, base, other, key=None, index=None):
+      raise Exception("'diff' method is not implemented")
+
    def value_to_string(self, v):
       return repr(self._validate(v))
 
@@ -164,6 +170,20 @@ class Boolean(TypeValidator):
    def copy(self):
       return Boolean(default=self.default, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
+   def diff_type(self):
+      return self
+
+   def diff(self, dst, dval, base, other, key=None, index=None):
+      if base != other:
+         if key:
+            dval[key] = other
+         elif index:
+            dval[index] = other
+         else:
+            return other
+      else:
+         return None
+
 
 class Integer(TypeValidator):
    def __init__(self, default=None, min=None, max=None, enum=None, description=None, editable=True, hidden=False, __properties__=None):
@@ -235,6 +255,20 @@ class Integer(TypeValidator):
    def copy(self):
       return Integer(default=self.default, min=self.min, max=self.max, enum=self.enum, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
+   def diff_type(self):
+      return self
+
+   def diff(self, dst, dval, base, other, key=None, index=None):
+      if base != other:
+         if key:
+            dval[key] = other
+         elif index:
+            dval[index] = other
+         else:
+            return other
+      else:
+         return None
+
 
 class Real(TypeValidator):
    def __init__(self, default=None, min=None, max=None, description=None, editable=True, hidden=False, __properties__=None):
@@ -279,6 +313,19 @@ class Real(TypeValidator):
    def copy(self):
       return Real(default=self.default, min=self.min, max=self.max, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
+   def diff_type(self):
+      return self
+
+   def diff(self, dst, dval, base, other, key=None, index=None):
+      if base != other:
+         if key:
+            dval[key] = other
+         elif index:
+            dval[index] = other
+         else:
+            return other
+      else:
+         return None
 
 
 class String(TypeValidator):
@@ -359,6 +406,19 @@ class String(TypeValidator):
    def copy(self):
       return String(default=self.default, choices=self.choices, matches=self.matches, strict=self.strict, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
+   def diff_type(self):
+      return self
+
+   def diff(self, dst, dval, base, other, key=None, index=None):
+      if base != other:
+         if key:
+            dval[key] = other
+         elif index:
+            dval[index] = other
+         else:
+            return other
+      else:
+         return None
 
 class Set(TypeValidator):
    def __init__(self, type, default=None, description=None, editable=True, hidden=False, __properties__=None):
@@ -424,6 +484,27 @@ class Set(TypeValidator):
    def copy(self):
       return Set(self.type.copy(), default=self.default, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
+   def diff_type(self):
+      bdt = Set(self.type.copy(), default=None, editable=False, hidden=False)
+      return Struct(added=Optional(bdt), removed=Optional(bdt))
+
+   def diff(self, dst, dval, base, other, key=None, index=None):
+      if base != other:
+         rv = dst.make_default()
+         added = other.difference(base)
+         removed = base.difference(other)
+         if added or removed:
+            if added:
+               rv.added = added
+            if removed:
+               rv.removed = removed
+            if key:
+               dval[key] = rv
+            elif index:
+               dval[index] = rv
+            else:
+               return rv
+      return None
 
 class Sequence(TypeValidator):
    def __init__(self, type, default=None, size=None, min_size=None, max_size=None, description=None, editable=True, hidden=False, __properties__=None):
@@ -507,6 +588,34 @@ class Sequence(TypeValidator):
 
    def copy(self):
       return Sequence(self.type.copy(), default=self.default, size=self.size, min_size=self.min_size, max_size=self.max_size, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
+
+   def diff_type(self):
+      # should remove side limits
+      return Struct(added=Optional(self), removed=Optional(self), changed=Struct(index=Integer(min=0), value=self.type.diff_type())))
+
+   def diff(self, dst, dval, base, other, key=None, index=None):
+      if base != other:
+         rv = dst.make_default()
+         if len(base) > len(other):
+            for i in xrange(len(other), len(base)):
+               rv.removed.append(base[i])
+         elif len(other) > len(base):
+            for i in range(len(base), len(other)):
+               rv.added.append(other[i])
+         for i in xrange(min(len(base), len(other))):
+            rv.changed = {"index": i, dst.type.diff(, )
+         added = other.difference(base)
+         removed = base.difference(other)
+         if added or removed:
+            rv.added = added
+            rv.removed = removed
+            if key:
+               dval[key] = rv
+            elif index:
+               dval[index] = rv
+            else:
+               return rv
+      return None
 
 
 class Tuple(TypeValidator):
