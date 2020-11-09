@@ -2,6 +2,7 @@ import das
 import das.schematypes
 import das
 
+
 def get_schema_type(st):
    if isinstance(st, basestring):
       st = das.get_schema_type(st)
@@ -21,7 +22,8 @@ def get_schema_type(st):
          das.add_schema_type(stn, dst)
       return dst
 
-def make_diff(base, other):
+
+def diff(base, other):
    st0 = base._get_schema_type()
    st1 = other._get_schema_type()
    if st0 != st1:
@@ -29,3 +31,7 @@ def make_diff(base, other):
    dst = get_schema_type(st0)
    dv = dst.make_default()
    return st0.diff(dst, dv, base=v0, other=v1)
+
+
+def patch(value, diff):
+   pass
