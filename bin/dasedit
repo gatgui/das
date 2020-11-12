@@ -252,7 +252,9 @@ if __name__ == "__main__":
          else:
             QtWidgets.QApplication.setStyle(style)
 
-      app = QtWidgets.QApplication([sys.argv[0]])
+      app = QtWidgets.QApplication.instance()
+      if not app:
+         app = QtWidgets.QApplication([sys.argv[0]])
 
       if style == "plastique" and darkmode:
          # Nuke-like color palette
