@@ -33,6 +33,8 @@ from .mixin import (SchemaTypeError,
                     has_bound_mixins,
                     get_bound_mixins)
 from . import schema
+from . import schematypes
+from . import types
 
 # For backward compatibiilty
 Das = Struct
@@ -46,8 +48,8 @@ def list_schemas():
    return SchemaTypesRegistry.instance.list_schemas()
 
 
-def has_schema():
-   return SchemaTypesRegistry.instance.has_schema()
+def has_schema(name):
+   return SchemaTypesRegistry.instance.has_schema(name)
 
 
 def get_schema(name_or_type):
@@ -225,7 +227,7 @@ def adapt_value(value, schema_type=None, key=None, index=None):
       elif isinstance(value, dict):
          try:
             rv = Struct(**value)
-         except ReservedNameError, e:
+         except ReservedNameError:
             # If failed to create Struct because of a ReservedNameError exception, wrap using Dict class
             rv = Dict(**value)
          return rv
@@ -292,7 +294,7 @@ def is_compatible(d, schema_type):
 
 
 def _read_file(path, skip_content=False):
-   mde = re.compile("^\s*([^:]+):\s*(.*)\s*$")
+   mde = re.compile(r"^\s*([^:]+):\s*(.*)\s*$")
    reading_content = False
    content = ""
    md = {}
@@ -775,7 +777,7 @@ def read_csv_table(csv_table):
                contents.append(cur)
 
             elif cur is not None:
-               cur["end"] = r
+               cur["end"] = r # pylint: disable=unsupported-assignment-operation
 
       else:
          mts[hr.group(1)] = data_table[0][column]
@@ -822,9 +824,9 @@ def read_csv_table(csv_table):
 
 
 def read_csv(csv_path, delimiter="\t", newline="\n"):
-   re_metadata = re.compile("^[<](.*)[>]$")
+   # re_metadata = re.compile("^[<](.*)[>]$")
+   # re_alias = re.compile("[ ]+as[ ]+([^ ]+)[ ]*$")
    re_strip = re.compile(newline + "$")
-   re_alias = re.compile("[ ]+as[ ]+([^ ]+)[ ]*$")
    re_delimiter = re.compile(delimiter)
 
    if not os.path.isfile(csv_path):
