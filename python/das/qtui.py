@@ -6,11 +6,11 @@ import math
 NoUI = False
 
 try:
-   import Qt
-   from Qt import QtCore
-   from Qt import QtGui
-   from Qt import QtWidgets
-   from Qt import QtCompat
+   import Qt # pylint: disable=import-error
+   from Qt import QtCore # pylint: disable=import-error
+   from Qt import QtGui # pylint: disable=import-error
+   from Qt import QtWidgets # pylint: disable=import-error
+   from Qt import QtCompat # pylint: disable=import-error
 except Exception, e:
    print("Failed to import Qt (%s)" % e)
    NoUI = True
@@ -146,7 +146,7 @@ if not NoUI:
          self.filters = []
 
       def remove(self, idxOrName):
-         if isisnstance(idxOrName, basestring):
+         if isinstance(idxOrName, basestring):
             idx = -1
             for i in xrange(len(self.filters)):
                if idxOrName == self.filters[i].name:
@@ -980,7 +980,7 @@ if not NoUI:
             return False
 
       def setBoolModelData(self, widget, model, modelIndex):
-         item = modelIndex.internalPointer()
+         # item = modelIndex.internalPointer()
          data = (widget.checkState() == QtCore.Qt.Checked)
          return model.setData(modelIndex, data, QtCore.Qt.EditRole)
 
@@ -1030,7 +1030,7 @@ if not NoUI:
          super(Model, self).__init__(parent)
          # A little hacky but how else?
          if IsPySide2():
-            self._org_data_changed = self.dataChanged
+            self._org_data_changed = self.dataChanged # pylint: disable=access-member-before-definition
             self.dataChanged = self.dataChanged2Args
             self.dataChanged.connect(self.__emitDataChanged)
          if headers is None:
@@ -1231,7 +1231,7 @@ if not NoUI:
          idx = 0
          parentIndex = QtCore.QModelIndex()
          curKey = ""
-         while idx < len(spl):
+         while idx < cnt:
             curKey = curKey + ("." if curKey else "") + spl[idx]
             nr = self.rowCount(parentIndex)
             for r in xrange(nr):
@@ -1739,7 +1739,7 @@ if not NoUI:
             pos = self.viewport().mapFromGlobal(gpos)
             modelIndex = self.indexAt(pos)
             item = (None if (modelIndex is None or not modelIndex.isValid()) else modelIndex.internalPointer())
-            validitem = (item and item.exists())
+            # validitem = (item and item.exists())
 
             if not self._readonly and item:
                pn = ""

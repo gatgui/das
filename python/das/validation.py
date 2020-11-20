@@ -210,7 +210,7 @@ class SchemaLocation(object):
       return rv
 
    def has_schema_type(self, name):
-      for sname, schema in self.schemas.iteritems():
+      for _, schema in self.schemas.iteritems():
          if schema.has_type(name):
             return True
       return False
@@ -224,7 +224,7 @@ class SchemaLocation(object):
       return None
 
    def get_schema_type_name(self, typ):
-      for sname, schema in self.schemas.iteritems():
+      for _, schema in self.schemas.iteritems():
          rv = schema.get_type_name(typ)
          if rv:
             return rv

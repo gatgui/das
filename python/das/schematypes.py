@@ -1175,14 +1175,14 @@ class Class(TypeValidator):
                newval = self.klass()
                newval.string_to_value(value)
                return newval
-            except Exception, e:
+            except:
                raise ValidationError("Cannot instanciace class '%s' from string %s" % (self.klass.__name__, repr(value)))
          elif hasattr(self.klass, "any_to_value"):
             try:
                newval = self.klass()
                newval.any_to_value(value)
                return newval
-            except Exception, e:
+            except:
                raise ValidationError("Cannot instanciace class '%s' from value %s" % (self.klass.__name__, repr(value)))
          else:
             raise ValidationError("Expected a %s value, got %s" % (self.klass.__name__, type(value).__name__))
@@ -1240,7 +1240,6 @@ class Or(TypeValidator):
       emsg = "Value of type %s doesn't match any of the allowed types" % type(value).__name__
       emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
       raise ValidationError(emsg)
-      return None
 
    def _validate(self, value, key=None, index=None):
       if Struct.CompatibilityMode:
@@ -1265,7 +1264,6 @@ class Or(TypeValidator):
       emsg = "Value of type %s doesn't match any of the allowed types" % type(value).__name__
       emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
       raise ValidationError(emsg)
-      return None
 
    def value_to_string(self, v):
       for typ in self.types:
@@ -1313,7 +1311,7 @@ class Or(TypeValidator):
          except ValidationError, e:
             emsgs.append(str(e))
 
-      emsg = "Cannot conform to any of the allowed types from arguments (args=%s, kwargs=%s)" % (repr(args), repr(kwargs))
+      emsg = "Cannot conform to any of the allowed types (args=%s, fill=%s)" % (repr(args), repr(fill))
       emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
       raise ValidationError(emsg)
 
