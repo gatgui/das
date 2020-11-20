@@ -483,7 +483,7 @@ def read(path, schema_type=None, ignore_meta=False, strict_schema=None, **funcs)
 
 class _Placeholder(object):
    def __init__(self, is_optional=False):
-      object.__init__(self)
+      super(_Placeholder, self).__init__()
       self.optional = is_optional
 
    def __repr__(self):
@@ -610,20 +610,19 @@ def _get_value_type(parent, key):
    elif key == "[value]":
       return parent.type
 
-   return parent[key]
+   else:
+      return parent[key]
 
 
-def _get_org_type(st):
-   while (isinstance(st, schematypes.SchemaType)):
-      st = get_schema_type(st.name)
+def _get_actual_type(st):
+   if isinstance(st, schematypes.SchemaType):
+      return _get_actual_type(get_schema_type(st.name))
 
-   if isinstance(st, schematypes.Optional):
-      st = st.type
+   elif isinstance(st, schematypes.Optional):
+      return _get_actual_type(st.type)
 
-   while (isinstance(st, schematypes.SchemaType)):
-      st = get_schema_type(st.name)
-
-   return st
+   else:
+      return st
 
 
 def _read_csv(value, row, header, headers, schematype, data, csv):
@@ -662,7 +661,7 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
       if isinstance(st, schematypes.Optional):
          is_optional = True
 
-      st = _get_org_type(st)
+      st = _get_actual_type(st)
 
       if cur_key == "{value}":
          creatable = False
@@ -702,13 +701,13 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
 
    if re_d_key.search(header):
       if value != "":
-         parent[value] = _Placeholder.make_place_holder(_get_org_type(st.vtype), is_optional=is_optional)
+         parent[value] = _Placeholder.make_place_holder(_get_actual_type(st.vtype), is_optional=is_optional)
 
       return
 
    if re_a_index.search(header):
       if value != "":
-         parent.append(_Placeholder.make_place_holder(_get_org_type(st.type), is_optional=is_optional))
+         parent.append(_Placeholder.make_place_holder(_get_actual_type(st.type), is_optional=is_optional))
 
       return
 
@@ -720,7 +719,6 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
 
    if not value:
       if is_optional:
-         p = _Placeholder(is_optional=is_optional)
          return
 
       try:
@@ -728,7 +726,10 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
       except:
          return
 
-   parent[key] = st.string_to_value(value)
+   else:
+      value = st.string_to_value(value)
+
+   parent[key] = value
 
 
 def read_csv_table(csv_table):
@@ -1155,7 +1156,7 @@ def _dump_csv_data(k, d, valuetype, headers, parent=None, prefix=None):
    if prefix is None:
       prefix = ""
 
-   valuetype = _get_org_type(valuetype)
+   valuetype = _get_actual_type(valuetype)
 
    if isinstance(d, Struct):
       if not d:
