@@ -591,7 +591,7 @@ class Sequence(TypeValidator):
 
    def diff_type(self):
       # should remove side limits
-      return Struct(added=Optional(self), removed=Optional(self), changed=Struct(index=Integer(min=0), value=self.type.diff_type())))
+      return Struct(added=Optional(self), removed=Optional(self), changed=Struct(index=Integer(min=0), value=self.type.diff_type()))
 
    def diff(self, dst, dval, base, other, key=None, index=None):
       if base != other:
@@ -603,7 +603,8 @@ class Sequence(TypeValidator):
             for i in range(len(base), len(other)):
                rv.added.append(other[i])
          for i in xrange(min(len(base), len(other))):
-            rv.changed = {"index": i, dst.type.diff(, )
+            #rv.changed = {"index": i, dst.type.diff(, )
+            pass
          added = other.difference(base)
          removed = base.difference(other)
          if added or removed:

@@ -1,12 +1,12 @@
 import das
-import das.schematypes
+from . import schematypes
 import das
 
 
 def get_schema_type(st):
    if isinstance(st, basestring):
       st = das.get_schema_type(st)
-   if not isinstance(st, das.schematypes.TypeValidator):
+   if not isinstance(st, schematypes.TypeValidator):
       raise Exception("Expected a string or a das.schema.TypeValidator instance")
 
    stn = das.get_schema_type_name(st)
@@ -30,7 +30,7 @@ def diff(base, other):
       raise Exception("Cannot diff value of deferring schema type")
    dst = get_schema_type(st0)
    dv = dst.make_default()
-   return st0.diff(dst, dv, base=v0, other=v1)
+   return st0.diff(dst, dv, base, other)
 
 
 def patch(value, diff):
