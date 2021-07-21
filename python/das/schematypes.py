@@ -57,13 +57,6 @@ class TypeValidator(object):
    def _validate(self, value, key=None, index=None):
       raise ValidationError("'_validate' method is not implemented")
 
-   def _is_compatible(self, value, key=None, index=None):
-      try:
-         self._validate(value, key=key, index=index)
-         return True
-      except:
-         return False
-
    def _decode(self, encoding):
       if self.description is not None:
          self.description = das.decode(self.description, encoding)
@@ -72,7 +65,17 @@ class TypeValidator(object):
       return self
 
    def is_compatible(self, value, key=None, index=None):
-      return self._is_compatible(value, key=key, index=index)
+      try:
+         self._validate(value, key=key, index=index)
+         return True
+      except:
+         return False
+
+   def real_type(self, parent=None):
+      return self
+
+   def is_type_compatible(self, st, key=None, index=None):
+      return isinstance(st.real_type(), self.__class__)
 
    def validate(self, value, key=None, index=None):
       mixins = (None if not das.has_bound_mixins(value) else das.get_bound_mixins(value))
@@ -139,6 +142,8 @@ class Boolean(TypeValidator):
 
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
+
+   # No need to override is_type_compatible here, a Boolean matches another Boolean only
 
    def value_to_string(self, v):
       return "true" if self._validate(v) else "false"
@@ -207,6 +212,25 @@ class Integer(TypeValidator):
          self.enumvals = set(self.enum.values())
       return self
 
+   def is_type_compatible(self, st, key=None, index=None):
+      if not super(Integer, self).is_type_compatible(st, key=key, index=index):
+         return False
+
+      _st = st.real_type()
+
+      if self.enum is not None:
+         return (_st.enum is not None and _st.enum == self.enum)
+      elif _st.enum is not None:
+         return False
+
+      if self.min is not None and (_st.min is None or _st.min < self.min):
+         return False
+
+      if self.max is not None and (_st.max is None or _st.max > self.max):
+         return False
+
+      return True
+
    def value_to_string(self, v):
       return str(self._validate(v))
 
@@ -254,6 +278,20 @@ class Real(TypeValidator):
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
 
+   def is_type_compatible(self, st, key=None, index=None):
+      if not super(Real, self).is_type_compatible(st, key=key, index=index):
+         return False
+
+      _st = st.real_type()
+
+      if self.min is not None and (_st.min is None or _st.min < self.min):
+         return False
+
+      if self.max is not None and (_st.max is None or _st.max > self.max):
+         return False
+
+      return True
+
    def value_to_string(self, v):
       return str(self._validate(v))
 
@@ -280,7 +318,6 @@ class Real(TypeValidator):
       return Real(default=self.default, min=self.min, max=self.max, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
 
-
 class String(TypeValidator):
    def __init__(self, default=None, choices=None, matches=None, strict=True, description=None, editable=True, hidden=False, __properties__=None):
       super(String, self).__init__(default=("" if default is None else default), description=description, editable=editable, hidden=hidden, __properties__=__properties__)
@@ -295,15 +332,21 @@ class String(TypeValidator):
          else:
             raise Exception("String schema type 'matches' option must be a string or a compiled regular expression")
 
+   def _expand_choices(self, asSet=False):
+      if self.choices is None:
+         return None
+      if callable(self.choices):
+         rv = map(lambda x: das.ascii_or_unicode(x), self.choices())
+      else:
+         rv = self.choices
+      return (set(rv) if asSet else rv)
+
    def _validate_self(self, value):
       if not isinstance(value, basestring):
          raise ValidationError("Expected a string value, got %s" % type(value).__name__)
       v = das.ascii_or_unicode(value)
       if self.choices is not None and self.strict:
-         if callable(self.choices):
-            choices = map(lambda x: das.ascii_or_unicode(x), self.choices())
-         else:
-            choices = self.choices
+         choices = self._expand_choices()
          if not v in choices:
             raise ValidationError("String value must be on of %s, got %s" % (repr(choices), repr(v)))
       if self.matches is not None and not self.matches.match(v):
@@ -321,6 +364,25 @@ class String(TypeValidator):
       if self.matches:
          self.matches = re.compile(das.decode(self.matches.pattern, encoding))
       return self
+
+   def is_type_compatible(self, st, key=None, index=None):
+      if not super(String, self).is_type_compatible(st, key=key, index=index):
+         return False
+
+      _st = st.real_type()
+
+      if self.choices is not None and self.strict:
+         if _st.choices is None or not _st.strict:
+            return False
+         else:
+            s0 = self._expand_choices(asSet=True)
+            s1 = _st._expand_choices(asSet=True)
+            return (len(s0.symmetric_difference(s1)) == 0)
+
+      if self.matches is not None and (_st.matches is None or _st.matches.pattern != self.matches.pattern):
+         return False
+
+      return True
 
    def value_to_string(self, v):
       return str(self._validate(v))
@@ -391,6 +453,15 @@ class Set(TypeValidator):
       super(Set, self)._decode(encoding)
       self.type = das.decode(self.type, encoding)
       return self
+
+   def is_type_compatible(self, st, key=None, index=None):
+      if index is not None:
+         return self.type.is_type_compatible(st)
+      else:
+         if not super(Set, self).is_type_compatible(st, key=key, index=index):
+            return False
+         else:
+            return self.type.is_type_compatible(st.real_type().type)
 
    def make(self, *args, **kwargs):
       return self._validate(args)
@@ -468,6 +539,24 @@ class Sequence(TypeValidator):
       self.type = das.decode(self.type, encoding)
       return self
 
+   def is_type_compatible(self, st, key=None, index=None):
+      if index is not None:
+         return self.type.is_type_compatible(st)
+      else:
+         if not super(Sequence, self).is_type_compatible(st, key=key, index=index):
+            return False
+         _st = st.real_type()
+         if not self.type.is_type_compatible(_st.type):
+            return False
+         elif self.size is not None and (_st.size is None or _st.size != self.size):
+            return False
+         elif self.min_size is not None and (_st.min_size is None or _st.min_size < self.min_size):
+            return False
+         elif self.max_size is not None and (_st.max_size is None or _st.max_size > self.max_size):
+            return False
+         else:
+            return True
+
    def make(self, *args, **kwargs):
       return self._validate(args)
 
@@ -542,6 +631,22 @@ class Tuple(TypeValidator):
       super(Tuple, self)._decode(encoding)
       self.types = tuple(map(lambda x: das.decode(x, encoding), self.types))
       return self
+
+   def is_type_compatible(self, st, key=None, index=None):
+      if index is not None:
+         return self.types[index].is_type_compatible(st)
+      else:
+         if not super(Tuple, self).is_type_compatible(st, key=key, index=index):
+            return False
+         _st = st.real_type()
+         if len(_st.types) != len(self.types):
+            return False
+         else:
+            for i in xrange(len(self.types)):
+               if not self.types[i].is_type_compatible(_st.types[i]):
+                  return False
+            else:
+               return True
 
    def make_default(self):
       if not self.default_validated and self.default is None:
@@ -791,6 +896,36 @@ class Struct(TypeValidator, dict):
          self[k] = das.decode(self[k], encoding)
       return self
 
+   def real_type(self, parent=None):
+      if isinstance(parent, Struct):
+         aname = Alias.Name(self)
+         if aname is not None:
+            return parent[aname].real_type()
+      return super(Struct, self).real_type()
+
+   def is_type_compatible(self, st, key=None, index=None):
+      if key is not None:
+         vtype = self.get(key, None)
+         if vtype is None:
+            return False
+         else:
+            # st is supposedly the type of the key, shouldn't be an Alias anymore at that point
+            return vtype.real_type(parent=self).is_type_compatible(st)
+      else:
+         if not super(Struct, self).is_type_compatible(st, key=key, index=index):
+            return False
+         _st = self.real_type()
+         for k, v in self.iteritems():
+            # don't add aliases to dictionary
+            _vt0 = v.real_type(parent=self)
+            if not k in _st:
+               return False
+            else:
+               _vt1 = _st[k].real_type(parent=_st)
+               if not _vt0.is_type_compatible(_vt1):
+                  return False
+         return True
+
    def load_extensions(self):
       for et, ld in self._properties["extensions"].items():
          if not ld:
@@ -976,6 +1111,27 @@ class Dict(TypeValidator):
       self.vtypeOverrides = vtypeOverrides
       return self
 
+   def is_type_compatible(self, st, key=None, index=None):
+      if key is not None:
+         return self.vtypeOverrides.get(str(key), self.vtype).is_type_compatible(st)
+      else:
+         if not super(Dict, self).is_type_compatible(st, key=key, index=index):
+            return False
+         _st = st.real_type()
+         if not self.ktype.is_type_compatible(_st.ktype):
+            return False
+         if not self.vtype.is_type_compatible(_st.vtype):
+            return False
+         for k, v in self.vtypeOverrides.iteritems():
+            if not v.is_type_compatible(_st.vtypeOverrides.get(k, _st.vtype)):
+               return False
+         for k, v in _st.vtypeOverrides.iteritems():
+            if k in self.vtypeOverrides:
+               continue
+            elif not self.vtype.is_type_compatible(v):
+               return False
+         return True
+
    def make(self, *args, **kwargs):
       return self._validate(kwargs)
 
@@ -1084,6 +1240,12 @@ class Class(TypeValidator):
 
    # No _decode?
 
+   def is_type_compatible(self, st, key=None, index=None):
+      if not super(Class, self).is_type_compatible(st, key=key, index=index):
+         return False
+      else:
+         return issubclass(self.real_type(st).klass, self.klass)
+
    def __repr__(self):
       cmod = self.klass.__module__
       if cmod != "__main__":
@@ -1155,6 +1317,22 @@ class Or(TypeValidator):
       emsg = "Value of type %s doesn't match any of the allowed types" % type(value).__name__
       emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
       raise ValidationError(emsg)
+
+   def is_type_compatible(self, st, key=None, index=None):
+      _st = self.real_type(st)
+      if _st is None:
+         return False
+      else:
+         if isinstance(_st, Or):
+            for typ in _st.types:
+               if not self.is_type_compatible(typ):
+                  return False
+            return True
+         else:
+            for typ in self.types:
+               if typ.is_type_compatible(_st):
+                  return True
+            return False
 
    def value_to_string(self, v):
       for typ in self.types:
@@ -1252,6 +1430,9 @@ class Optional(TypeValidator):
       self.type = das.decode(self.type, encoding)
       return self
 
+   def is_type_compatible(self, st, key=None, index=None):
+      return self.type.is_type_compatible(st, key=key, index=index)
+
    def make_default(self):
       return self.type.make_default()
 
@@ -1299,6 +1480,8 @@ class Deprecated(Optional):
       self.message = das.decode(self.message, encoding)
       return self
 
+   # Do not override is_type_compatible, already re-defined in Optional
+
    def make_default(self):
       return None
 
@@ -1320,6 +1503,8 @@ class Empty(TypeValidator):
 
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
+
+   # no need to override is_type_compatible, Empty only matches another Empty
 
    def make_default(self):
       return None
@@ -1351,7 +1536,9 @@ class Alias(TypeValidator):
    def Name(t):
       if isinstance(t, Alias):
          return t.name
-      elif isinstance(t, Deprecated) and isinstance(t.type, Alias):
+      # Can't this be optional too?
+      #elif isinstance(t, Deprecated) and isinstance(t.type, Alias):
+      elif isinstance(t, Optional) and isinstance(t.type, Alias):
          return t.type.name
       else:
          return None
@@ -1365,6 +1552,13 @@ class Alias(TypeValidator):
 
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
+
+   def is_type_compatible(self, st, key=None, index=None):
+      _st = self.real_type(st)
+      if not isinstance(_st, Alias):
+         return False
+      else:
+         return (self.name == _st.name)
 
    def make_default(self):
       return None
@@ -1391,6 +1585,9 @@ class SchemaType(TypeValidator):
    def _validate(self, value, key=None, index=None):
       st = das.get_schema_type(self.name)
       return st.validate(value, key=key, index=index)
+
+   def is_type_compatible(self, st, key=None, index=None):
+      return das.get_schema_type(self.name).is_type_compatible(st, key=key, index=index)
 
    def make_default(self):
       if not self.default_validated and self.default is None:
