@@ -5,10 +5,10 @@ import glob
 
 thisdir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(thisdir, "..", "python"))
-dirs = map(lambda y: thisdir + "/" + y, filter(lambda x: re.match("test\d+", x), os.listdir(thisdir)))
+dirs = map(lambda y: thisdir + "/" + y, filter(lambda x: re.match(r"test\d+", x), os.listdir(thisdir)))
 os.environ["DAS_SCHEMA_PATH"] = os.pathsep.join(dirs)
 
-import das
+import das # pylint: disable=import-error
 
 def print_types():
    print("=== Print default for all 'hud' schema types")
@@ -127,7 +127,7 @@ def test_mixin2():
          return "timeline.Range"
 
       def __init__(self, *args, **kwargs):
-         super(Fn2, self).__init__()
+         super(Fn3, self).__init__()
 
       def echo(self):
          print("From Fn3 Mixin")

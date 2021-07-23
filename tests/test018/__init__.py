@@ -1,7 +1,7 @@
 # -*- coding: utf8 -*-
 import os
 import unittest
-import das
+import das # pylint: disable=import-error
 
 
 class TestCase(unittest.TestCase):
@@ -83,15 +83,15 @@ class TestCase(unittest.TestCase):
 
    def testDict(self):
       try:
-         res = das.conform({1: {"given": "Bart", "family": "Simpson"}}, "conform.NameDict")
-      except Exception as e:
+         das.conform({1: {"given": "Bart", "family": "Simpson"}}, "conform.NameDict")
+      except Exception:
          self.assertTrue(False)
       else:
          self.assertTrue(True)
 
       try:
-         res = das.conform({1: "Simpson"}, "conform.NameDict")
-      except Exception as e:
+         das.conform({1: "Simpson"}, "conform.NameDict")
+      except Exception:
          self.assertTrue(True)
       else:
          self.assertTrue(False)
