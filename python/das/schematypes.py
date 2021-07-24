@@ -379,8 +379,16 @@ class String(TypeValidator):
             s1 = _st._expand_choices(asSet=True)
             return (len(s0.symmetric_difference(s1)) == 0)
 
-      if self.matches is not None and (_st.matches is None or _st.matches.pattern != self.matches.pattern):
-         return False
+      if self.matches is not None: # and
+         if _st.matches is None:
+            if _st.choices and _st.strict:
+               allchoicesmatch = all([self.matches.match(x) is not None for x in _st._expand_choices()])
+               if not allchoicesmatch:
+                  return False
+            else:
+               return False
+         elif _st.matches.pattern != self.matches.pattern:
+            return False
 
       return True
 
