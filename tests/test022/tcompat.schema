@@ -17,6 +17,7 @@
    "integerRange5": Integer(default=5, min=0, max=5),
    "integerEnum1": Integer(default=1, enum={"enum1": 1, "enum2": 2, "enum3": 3}),
    "integerEnum2": Integer(default=1, enum={"enum1": 1, "enum2": 2, "enum3": 4}),
+   "integerEnum3": Integer(default=1, enum={"enum1": 1, "enum2": 2, "enum4": 3}),
    "real": Real(default=0.5),
    "realMin1": Real(default=0.5, min=-10),
    "realMin2": Real(default=0.5, min=-20),
