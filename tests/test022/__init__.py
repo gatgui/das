@@ -98,3 +98,56 @@ class TestCase(unittest.TestCase):
       self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.integerEnum1")))
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.integerEnum2")))
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.integerEnum3")))
+
+   def testReal(self):
+      k0 = "compat.real"
+      v0 = das.get_schema_type(k0)
+      for k1 in das.list_schema_types("compat"):
+         v1 = das.get_schema_type(k1)
+         rv = v0.is_type_compatible(v1)
+         if k1.startswith("compat.real"):
+            self.assertTrue(rv)
+         else:
+            self.assertFalse(rv)
+
+   def testRealMin(self):
+      st = das.get_schema_type("compat.realMin1")
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.real")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realMin2")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.realMin3")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realMax1")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realMax2")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realMax3")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.realRange1")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realRange2")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.realRange3")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.realRange4")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realRange5")))
+
+   def testRealMax(self):
+      st = das.get_schema_type("compat.realMax1")
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.real")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realMax2")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.realMax3")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realMin1")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realMin2")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realMin3")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.realRange1")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realRange2")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.realRange3")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realRange4")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.realRange5")))
+
+   def testRealRange(self):
+      st = das.get_schema_type("compat.realRange1")
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.real")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realMin1")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realMin2")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realMin3")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realMax1")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realMax2")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realMax3")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realRange2")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.realRange3")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realRange4")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realRange5")))
