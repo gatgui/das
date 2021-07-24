@@ -1,0 +1,36 @@
+# name: compat
+# version: 1.0
+# das_minimum_version: 0.13.0
+{
+   "boolean": Boolean(default=True),
+   "integer": Integer(default=1),
+   "integerMin1": Integer(default=5, min=1),
+   "integerMin2": Integer(default=5, min=0),
+   "integerMin3": Integer(default=5, min=2),
+   "integerMax1": Integer(default=5, max=10),
+   "integerMax2": Integer(default=5, max=20),
+   "integerMax3": Integer(default=5, max=5),
+   "integerRange1": Integer(default=5, min=1, max=10),
+   "integerRange2": Integer(default=5, min=2, max=5),
+   "integerRange3": Integer(default=5, min=0, max=20),
+   "integerRange4": Integer(default=5, min=2, max=20),
+   "integerRange5": Integer(default=5, min=0, max=5),
+   "integerEnum1": Integer(default=1, enum={"enum1": 1, "enum2": 2, "enum3": 3}),
+   "integerEnum2": Integer(default=1, enum={"enum1": 1, "enum2": 2, "enum3": 4}),
+   "real": Real(default=0.5),
+   "realMin1": Real(default=0.5, min=-10),
+   "realMin2": Real(default=0.5, min=-20),
+   "realMin3": Real(default=0.5, min=-5),
+   "realMax1": Real(default=0.5, max=10),
+   "realMax2": Real(default=0.5, max=20),
+   "realMax3": Real(default=0.5, max=5),
+   "realRange1": Real(default=0.5, min=-10, max=10),
+   "realRange2": Real(default=0.5, min=-20, max=20),
+   "realRange3": Real(default=0.5, min=-5, max=5),
+   "realRange4": Real(default=0.5, min=-5, max=20),
+   "realRange5": Real(default=0.5, min=-20, max=5),
+   "string": String(default="hello"),
+   "stringLooseChoices": String(default="hello", choices=["hello", "goodbye"], strict=False),
+   "stringStrictChoices": String(default="hello", choices=["hello", "goodbye"], strict=True),
+   "stringMatches": String(default="v001", matches=r"v\d{3,}")
+}

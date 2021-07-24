@@ -5,15 +5,9 @@ import das # pylint: disable=import-error
 
 
 class TestCase(unittest.TestCase):
-   TestDir = None
-   Schema = None
-   HomerOutput = None
-
    @classmethod
    def setUpClass(cls):
-      cls.TestDir = os.path.abspath(os.path.dirname(__file__))
-      cls.Schema = cls.TestDir + "/conform.schema"      
-      os.environ["DAS_SCHEMA_PATH"] = cls.TestDir
+      os.environ["DAS_SCHEMA_PATH"] = os.path.abspath(os.path.dirname(__file__))
 
    def setUp(self):
       self.addCleanup(self.cleanUp)
