@@ -379,7 +379,7 @@ class String(TypeValidator):
             s1 = _st._expand_choices(asSet=True)
             return (len(s0.symmetric_difference(s1)) == 0)
 
-      if self.matches is not None: # and
+      if self.matches is not None:
          if _st.matches is None:
             if _st.choices and _st.strict:
                allchoicesmatch = all([self.matches.match(x) is not None for x in _st._expand_choices()])
@@ -508,8 +508,14 @@ class Sequence(TypeValidator):
    def __init__(self, type, default=None, size=None, min_size=None, max_size=None, description=None, editable=True, hidden=False, __properties__=None):
       super(Sequence, self).__init__(default=([] if default is None else default), description=description, editable=editable, hidden=hidden, __properties__=__properties__)
       self.size = size
-      self.min_size = min_size
-      self.max_size = max_size
+      self.min_size = None
+      self.max_size = None
+      if size is None:
+         if min_size is not None and max_size is not None and min_size == max_size:
+            self.size = min_size
+         else:
+            self.min_size = min_size
+            self.max_size = max_size
       self.type = type
 
    def _validate_self(self, value):
@@ -1438,6 +1444,9 @@ class Optional(TypeValidator):
       self.type = das.decode(self.type, encoding)
       return self
 
+   def real_type(self, parent=None):
+      return self.type
+
    def is_type_compatible(self, st, key=None, index=None):
       return self.type.is_type_compatible(st, key=key, index=index)
 
@@ -1593,6 +1602,9 @@ class SchemaType(TypeValidator):
    def _validate(self, value, key=None, index=None):
       st = das.get_schema_type(self.name)
       return st.validate(value, key=key, index=index)
+
+   def real_type(self, parent=None):
+      return das.get_schema_type(self.name)
 
    def is_type_compatible(self, st, key=None, index=None):
       return das.get_schema_type(self.name).is_type_compatible(st, key=key, index=index)
