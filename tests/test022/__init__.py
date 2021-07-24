@@ -179,3 +179,54 @@ class TestCase(unittest.TestCase):
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.stringChoice1")))
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.stringChoice2")))
       self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.stringChoice3")))
+
+   def testSequence(self):
+      k0 = "compat.sequence"
+      v0 = das.get_schema_type(k0)
+      for k1 in das.list_schema_types("compat"):
+         v1 = das.get_schema_type(k1)
+         rv = v0.is_type_compatible(v1)
+         if k1.startswith("compat.sequence"):
+            self.assertTrue(rv, "%s vs %s" % (k0, k1))
+         else:
+            self.assertFalse(rv)
+
+   def testSequenceMin(self):
+      st = das.get_schema_type("compat.sequenceMin2")
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceMin1")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.sequenceMin3")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceMax1")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceMax2")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceMax3")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.sequenceRange1")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.sequenceRange2")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceRange3")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceRange4")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.sequenceRange5")))
+
+   def testSequenceMax(self):
+      st = das.get_schema_type("compat.sequenceMax1")
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceMax2")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.sequenceMax3")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceMin1")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceMin2")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceMin3")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.sequenceRange1")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.sequenceRange2")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.sequenceRange3")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceRange4")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceRange5")))
+
+   def testSequenceRange(self):
+      st = das.get_schema_type("compat.sequenceRange1")
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequence")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceMin1")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceMin2")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceMin3")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceMax1")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceMax2")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceMax3")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.sequenceRange2")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceRange3")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceRange4")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceRange5")))

@@ -34,5 +34,19 @@
    "stringChoice1": String(default="hello", choices=["hello", "goodbye"], strict=False),
    "stringChoice2": String(default="hello", choices=["hello", "goodbye"], strict=True),
    "stringChoice3": String(default="hello", choices=["v001", "v002", "v003"], strict=True),
-   "stringMatch": String(default="v001", matches=r"v\d{3,}")
+   "stringMatch": String(default="v001", matches=r"v\d{3,}"),
+   "sequence": Sequence(String()),
+   "sequence1": Sequence(SchemaType("stringMatch")),
+   "sequence2": Sequence(SchemaType("stringChoice3")),
+   "sequenceMin1": Sequence(String(), default=["A"], min_size=1),
+   "sequenceMin2": Sequence(String(), default=["A", "B"], min_size=2),
+   "sequenceMin3": Sequence(String(), default=["A", "B", "C"], min_size=3),
+   "sequenceMax1": Sequence(String(), max_size=5),
+   "sequenceMax2": Sequence(String(), max_size=6),
+   "sequenceMax3": Sequence(String(), max_size=4),
+   "sequenceRange1": Sequence(String(), default=["A", "B"], min_size=2, max_size=5),
+   "sequenceRange2": Sequence(String(), default=["A", "B", "C"], min_size=3, max_size=4),
+   "sequenceRange3": Sequence(String(), default=["A"], min_size=1, max_size=4),
+   "sequenceRange4": Sequence(String(), default=["A"], min_size=1, max_size=6),
+   "sequenceRange5": Sequence(String(), default=["A", "B", "C"], min_size=3, max_size=6)
 }
