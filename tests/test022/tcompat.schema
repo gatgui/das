@@ -31,7 +31,8 @@
    "realRange4": Real(default=0.5, min=-5, max=20),
    "realRange5": Real(default=0.5, min=-20, max=5),
    "string": String(default="hello"),
-   "stringLooseChoices": String(default="hello", choices=["hello", "goodbye"], strict=False),
-   "stringStrictChoices": String(default="hello", choices=["hello", "goodbye"], strict=True),
-   "stringMatches": String(default="v001", matches=r"v\d{3,}")
+   "stringChoice1": String(default="hello", choices=["hello", "goodbye"], strict=False),
+   "stringChoice2": String(default="hello", choices=["hello", "goodbye"], strict=True),
+   "stringChoice3": String(default="hello", choices=["v001", "v002", "v003"], strict=True),
+   "stringMatch": String(default="v001", matches=r"v\d{3,}")
 }

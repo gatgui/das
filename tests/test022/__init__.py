@@ -151,3 +151,31 @@ class TestCase(unittest.TestCase):
       self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.realRange3")))
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realRange4")))
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.realRange5")))
+
+   def testString(self):
+      k0 = "compat.string"
+      v0 = das.get_schema_type(k0)
+      for k1 in das.list_schema_types("compat"):
+         v1 = das.get_schema_type(k1)
+         rv = v0.is_type_compatible(v1)
+         if k1.startswith("compat.string"):
+            self.assertTrue(rv)
+         else:
+            self.assertFalse(rv)
+
+   def testStringChoice(self):
+      st = das.get_schema_type("compat.stringChoice1")
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.string")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.stringChoice2")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.stringMatch")))
+      st = das.get_schema_type("compat.stringChoice2")
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.string")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.stringChoice1")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.stringMatch")))
+
+   def testStringMatch(self):
+      st = das.get_schema_type("compat.stringMatch")
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.string")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.stringChoice1")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.stringChoice2")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.stringChoice3")))
