@@ -928,7 +928,7 @@ class Struct(TypeValidator, dict):
       else:
          if not super(Struct, self).is_type_compatible(st, key=key, index=index):
             return False
-         _st = self.real_type()
+         _st = st.real_type()
          for k, v in self.iteritems():
             # don't add aliases to dictionary
             _vt0 = v.real_type(parent=self)
