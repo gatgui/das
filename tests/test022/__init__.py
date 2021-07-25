@@ -248,3 +248,28 @@ class TestCase(unittest.TestCase):
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.set")))
       self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.set1")))
       self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.set2")))
+
+   def testTuple(self):
+      k0 = "compat.tuple"
+      v0 = das.get_schema_type(k0)
+      for k1 in das.list_schema_types("compat"):
+         v1 = das.get_schema_type(k1)
+         rv = v0.is_type_compatible(v1)
+         if k1.startswith("compat.tuple"):
+            erv = {"compat.tuple": True,
+                   "compat.tuple1": False,
+                   "compat.tuple2": False,
+                   "compat.tuple3": True,
+                   "compat.tuple4": True}
+            if erv.get(k1, False):
+               self.assertTrue(rv, "%s vs %s" % (k0, k1))
+            else:
+               self.assertFalse(rv, "%s vs %s" % (k0, k1))
+         else:
+            self.assertFalse(rv)
+      st = das.get_schema_type("compat.tuple3")
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.tuple4")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.tuple")))
+      st = das.get_schema_type("compat.tuple4")
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.tuple3")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.tuple")))

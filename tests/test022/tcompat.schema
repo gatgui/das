@@ -53,4 +53,9 @@
    "set1": Set(SchemaType("stringMatch")),
    "set2": Set(SchemaType("stringChoice3")),
    "set3": Set(Or(SchemaType("real"), SchemaType("stringMatch"))),
+   "tuple": Tuple(String(), Integer(), Real()),
+   "tuple1": Tuple(String(), Integer()),
+   "tuple2": Tuple(String(), Integer(), Real(), Real()),
+   "tuple3": Tuple(SchemaType("stringMatch"), SchemaType("integerRange3"), SchemaType("realMax2")),
+   "tuple4": Tuple(SchemaType("stringChoice3"), SchemaType("integerRange4"), SchemaType("realMax2"))
 }
