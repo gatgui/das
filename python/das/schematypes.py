@@ -1258,7 +1258,7 @@ class Class(TypeValidator):
       if not super(Class, self).is_type_compatible(st, key=key, index=index):
          return False
       else:
-         return issubclass(self.real_type(st).klass, self.klass)
+         return issubclass(st.real_type().klass, self.klass)
 
    def __repr__(self):
       cmod = self.klass.__module__
@@ -1333,7 +1333,7 @@ class Or(TypeValidator):
       raise ValidationError(emsg)
 
    def is_type_compatible(self, st, key=None, index=None):
-      _st = self.real_type(st)
+      _st = st.real_type()
       if _st is None:
          return False
       else:
@@ -1445,7 +1445,7 @@ class Optional(TypeValidator):
       return self
 
    def real_type(self, parent=None):
-      return self.type
+      return self.type.real_type(parent=parent)
 
    def is_type_compatible(self, st, key=None, index=None):
       return self.type.is_type_compatible(st, key=key, index=index)
@@ -1571,7 +1571,7 @@ class Alias(TypeValidator):
       return self._validate_self(value)
 
    def is_type_compatible(self, st, key=None, index=None):
-      _st = self.real_type(st)
+      _st = st.real_type()
       if not isinstance(_st, Alias):
          return False
       else:
@@ -1604,7 +1604,7 @@ class SchemaType(TypeValidator):
       return st.validate(value, key=key, index=index)
 
    def real_type(self, parent=None):
-      return das.get_schema_type(self.name)
+      return das.get_schema_type(self.name).real_type(parent=parent)
 
    def is_type_compatible(self, st, key=None, index=None):
       return das.get_schema_type(self.name).is_type_compatible(st, key=key, index=index)
