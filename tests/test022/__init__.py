@@ -278,3 +278,8 @@ class TestCase(unittest.TestCase):
       st = das.get_schema_type("compat.struct")
       self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.struct1")))
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.struct2")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.struct3")))
+      st = das.get_schema_type("compat.struct2")
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.struct4")))
+      st = das.get_schema_type("compat.struct4")
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.struct2")))

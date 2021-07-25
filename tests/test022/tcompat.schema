@@ -33,7 +33,7 @@
    "string": String(default="hello"),
    "stringChoice1": String(default="hello", choices=["hello", "goodbye"], strict=False),
    "stringChoice2": String(default="hello", choices=["hello", "goodbye"], strict=True),
-   "stringChoice3": String(default="hello", choices=["v001", "v002", "v003"], strict=True),
+   "stringChoice3": String(default="v002", choices=["v001", "v002", "v003"], strict=True),
    "stringMatch": String(default="v001", matches=r"v\d{3,}"),
    "sequence": Sequence(String()),
    "sequence1": Sequence(SchemaType("stringMatch")),
@@ -66,5 +66,13 @@
                      field3=SchemaType("realMax2")),
    "struct2": Struct(field1=String(),
                      field2=Integer(),
-                     field3=Real())
+                     field3=Real()),
+   "struct3": Struct(field1=Deprecated(SchemaType("stringChoice3")),
+                     field2=SchemaType("integerRange4"),
+                     field3=SchemaType("realMax2")),
+   "struct4": Struct(field1=String(),
+                     field2=Integer(),
+                     field3=Real(),
+                     field4=Deprecated(Boolean()),
+                     field5=Alias("field4"))
 }
