@@ -74,5 +74,11 @@
                      field2=Integer(),
                      field3=Real(),
                      field4=Deprecated(Boolean()),
-                     field5=Alias("field4"))
+                     field5=Alias("field4")),
+   "dict": Dict(ktype=String(),
+                vtype=Real()),
+   "dict1": Dict(ktype=SchemaType("stringMatch"),
+                 vtype=SchemaType("realMin1")),
+   "dict2": Dict(ktype=SchemaType("stringChoice3"),
+                 vtype=SchemaType("realMin3"))
 }

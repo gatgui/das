@@ -275,6 +275,13 @@ class TestCase(unittest.TestCase):
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.tuple")))
 
    def testStruct(self):
+      k0 = "compat.struct2"
+      v0 = das.get_schema_type(k0)
+      for k1 in das.list_schema_types("compat"):
+         if k1.startswith("compat.struct"):
+            continue
+         else:
+            self.assertFalse(v0.is_type_compatible(das.get_schema_type(k1)))
       st = das.get_schema_type("compat.struct")
       self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.struct1")))
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.struct2")))
@@ -283,3 +290,22 @@ class TestCase(unittest.TestCase):
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.struct4")))
       st = das.get_schema_type("compat.struct4")
       self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.struct2")))
+
+   def testDict(self):
+      k0 = "compat.dict"
+      v0 = das.get_schema_type(k0)
+      for k1 in das.list_schema_types("compat"):
+         if k1.startswith("compat.dict"):
+            continue
+         else:
+            self.assertFalse(v0.is_type_compatible(das.get_schema_type(k1)))
+      st = das.get_schema_type("compat.dict")
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.dict1")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.dict2")))
+      st = das.get_schema_type("compat.dict1")
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.dict")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.dict2")))
+      st = das.get_schema_type("compat.dict2")
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.dict")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.dict1")))
+      
