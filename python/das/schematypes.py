@@ -910,12 +910,28 @@ class Struct(TypeValidator, dict):
          self[k] = das.decode(self[k], encoding)
       return self
 
-   def real_type(self, parent=None):
-      if isinstance(parent, Struct):
-         aname = Alias.Name(self)
-         if aname is not None:
-            return parent[aname].real_type()
-      return super(Struct, self).real_type()
+   def _aliased_type(self, nameOrType):
+      if isinstance(nameOrType, basestring):
+         vt = self[nameOrType]
+      elif isinstance(nameOrType, TypeValidator):
+         vt = nameOrType
+      else:
+         raise Exception("Expected 'str' or 'TypeValidator' instance got '%s'" % type(nameOrType).__name__)
+      an = Alias.Name(vt)
+      return (vt if an is None else self[an])
+
+   def _is_alias(self, nameOrType):
+      if isinstance(nameOrType, basestring):
+         vt = self[nameOrType]
+      elif isinstance(nameOrType, TypeValidator):
+         vt = nameOrType
+      else:
+         raise Exception("Expected 'str' or 'TypeValidator' instance got '%s'" % type(nameOrType).__name__)
+      an = Alias.Name(vt)
+      return (an is not None)
+
+   def _is_optional(self, name):
+      return isinstance(self._aliased_type(name), Optional)
 
    def is_type_compatible(self, st, key=None, index=None):
       if key is not None:
@@ -923,7 +939,7 @@ class Struct(TypeValidator, dict):
          if vtype is None:
             return False
          else:
-            # st is supposedly the type of the key, shouldn't be an Alias anymore at that point
+            # st is supposedly the type of the key
             return vtype.real_type(parent=self).is_type_compatible(st)
       else:
          if not super(Struct, self).is_type_compatible(st, key=key, index=index):
@@ -933,11 +949,23 @@ class Struct(TypeValidator, dict):
             # don't add aliases to dictionary
             _vt0 = v.real_type(parent=self)
             if not k in _st:
-               return False
+               # only error if k is not an optional field
+               if not self._is_optional(v):
+                  return False
             else:
                _vt1 = _st[k].real_type(parent=_st)
                if not _vt0.is_type_compatible(_vt1):
                   return False
+               # Non optional fields are not compatible with optional ones
+               if not self._is_optional(v) and _st._is_optional(_st[k]):
+                  return False
+         # check for any fields in _st not in self
+         for k, v in _st.iteritems():
+            if _st._is_alias(v):
+               continue
+            if not k in self:
+               # allow if it is optional? -> no
+               return False
          return True
 
    def load_extensions(self):
@@ -1569,6 +1597,12 @@ class Alias(TypeValidator):
 
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
+
+   def real_type(self, parent=None):
+      if parent is not None:
+         return parent[self.name].real_type(parent=parent)
+      else:
+         return super(Alias, self).real_type(parent=parent)
 
    def is_type_compatible(self, st, key=None, index=None):
       _st = st.real_type()
