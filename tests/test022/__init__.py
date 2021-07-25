@@ -230,3 +230,21 @@ class TestCase(unittest.TestCase):
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceRange3")))
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceRange4")))
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.sequenceRange5")))
+
+   def testSet(self):
+      k0 = "compat.set"
+      v0 = das.get_schema_type(k0)
+      for k1 in das.list_schema_types("compat"):
+         v1 = das.get_schema_type(k1)
+         rv = v0.is_type_compatible(v1)
+         if k1.startswith("compat.set"):
+            if k1 == "compat.set3":
+               self.assertFalse(rv, "%s vs %s" % (k0, k1))
+            else:
+               self.assertTrue(rv, "%s vs %s" % (k0, k1))
+         else:
+            self.assertFalse(rv)
+      st = das.get_schema_type("compat.set3")
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.set")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.set1")))
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.set2")))

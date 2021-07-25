@@ -48,5 +48,9 @@
    "sequenceRange2": Sequence(String(), default=["A", "B", "C"], min_size=3, max_size=4),
    "sequenceRange3": Sequence(String(), default=["A"], min_size=1, max_size=4),
    "sequenceRange4": Sequence(String(), default=["A"], min_size=1, max_size=6),
-   "sequenceRange5": Sequence(String(), default=["A", "B", "C"], min_size=3, max_size=6)
+   "sequenceRange5": Sequence(String(), default=["A", "B", "C"], min_size=3, max_size=6),
+   "set": Set(String()),
+   "set1": Set(SchemaType("stringMatch")),
+   "set2": Set(SchemaType("stringChoice3")),
+   "set3": Set(Or(SchemaType("real"), SchemaType("stringMatch"))),
 }
