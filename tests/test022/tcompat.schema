@@ -57,5 +57,14 @@
    "tuple1": Tuple(String(), Integer()),
    "tuple2": Tuple(String(), Integer(), Real(), Real()),
    "tuple3": Tuple(SchemaType("stringMatch"), SchemaType("integerRange3"), SchemaType("realMax2")),
-   "tuple4": Tuple(SchemaType("stringChoice3"), SchemaType("integerRange4"), SchemaType("realMax2"))
+   "tuple4": Tuple(SchemaType("stringChoice3"), SchemaType("integerRange4"), SchemaType("realMax2")),
+   "struct": Struct(field1=SchemaType("stringMatch"),
+                    field2=SchemaType("integerRange3"),
+                    field3=SchemaType("realMax2")),
+   "struct1": Struct(field1=SchemaType("stringChoice3"),
+                     field2=SchemaType("integerRange4"),
+                     field3=SchemaType("realMax2")),
+   "struct2": Struct(field1=String(),
+                     field2=Integer(),
+                     field3=Real())
 }

@@ -273,3 +273,8 @@ class TestCase(unittest.TestCase):
       st = das.get_schema_type("compat.tuple4")
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.tuple3")))
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.tuple")))
+
+   def testStruct(self):
+      st = das.get_schema_type("compat.struct")
+      self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.struct1")))
+      self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.struct2")))
