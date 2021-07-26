@@ -1,7 +1,7 @@
 # -*- coding: utf8 -*-
 import os
 import unittest
-import das
+import das # pylint: disable=import-error
 
 class TestCase(unittest.TestCase):
    TestDir = None
