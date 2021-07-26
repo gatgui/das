@@ -89,4 +89,7 @@
                  vtype=Real(),
                  somekey=SchemaType("integerMin1"),
                  anotherkey=SchemaType("stringMatch")),
+   "or": Or(Integer(), Real(), String()),
+   "or1": Or(Integer(), Real()),
+   "or2": Or(Integer(), Real(), String(), Set(String()))
 }

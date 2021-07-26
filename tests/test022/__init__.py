@@ -313,3 +313,17 @@ class TestCase(unittest.TestCase):
       self.assertTrue(st.is_type_compatible(das.get_schema_type("compat.dict4")))
       st = das.get_schema_type("compat.dict4")
       self.assertFalse(st.is_type_compatible(das.get_schema_type("compat.dict3")))
+
+   def testOr(self):
+      k0 = "compat.or2"
+      v0 = das.get_schema_type(k0)
+      for k1 in das.list_schema_types("compat"):
+         if k1.startswith("compat.or"):
+            continue
+         elif (k1.startswith("compat.integer") and not k1.startswith("compat.integerEnum")) or \
+              k1.startswith("compat.real") or \
+              k1.startswith("compat.string") or \
+              (k1.startswith("compat.set") and k1 != "compat.set3"):
+            self.assertTrue(v0.is_type_compatible(das.get_schema_type(k1)), "%s / %s" % (k0, k1))
+         else:
+            self.assertFalse(v0.is_type_compatible(das.get_schema_type(k1)), "%s / %s" % (k0, k1))
