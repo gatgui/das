@@ -59,4 +59,7 @@ class TestCase(unittest.TestCase):
       st = das.get_schema_type("extend.ScaledResolution")
       with self.assertRaises(Exception):
          st.extend("extend.Rect2")
-   
+
+   def testFieldOverride(self):
+      st = das.get_schema_type("extend.ScaledResolution")
+      st.extend("extend.Rect3")

@@ -13,10 +13,13 @@
    "ScaledResolution": Struct(__extends__=["Resolution"],
                               scale=SchemaType("Scale")),
 
-   "Rect1": Struct(width=Integer(),
-                   height=Integer()),
+   "Rect1": Struct(width=Real(),
+                   height=Real()),
 
    "Rect2": Struct(w=Integer(),
                    h=Integer(),
-                   width=Alias("w"))
+                   width=Alias("w")),
+
+   "Rect3": Struct(width=Integer(),
+                   height=Integer())
 }
