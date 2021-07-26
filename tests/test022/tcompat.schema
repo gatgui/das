@@ -80,5 +80,13 @@
    "dict1": Dict(ktype=SchemaType("stringMatch"),
                  vtype=SchemaType("realMin1")),
    "dict2": Dict(ktype=SchemaType("stringChoice3"),
-                 vtype=SchemaType("realMin3"))
+                 vtype=SchemaType("realMin3")),
+   "dict3": Dict(ktype=String(),
+                 vtype=Real(),
+                 somekey=Integer(),
+                 anotherkey=String()),
+   "dict4": Dict(ktype=String(),
+                 vtype=Real(),
+                 somekey=SchemaType("integerMin1"),
+                 anotherkey=SchemaType("stringMatch")),
 }
