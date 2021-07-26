@@ -1,5 +1,9 @@
 **0.13.0**
 - Added new method `is_type_compatible` to `TypeValidator` class to check for type compatibility.
+- Allow field overrides when extending a `Struct` as long as type is compatible.
+- Fixed several issues with `Struct` extensions:
+  - missing aliases
+  - double fields in serialization
 
 **0.12.3**
 - Check for QApplication instance existence before creating it in `dasedit`.

@@ -733,27 +733,19 @@ class Struct(TypeValidator, dict):
             if das.__verbose__:
                das.print_once("[das] '%s' treated as a standard field for Struct type. Use '__%s__' to set schema type's attribute" % (name, name))
             del(kwargs[name])
+      removedItems = removedValues.items()
 
       super(Struct, self).__init__(default=None, description=__description__, editable=__editable__, hidden=__hidden__, __properties__=__properties__, **kwargs)
 
       # Keep mapping of aliases
       self._aliases = {}
-      for k, v in self.items():
+      for k, v in (self.items() + removedItems):
          aliasname = Alias.Name(v)
          if aliasname is not None:
             self._aliases[k] = aliasname
 
       # Build fields ordering
-      keys = [k for k, _ in self.items() if not k in self._aliases]
-      if __order__ is not None:
-         self._original_order = list(__order__)
-         self._order = filter(lambda x: x in keys, self._original_order)
-         for n in keys:
-            if not n in __order__:
-               self._order.append(n)
-      else:
-         self._original_order = None
-         self._order = sorted(keys)
+      self._fix_order(__order__, extraItems=removedItems)
 
       # Track schema to extend
       exttypes = ([] if not self.has_property("extensions") else self.get_property("extensions").keys())
@@ -773,10 +765,22 @@ class Struct(TypeValidator, dict):
       self.set_property("extensions", dict([(et, False) for et in exttypes]))
 
       # As some fields were removed from kwargs to avoid conflict with
-      #   TypeValidator class initializer, add them back
-
+      #   TypeValidator class initializer, add them back at last
+      # Adding them before may cause problems as __setitem__ is triggered
       for name, value in removedValues.iteritems():
          self[name] = value
+
+   def _fix_order(self, order, extraItems=None):
+      keys = [k for k, _ in (self.items() + (extraItems or [])) if not k in self._aliases]
+      if order is not None:
+         self._original_order = list(order)
+         self._order = filter(lambda x: x in keys, self._original_order)
+         for n in keys:
+            if not n in order:
+               self._order.append(n)
+      else:
+         self._original_order = None
+         self._order = sorted(keys)
 
    def _extend(self, name):
       st = das.get_schema_type(name)
@@ -785,11 +789,19 @@ class Struct(TypeValidator, dict):
       if not isinstance(st, Struct):
          raise Exception("Cannot inherit from %s schema types %s ()" % (type(st).__name__, repr(name)))
 
-      # Check for conflicting fields
+      # Check for conflicting fields but allow overrides
       for k in st.ordered_keys():
          if k in self:
-            # TODO: eventually check for matching types here before failing
-            raise Exception("Cannot inherit schema type %s (conflicting field %s)" % (repr(name), repr(k)))
+            t0 = st[k].real_type(parent=st)
+            t1 = self[k].real_type(parent=self)
+            override = True
+            if not t0.is_type_compatible(t1):
+               override = False
+            else:
+               if not st._is_optional(k) and self._is_optional(k):
+                  override = False
+            if not override:
+               raise Exception("Cannot inherit schema type %s (conflicting field %s)" % (repr(name), repr(k)))
 
       # Check for conflicting aliases
       aliases = self._aliases.copy()
@@ -799,18 +811,26 @@ class Struct(TypeValidator, dict):
          if n in aliases:
             if aliases[n] != a:
                raise Exception("Cannot inherit schema type %s (conflicting alias %s -> %s / %s)" % (repr(name), repr(n), repr(a), aliases[n]))
-         aliases[a] = n
+         aliases[n] = a
+      self._aliases = aliases
+
+      if st._original_order or self._original_order:
+         if st._original_order:
+            _original_order = st._original_order[:]
+            _tmp = (self._order[:] if not self._original_order else self._original_order[:])
+         else:
+            _original_order = self._original_order[:]
+            _tmp = (st._order[:] if not st._original_order else st._original_order[:])
+         for item in _tmp:
+            if not item in _original_order:
+               _original_order.append(item)
+         self._original_order = _original_order
 
       # Merge fields
-      for k in st.ordered_keys():
-         self[k] = st[k].copy()
-
-      # Update order
-      self._order = st._order + self._order
-      self._original_order = (st._original_order or []) + (self._original_order or [])
-
-      # Update alias
-      self._aliases = aliases
+      for k in st.keys():
+         # if we reach here and k is defined in self, it is a compatible override, keep it
+         if not k in self:
+            self[k] = st[k].copy()
 
       # Register and apply extra mixins
       mixins = das.get_registered_mixins(name)
