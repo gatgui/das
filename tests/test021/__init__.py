@@ -1,20 +1,14 @@
 # -*- coding: utf8 -*-
 import os
 import unittest
-import das
+import das # pylint: disable=import-error
 import math
 
 
 class TestCase(unittest.TestCase):
-   TestDir = None
-   Schema = None
-   HomerOutput = None
-
    @classmethod
    def setUpClass(cls):
-      cls.TestDir = os.path.abspath(os.path.dirname(__file__))
-      cls.Schema = cls.TestDir + "/extend.schema"
-      os.environ["DAS_SCHEMA_PATH"] = cls.TestDir
+      os.environ["DAS_SCHEMA_PATH"] = os.path.abspath(os.path.dirname(__file__))
 
    def setUp(self):
       self.addCleanup(self.cleanUp)
@@ -65,4 +59,7 @@ class TestCase(unittest.TestCase):
       st = das.get_schema_type("extend.ScaledResolution")
       with self.assertRaises(Exception):
          st.extend("extend.Rect2")
-   
+
+   def testFieldOverride(self):
+      st = das.get_schema_type("extend.ScaledResolution")
+      st.extend("extend.Rect3")

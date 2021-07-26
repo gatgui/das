@@ -1,10 +1,11 @@
 # -*- coding: utf8 -*-
 import os
 import unittest
+# pylint: disable=import-error
 import das
 import das.mixin
 import das.schematypes
-
+# pylint: enable=import-error
 
 class TestCase(unittest.TestCase):
    @classmethod
@@ -29,7 +30,7 @@ class TestCase(unittest.TestCase):
       t_tup = das.schematypes.Tuple(das.schematypes.Real(), das.schematypes.Real())
       tup = t_tup.make_default()
       with self.assertRaises(das.ValidationError):
-         tmp = tup + (20,)
+         _ = tup + (20,)
 
    def testSequence(self):
       t_seq = das.schematypes.Sequence(das.schematypes.String(), min_size=1, max_size=3, default=["a"])

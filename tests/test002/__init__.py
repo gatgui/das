@@ -1,6 +1,6 @@
 import os
 import unittest
-import das
+import das # pylint: disable=import-error
 
 class TestCase(unittest.TestCase):
    TestDir = None
@@ -26,7 +26,7 @@ class TestCase(unittest.TestCase):
    # Test functions
 
    def testRead1(self):
-      rv = das.read(self.TestDir + "/ok.asset", schema_type="asset.TokenDict")
+      _ = das.read(self.TestDir + "/ok.asset", schema_type="asset.TokenDict")
 
    def testRead2(self):
       with self.assertRaises(das.ValidationError):
