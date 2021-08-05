@@ -26,23 +26,17 @@ class TestCase(unittest.TestCase):
 
    # Test functions
    def testTuple(self):
-       v = das.make_default("mix.tuple")
+       v = das.make("mix.tuple", "C", "D", "E")
        v.niceEcho()
 
    def testSequence(self):
-       v = das.make_default("mix.sequence")
-       v.append("hello")
-       v.append("world")
+       v = das.make("mix.sequence", "hello", "world")
        v.niceEcho()
 
    def testSet(self):
-       v = das.make_default("mix.set")
-       v.add("fruit")
-       v.add("basket")
+       v = das.make("mix.set", "basket", "fruit")
        v.niceEcho()
 
    def testDict(self):
-       v = das.make_default("mix.dict")
-       v["key1"] = "value1"
-       v["key2"] = "value2"
+       v = das.make("mix.dict", key1="value1", key2="value2")
        v.niceEcho()
