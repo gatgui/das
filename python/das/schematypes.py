@@ -46,10 +46,10 @@ class TypeValidator(object):
          del(self._properties[name])
 
    def value_to_string(self, v):
-      return repr(self._validate(v))
+      return repr(self.validate(v))
 
    def string_to_value(self, v):
-      return self._validate(eval(v))
+      return self.validate(eval(v))
 
    def _validate_self(self, value):
       raise ValidationError("'_validate_self' method is not implemented")
@@ -66,7 +66,7 @@ class TypeValidator(object):
 
    def is_compatible(self, value, key=None, index=None):
       try:
-         self._validate(value, key=key, index=index)
+         self.validate(value, key=key, index=index)
          return True
       except:
          return False
@@ -105,10 +105,10 @@ class TypeValidator(object):
       return das.copy(self.default)
 
    def make(self, *args, **kwargs):
-      return self._validate(args[0])
+      return self.validate(args[0])
 
    def partial_make(self, args):
-      return self._validate(args)
+      return self.validate(args)
 
    def conform(self, args, fill=False):
       return self.validate(args)
@@ -146,15 +146,10 @@ class Boolean(TypeValidator):
    # No need to override is_type_compatible here, a Boolean matches another Boolean only
 
    def value_to_string(self, v):
-      return "true" if self._validate(v) else "false"
+      return "true" if self.validate(v) else "false"
 
    def string_to_value(self, v):
-      if v == "true":
-         self._validate(True)
-      elif v == "false":
-         self._validate(False)
-
-      return self._validate(v)
+      return self.validate(v)
 
    def __repr__(self):
       s = "Boolean("
@@ -232,10 +227,10 @@ class Integer(TypeValidator):
       return True
 
    def value_to_string(self, v):
-      return str(self._validate(v))
+      return str(self.validate(v))
 
    def string_to_value(self, v):
-      return self._validate(int(v))
+      return self.validate(int(v))
 
    def __repr__(self):
       s = "Integer("
@@ -293,10 +288,10 @@ class Real(TypeValidator):
       return True
 
    def value_to_string(self, v):
-      return str(self._validate(v))
+      return str(self.validate(v))
 
    def string_to_value(self, v):
-      return self._validate(float(v))
+      return self.validate(float(v))
 
    def __repr__(self):
       s = "Real("
@@ -393,10 +388,10 @@ class String(TypeValidator):
       return True
 
    def value_to_string(self, v):
-      return str(self._validate(v))
+      return str(self.validate(v))
 
    def string_to_value(self, v):
-      return self._validate(v)
+      return self.validate(v)
 
    def __repr__(self):
       s = "String("
@@ -472,7 +467,7 @@ class Set(TypeValidator):
             return self.type.is_type_compatible(st.real_type().type)
 
    def make(self, *args, **kwargs):
-      return self._validate(args)
+      return self.validate(args)
 
    def conform(self, args, fill=False):
       if not isinstance(args, (list, set, tuple)):
@@ -572,7 +567,7 @@ class Sequence(TypeValidator):
             return True
 
    def make(self, *args, **kwargs):
-      return self._validate(args)
+      return self.validate(args)
 
    def conform(self, args, fill=False):
       if not isinstance(args, (list, set, tuple)):
@@ -668,7 +663,7 @@ class Tuple(TypeValidator):
       return super(Tuple, self).make_default()
 
    def make(self, *args, **kwargs):
-      return self._validate(args)
+      return self.validate(args)
 
    def conform(self, args, fill=False):
       if not isinstance(args, (list, set, tuple)):
@@ -1195,7 +1190,7 @@ class Dict(TypeValidator):
          return True
 
    def make(self, *args, **kwargs):
-      return self._validate(kwargs)
+      return self.validate(kwargs)
 
    def conform(self, args, fill=False):
       if not isinstance(args, (dict, das.types.Struct)):
@@ -1575,15 +1570,13 @@ class Empty(TypeValidator):
       return None
 
    def value_to_string(self, v):
-      self._validate(v)
-
+      self.validate(v)
       return ""
 
    def string_to_value(self, v):
       if v:
          raise ValidationError("The value is not empty")
-
-      return self._validate(None)
+      return self.validate(None)
 
    def __repr__(self):
       return "Empty()"

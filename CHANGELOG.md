@@ -4,6 +4,7 @@
 - Fixed several issues with `Struct` extensions:
   - missing aliases
   - double fields in serialization
+- Fixed internal inconsistencies with mixins and global validation handling leading to classes where returned value may not have associated mixins bound and global validation called.
 
 **0.12.3**
 - Check for QApplication instance existence before creating it in `dasedit`.
