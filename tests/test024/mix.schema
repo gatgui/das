@@ -1,0 +1,9 @@
+# name: mix
+# version: 1.0
+# das_minimum_version: 0.13.0
+{
+    "tuple": Tuple(String("A"), String("B"), String("C")),
+    "sequence": Sequence(String()),
+    "set": Set(String()),
+    "dict": Dict(ktype=String(), vtype=String())
+}

@@ -3,7 +3,7 @@ import re
 import sys
 import datetime
 
-__version__ = "0.12.3"
+__version__ = "0.13.0"
 __verbose__ = False
 try:
    __verbose__ = (int(os.environ.get("DAS_VERBOSE", "0")) != 0)
@@ -33,6 +33,8 @@ from .mixin import (SchemaTypeError,
                     has_bound_mixins,
                     get_bound_mixins)
 from . import schema
+from . import schematypes
+from . import types
 
 # For backward compatibiilty
 Das = Struct
@@ -46,8 +48,8 @@ def list_schemas():
    return SchemaTypesRegistry.instance.list_schemas()
 
 
-def has_schema():
-   return SchemaTypesRegistry.instance.has_schema()
+def has_schema(name):
+   return SchemaTypesRegistry.instance.has_schema(name)
 
 
 def get_schema(name_or_type):
@@ -225,7 +227,7 @@ def adapt_value(value, schema_type=None, key=None, index=None):
       elif isinstance(value, dict):
          try:
             rv = Struct(**value)
-         except ReservedNameError, e:
+         except ReservedNameError:
             # If failed to create Struct because of a ReservedNameError exception, wrap using Dict class
             rv = Dict(**value)
          return rv
@@ -292,7 +294,7 @@ def is_compatible(d, schema_type):
 
 
 def _read_file(path, skip_content=False):
-   mde = re.compile("^\s*([^:]+):\s*(.*)\s*$")
+   mde = re.compile(r"^\s*([^:]+):\s*(.*)\s*$")
    reading_content = False
    content = ""
    md = {}
@@ -481,7 +483,7 @@ def read(path, schema_type=None, ignore_meta=False, strict_schema=None, **funcs)
 
 class _Placeholder(object):
    def __init__(self, is_optional=False):
-      object.__init__(self)
+      super(_Placeholder, self).__init__()
       self.optional = is_optional
 
    def __repr__(self):
@@ -608,20 +610,19 @@ def _get_value_type(parent, key):
    elif key == "[value]":
       return parent.type
 
-   return parent[key]
+   else:
+      return parent[key]
 
 
-def _get_org_type(st):
-   while (isinstance(st, schematypes.SchemaType)):
-      st = get_schema_type(st.name)
+def _get_actual_type(st):
+   if isinstance(st, schematypes.SchemaType):
+      return _get_actual_type(get_schema_type(st.name))
 
-   if isinstance(st, schematypes.Optional):
-      st = st.type
+   elif isinstance(st, schematypes.Optional):
+      return _get_actual_type(st.type)
 
-   while (isinstance(st, schematypes.SchemaType)):
-      st = get_schema_type(st.name)
-
-   return st
+   else:
+      return st
 
 
 def _read_csv(value, row, header, headers, schematype, data, csv):
@@ -660,7 +661,7 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
       if isinstance(st, schematypes.Optional):
          is_optional = True
 
-      st = _get_org_type(st)
+      st = _get_actual_type(st)
 
       if cur_key == "{value}":
          creatable = False
@@ -700,13 +701,13 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
 
    if re_d_key.search(header):
       if value != "":
-         parent[value] = _Placeholder.make_place_holder(_get_org_type(st.vtype), is_optional=is_optional)
+         parent[value] = _Placeholder.make_place_holder(_get_actual_type(st.vtype), is_optional=is_optional)
 
       return
 
    if re_a_index.search(header):
       if value != "":
-         parent.append(_Placeholder.make_place_holder(_get_org_type(st.type), is_optional=is_optional))
+         parent.append(_Placeholder.make_place_holder(_get_actual_type(st.type), is_optional=is_optional))
 
       return
 
@@ -718,7 +719,6 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
 
    if not value:
       if is_optional:
-         p = _Placeholder(is_optional=is_optional)
          return
 
       try:
@@ -726,7 +726,10 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
       except:
          return
 
-   parent[key] = st.string_to_value(value)
+   else:
+      value = st.string_to_value(value)
+
+   parent[key] = value
 
 
 def read_csv_table(csv_table):
@@ -775,7 +778,7 @@ def read_csv_table(csv_table):
                contents.append(cur)
 
             elif cur is not None:
-               cur["end"] = r
+               cur["end"] = r # pylint: disable=unsupported-assignment-operation
 
       else:
          mts[hr.group(1)] = data_table[0][column]
@@ -822,9 +825,9 @@ def read_csv_table(csv_table):
 
 
 def read_csv(csv_path, delimiter="\t", newline="\n"):
-   re_metadata = re.compile("^[<](.*)[>]$")
+   # re_metadata = re.compile("^[<](.*)[>]$")
+   # re_alias = re.compile("[ ]+as[ ]+([^ ]+)[ ]*$")
    re_strip = re.compile(newline + "$")
-   re_alias = re.compile("[ ]+as[ ]+([^ ]+)[ ]*$")
    re_delimiter = re.compile(delimiter)
 
    if not os.path.isfile(csv_path):
@@ -1153,7 +1156,7 @@ def _dump_csv_data(k, d, valuetype, headers, parent=None, prefix=None):
    if prefix is None:
       prefix = ""
 
-   valuetype = _get_org_type(valuetype)
+   valuetype = _get_actual_type(valuetype)
 
    if isinstance(d, Struct):
       if not d:

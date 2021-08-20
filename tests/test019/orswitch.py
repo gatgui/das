@@ -1,4 +1,4 @@
-import das
+import das # pylint: disable=import-error
 import math
 
 class Test(das.Mixin):
@@ -61,7 +61,7 @@ class Test(das.Mixin):
       # Transfer old data to new
       with das.GlobalValidationDisabled(self):
          # Resolution & Margins
-         if das.check(self.resolution, "orswitch.Resolution"):
+         if das.check(self.resolution, "orswitch.Resolution"): # pylint: disable=access-member-before-definition
             self.resolution = self._get_schema_type()["resolution"].make(base=self.resolution)
 
          hasResolutionsWithMargins = hasattr(self, "resolutionsWithMargins")

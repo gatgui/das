@@ -61,7 +61,7 @@ class TypeBase(object):
          inst._gvalidate()
       return inst
 
-   def __init__(self):
+   def __init__(self, *args):
       super(TypeBase, self).__init__()
       self.__dict__["_schema_type"] = None
       self.__dict__["_validate_globally_cb"] = None
@@ -97,7 +97,7 @@ class TypeBase(object):
             gvcb()
          if hasattr(self, "_validate_globally"):
             try:
-               self._validate_globally()
+               getattr(self, "_validate_globally")()
             except:
                _, ei, tb = sys.exc_info()
                ei = das.ValidationError("Global Validation Failed (%s)" % str(ei))
@@ -575,8 +575,11 @@ class Dict(TypeBase, dict):
    #       return False
 
    def setdefault(self, *args):
-      if len(args) >= 2:
-         args[1] = self._adapt_value(args[1], key=args[0])
+      nargs = len(args)
+      if nargs > 2:
+         raise TypeError("setdefault expected at most 2 arguments, got %d" % nargs)
+      if nargs == 2:
+         args = (args[0], self._adapt_value(args[1], key=args[0]))
       super(Dict, self).setdefault(*args)
 
    def copy(self):
@@ -873,10 +876,13 @@ class Struct(TypeBase):
 
    # Override of dict.setdefault
    def _setdefault(self, *args):
-      if len(args) >= 1:
+      nargs = len(args)
+      if nargs > 2:
+         raise TypeError("_setdefault expected at most 2 arguments, got %d" % nargs)
+      if nargs >= 1:
          self._check_reserved(args[0])
-      if len(args) >= 2:
-         args[1] = self._adapt_value(args[1], key=args[0])
+      if nargs == 2:
+         args = (args[0], self._adapt_value(args[1], key=args[0]))
       self._dict.setdefault(*args)
 
    # Override of dict.update
