@@ -1,3 +1,6 @@
+**0.13.1**
+- Echo more useful error message when failing to instanciate a Class schema type object
+
 **0.13.0**
 - Added new method `is_type_compatible` to `TypeValidator` class to check for type compatibility.
 - Allow field overrides when extending a `Struct` as long as type is compatible.

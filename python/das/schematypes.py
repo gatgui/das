@@ -1279,15 +1279,15 @@ class Class(TypeValidator):
                newval = self.klass()
                newval.string_to_value(value)
                return newval
-            except:
-               raise ValidationError("Cannot instanciace class '%s' from string %s" % (self.klass.__name__, repr(value)))
+            except Exception as e:
+               raise ValidationError("Cannot instanciate class '%s' from string %s (%s)" % (self.klass.__name__, repr(value), e))
          elif hasattr(self.klass, "any_to_value"):
             try:
                newval = self.klass()
                newval.any_to_value(value)
                return newval
-            except:
-               raise ValidationError("Cannot instanciace class '%s' from value %s" % (self.klass.__name__, repr(value)))
+            except Exception as e:
+               raise ValidationError("Cannot instanciate class '%s' from value %s (%s)" % (self.klass.__name__, repr(value), e))
          else:
             raise ValidationError("Expected a %s value, got %s" % (self.klass.__name__, type(value).__name__))
       return value
