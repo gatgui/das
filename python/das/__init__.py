@@ -630,6 +630,7 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
    re_a_index = re.compile("[[]index[]]$")
    re_dot = re.compile("[.]")
    re_tkn = re.compile("[[{][^]}{[]+[]}]")
+   re_int = re.compile("([0-9]+)")
    st = schematype
 
    keys = []
@@ -706,8 +707,10 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
       return
 
    if re_a_index.search(header):
-      if value != "":
-         parent.append(_Placeholder.make_place_holder(_get_actual_type(st.type), is_optional=is_optional))
+      int_res = re_int.match(value)
+      if int_res:
+         for _ in range(int(int_res.group(1)) + 1 - len(parent)):
+            parent.append(_Placeholder.make_place_holder(_get_actual_type(st.type), is_optional=is_optional))
 
       return
 
