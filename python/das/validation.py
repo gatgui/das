@@ -9,12 +9,12 @@ import das
 
 class UnknownSchemaError(Exception):
    def __init__(self, name):
-      super(UnknownSchemaError, self).__init__("'%s' is not a known schema%s" % (name, " type" if "." in name else ""))
+      super(UnknownSchemaError, self).__init__("%s is not a known schema or schema type" % repr(name))
 
 
 class SchemaVersionError(das.VersionError):
    def __init__(self, name, current_version=None, required_version=None):
-      super(SchemaVersionError, self).__init__("Schema '%s'" % name, current_version, required_version)
+      super(SchemaVersionError, self).__init__("Schema %s" % repr(name), current_version, required_version)
 
 
 class Schema(object):
@@ -98,9 +98,9 @@ class Schema(object):
             if das.__verbose__:
                das.print_once("[das] Warning: Schema '%s' defined in %s is unversioned" % (self.name, self.path))
 
-         das.schematypes.SchemaType.CurrentSchema = self.name
+         das.schematypes.TypeValidator.CurrentSchema = self.name
          rv = das.read_string(content, encoding=md.get("encoding", None), **eval_locals)
-         das.schematypes.SchemaType.CurrentSchema = ""
+         das.schematypes.TypeValidator.CurrentSchema = ""
          for typename, validator in rv.iteritems():
             k = "%s.%s" % (self.name, typename)
             if SchemaTypesRegistry.instance.has_schema_type(k):
@@ -210,7 +210,7 @@ class SchemaLocation(object):
       return rv
 
    def has_schema_type(self, name):
-      for sname, schema in self.schemas.iteritems():
+      for _, schema in self.schemas.iteritems():
          if schema.has_type(name):
             return True
       return False
@@ -224,7 +224,7 @@ class SchemaLocation(object):
       return None
 
    def get_schema_type_name(self, typ):
-      for sname, schema in self.schemas.iteritems():
+      for _, schema in self.schemas.iteritems():
          rv = schema.get_type_name(typ)
          if rv:
             return rv
@@ -277,6 +277,9 @@ class SchemaTypesRegistry(object):
       self.cache["name_to_schema"] = nts
       self.cache["name_to_type"] = ntt
       self.cache["type_to_name"] = ttn
+      for st in self.cache["type_to_name"]:
+         if isinstance(st, das.schematypes.Struct):
+            st.load_extensions()
 
    def load_schemas(self, paths=None, incremental=False, force=False):
       incremental = (paths is not None)
@@ -355,7 +358,7 @@ class SchemaTypesRegistry(object):
          if force:
             forcelocations = set()
             for p in paths:
-               forcelocations.add(SchemaLocation(d, dont_load=True))
+               forcelocations.add(SchemaLocation(p, dont_load=True))
             for location in self.locations:
                if location in forcelocations:
                   location.load_schemas()
@@ -460,12 +463,43 @@ class SchemaTypesRegistry(object):
          return False
 
    def set_schema_type_property(self, name, pname, pvalue):
-      props = self.properties.get(name, {})
-      props[pname] = pvalue
-      self.properties[name] = props
+      if not name:
+         return False
+      else:
+         # do not call get_schema_type() as it would trigger a load_schemas
+         if self.has_schema_type(name):
+            self.cache["name_to_type"][name].set_property(pname, pvalue)
+         # always keep a copy of the property in the registry
+         props = self.properties.get(name, {})
+         props[pname] = pvalue
+         self.properties[name] = props
+         return True
 
-   def get_schema_type_property(self, name, pname):
-      return self.properties.get(name, {}).get(pname, None)
+   def get_schema_type_property(self, name, pname, default=None):
+      # do not call get_schema_type() as it would trigger a load_schemas
+      if self.has_schema_type(name):
+         st = self.cache["name_to_type"][name]
+         if not st.has_property(pname):
+            props = self.properties.get(name, {})
+            if pname in props:
+               rv = props[pname]
+               # Transfer property to actual schema type
+               st.set_property(pname, rv)
+               return rv
+            else:
+               return default
+         else:
+            if st.has_property(pname):
+               pval = st.get_property(pname)
+               # Copy property to registry
+               props = self.properties.get(name, {})
+               props[pname] = pval
+               self.properties[name] = props
+               return pval
+            else:
+               return default
+      else:
+         return self.properties.get(name, {}).get(pname, default)
 
    def make_default(self, name):
       return self.get_schema_type(name).make_default()

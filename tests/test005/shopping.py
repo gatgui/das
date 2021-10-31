@@ -1,4 +1,4 @@
-import das
+import das # pylint: disable=import-error
 
 CurrencyRates = {"yen": 110.30,
                  "euro": 0.81,

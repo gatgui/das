@@ -3,7 +3,7 @@ import re
 import sys
 import datetime
 
-__version__ = "0.10.0"
+__version__ = "0.13.1"
 __verbose__ = False
 try:
    __verbose__ = (int(os.environ.get("DAS_VERBOSE", "0")) != 0)
@@ -33,6 +33,8 @@ from .mixin import (SchemaTypeError,
                     has_bound_mixins,
                     get_bound_mixins)
 from . import schema
+from . import schematypes
+from . import types
 
 # For backward compatibiilty
 Das = Struct
@@ -46,8 +48,8 @@ def list_schemas():
    return SchemaTypesRegistry.instance.list_schemas()
 
 
-def has_schema():
-   return SchemaTypesRegistry.instance.has_schema()
+def has_schema(name):
+   return SchemaTypesRegistry.instance.has_schema(name)
 
 
 def get_schema(name_or_type):
@@ -136,26 +138,66 @@ def define_inline_type(typ):
       raise Exception("Unsupported simple type '%s'" % typ.__name__)
 
 
-def register_mixins(*mixins):
+def register_mixins(*mixins, **kwargs):
+   schema_type = kwargs.get("schema_type", None)
    if __verbose__:
-      print("[das] Register mixins: %s" % ", ".join(map(lambda x: x.__module__ + "." + x.__name__, mixins)))
-   tmp = {}
-   for mixin in mixins:
-      st = mixin.get_schema_type()
-      lst = tmp.get(st, [])
-      lst.append(mixin)
-      tmp[st] = lst
-   for k, v in tmp.iteritems():
-      mixins = SchemaTypesRegistry.instance.get_schema_type_property(k, "mixins")
-      if mixins is None:
-         mixins = []
+      sts = "" if schema_type is None else " (%s)" % repr(schema_type)
+      fmt = "[das] Register mixins: %s%s"
+      print(fmt % (", ".join(map(lambda x: x.__module__ + "." + x.__name__, mixins)), sts))
+
+   if schema_type is not None:
+      if isinstance(schema_type, basestring):
+         stn = schema_type
+         try:
+            schema_type = get_schema_type(schema_type)
+         except:
+            return
+      else:
+         if not isinstance(schema_type, TypeValidator):
+            return
+
+         stn = get_schema_type_name(schema_type)
+
+      if stn:
+         _mixins = SchemaTypesRegistry.instance.get_schema_type_property(stn, "mixins")
+      else:
+         _mixins = schema_type.get_property("mixins", [])
+
+      if not _mixins:
+         _mixins = []
+
       changed = False
-      for mixin in v:
-         if not mixin in mixins:
-            mixins.append(mixin)
+
+      for mixin in mixins:
+         if not mixin in _mixins:
+            _mixins.append(mixin)
             changed = True
+
       if changed:
-         SchemaTypesRegistry.instance.set_schema_type_property(k, "mixins", mixins)
+         if stn:
+            SchemaTypesRegistry.instance.set_schema_type_property(stn, "mixins", mixins)
+         else:
+            schema_type.set_property("mixins", _mixins)
+
+   else:
+      tmp = {}
+      for mixin in mixins:
+         st = mixin.get_schema_type()
+         lst = tmp.get(st, [])
+         lst.append(mixin)
+         tmp[st] = lst
+
+      for k, v in tmp.iteritems():
+         mixins = SchemaTypesRegistry.instance.get_schema_type_property(k, "mixins")
+         if mixins is None:
+            mixins = []
+         changed = False
+         for mixin in v:
+            if not mixin in mixins:
+               mixins.append(mixin)
+               changed = True
+         if changed:
+            SchemaTypesRegistry.instance.set_schema_type_property(k, "mixins", mixins)
 
 
 def get_registered_mixins(name):
@@ -187,7 +229,7 @@ def adapt_value(value, schema_type=None, key=None, index=None):
       elif isinstance(value, dict):
          try:
             rv = Struct(**value)
-         except ReservedNameError as e:
+         except ReservedNameError:
             # If failed to create Struct because of a ReservedNameError exception, wrap using Dict class
             rv = Dict(**value)
          return rv
@@ -254,7 +296,7 @@ def is_compatible(d, schema_type):
 
 
 def _read_file(path, skip_content=False):
-   mde = re.compile("^\s*([^:]+):\s*(.*)\s*$")
+   mde = re.compile(r"^\s*([^:]+):\s*(.*)\s*$")
    reading_content = False
    content = ""
    md = {}
@@ -443,7 +485,7 @@ def read(path, schema_type=None, ignore_meta=False, strict_schema=None, **funcs)
 
 class _Placeholder(object):
    def __init__(self, is_optional=False):
-      object.__init__(self)
+      super(_Placeholder, self).__init__()
       self.optional = is_optional
 
    def __repr__(self):
@@ -570,20 +612,19 @@ def _get_value_type(parent, key):
    elif key == "[value]":
       return parent.type
 
-   return parent[key]
+   else:
+      return parent[key]
 
 
-def _get_org_type(st):
-   while (isinstance(st, schematypes.SchemaType)):
-      st = get_schema_type(st.name)
+def _get_actual_type(st):
+   if isinstance(st, schematypes.SchemaType):
+      return _get_actual_type(get_schema_type(st.name))
 
-   if isinstance(st, schematypes.Optional):
-      st = st.type
+   elif isinstance(st, schematypes.Optional):
+      return _get_actual_type(st.type)
 
-   while (isinstance(st, schematypes.SchemaType)):
-      st = get_schema_type(st.name)
-
-   return st
+   else:
+      return st
 
 
 def _read_csv(value, row, header, headers, schematype, data, csv):
@@ -591,6 +632,7 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
    re_a_index = re.compile("[[]index[]]$")
    re_dot = re.compile("[.]")
    re_tkn = re.compile("[[{][^]}{[]+[]}]")
+   re_int = re.compile("([0-9]+)")
    st = schematype
 
    keys = []
@@ -622,7 +664,7 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
       if isinstance(st, schematypes.Optional):
          is_optional = True
 
-      st = _get_org_type(st)
+      st = _get_actual_type(st)
 
       if cur_key == "{value}":
          creatable = False
@@ -662,25 +704,26 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
 
    if re_d_key.search(header):
       if value != "":
-         parent[value] = _Placeholder.make_place_holder(_get_org_type(st.vtype), is_optional=is_optional)
+         parent[value] = _Placeholder.make_place_holder(_get_actual_type(st.vtype), is_optional=is_optional)
 
       return
 
    if re_a_index.search(header):
-      if value != "":
-         parent.append(_Placeholder.make_place_holder(_get_org_type(st.type), is_optional=is_optional))
+      int_res = re_int.match(value)
+      if int_res:
+         for _ in range(int(int_res.group(1)) + 1 - len(parent)):
+            parent.append(_Placeholder.make_place_holder(_get_actual_type(st.type), is_optional=is_optional))
 
       return
 
    if key in parent and not isinstance(parent[key], _Placeholder):
       return
 
-   # TODO : find better way
+   # NOTE: find better way
    value = value.replace('\\"', '"')
 
    if not value:
       if is_optional:
-         p = _Placeholder(is_optional=is_optional)
          return
 
       try:
@@ -688,7 +731,10 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
       except:
          return
 
-   parent[key] = st.string_to_value(value)
+   else:
+      value = st.string_to_value(value)
+
+   parent[key] = value
 
 
 def read_csv_table(csv_table):
@@ -737,7 +783,7 @@ def read_csv_table(csv_table):
                contents.append(cur)
 
             elif cur is not None:
-               cur["end"] = r
+               cur["end"] = r # pylint: disable=unsupported-assignment-operation
 
       else:
          mts[hr.group(1)] = data_table[0][column]
@@ -784,9 +830,9 @@ def read_csv_table(csv_table):
 
 
 def read_csv(csv_path, delimiter="\t", newline="\n"):
-   re_metadata = re.compile("^[<](.*)[>]$")
+   # re_metadata = re.compile("^[<](.*)[>]$")
+   # re_alias = re.compile("[ ]+as[ ]+([^ ]+)[ ]*$")
    re_strip = re.compile(newline + "$")
-   re_alias = re.compile("[ ]+as[ ]+([^ ]+)[ ]*$")
    re_delimiter = re.compile(delimiter)
 
    if not os.path.isfile(csv_path):
@@ -1115,7 +1161,7 @@ def _dump_csv_data(k, d, valuetype, headers, parent=None, prefix=None):
    if prefix is None:
       prefix = ""
 
-   valuetype = _get_org_type(valuetype)
+   valuetype = _get_actual_type(valuetype)
 
    if isinstance(d, Struct):
       if not d:
@@ -1248,7 +1294,7 @@ def write_csv(data, path, alias=None, encoding=None, delimiter="\t", newline="\n
          for hd in header.data():
             vv = hd.value()
 
-            # TODO : find better way
+            # NOTE: find better way
             if "\"" in hd.value():
                vv = vv.replace("\"", "\\\"")
 
@@ -1339,3 +1385,33 @@ def print_once(msg):
       return
    print(msg)
    _PrintedMsgs.add(msg)
+
+# For python 2/3 compatibility
+if sys.version_info[0] > 2:
+   def reraise(eclass=None, einst=None, tb=None):
+      ec, ei, et = sys.exc_info()
+      if eclass is None:
+         if einst is None:
+            eclass = ec
+         else:
+            eclass = type(einst)
+      if einst is None or not isinstance(einst, eclass):
+         einst = eclass()
+      if tb is None and einst.__traceback__ is None:
+         tb = et
+      raise (einst.with_traceback(tb) if einst.__traceback__ is not tb else einst)
+else:
+   exec("""
+def reraise(eclass=None, einst=None, tb=None):
+   ec, ei, et = sys.exc_info()
+   if eclass is None:
+      if einst is None:
+         eclass = ec
+      else:
+         eclass = type(einst)
+   if einst is None or not isinstance(einst, eclass):
+      einst = eclass()
+   if tb is None:
+      tb = et
+   raise eclass, einst, tb
+""")

@@ -9,7 +9,10 @@ class ValidationError(Exception):
 
 
 class TypeValidator(object):
-   def __init__(self, default=None, description=None, editable=True, hidden=False, **kwargs):
+   CurrentSchema = ""
+
+   def __init__(self, default=None, description=None, editable=True, hidden=False,
+                __properties__=None, **kwargs):
       super(TypeValidator, self).__init__(**kwargs)
       self.default_validated = False
       self.default = default
@@ -17,25 +20,43 @@ class TypeValidator(object):
       self.description = ("" if description is None else description)
       self.editable = editable
       self.hidden = hidden
+      self._properties = {}
+      if __properties__:
+         for k, v in __properties__.iteritems():
+            self._properties[k] = v
+      # if not "mixins" in self._properties:
+      #    self._properties["mixins"] = []
+
+   def has_property(self, name):
+      return name in self._properties
+
+   def get_property(self, name, default=None):
+      return self._properties.get(name, default)
+
+   def get_properties(self):
+      return self._properties.copy()
+
+   def set_property(self, name, value):
+      self._properties[name] = value
+
+   def set_properties(self, props):
+      self._properties = props
+
+   def remove_property(self, name):
+      if name in self._properties:
+         del self._properties[name]
 
    def value_to_string(self, v):
-      return repr(self._validate(v))
+      return repr(self.validate(v))
 
    def string_to_value(self, v):
-      return self._validate(eval(v))
+      return self.validate(eval(v))
 
    def _validate_self(self, value):
       raise ValidationError("'_validate_self' method is not implemented")
 
    def _validate(self, value, key=None, index=None):
       raise ValidationError("'_validate' method is not implemented")
-
-   def _is_compatible(self, value, key=None, index=None):
-      try:
-         self._validate(value, key=key, index=index)
-         return True
-      except:
-         return False
 
    def _decode(self, encoding):
       if self.description is not None:
@@ -45,7 +66,17 @@ class TypeValidator(object):
       return self
 
    def is_compatible(self, value, key=None, index=None):
-      return self._is_compatible(value, key=key, index=index)
+      try:
+         self.validate(value, key=key, index=index)
+         return True
+      except:
+         return False
+
+   def real_type(self, parent=None):
+      return self
+
+   def is_type_compatible(self, st, key=None, index=None):
+      return isinstance(st.real_type(), self.__class__)
 
    def validate(self, value, key=None, index=None):
       mixins = (None if not das.has_bound_mixins(value) else das.get_bound_mixins(value))
@@ -55,9 +86,16 @@ class TypeValidator(object):
          das.mixin.bind(mixins, rv, reset=True)
       elif key is None and index is None and not das.has_bound_mixins(rv):
          # Bind registered mixins for return value type if nothing bound yet
-         mixins = das.get_registered_mixins(das.get_schema_type_name(self))
+         #   (give precedence to registry query as it might hanled the case
+         #    schema type objects with yet no mixins bound)
+         stn = das.get_schema_type_name(self)
+         if stn:
+            mixins = das.get_registered_mixins(stn)
+         else:
+            mixins = self.get_property("mixins", None)
          if mixins:
             das.mixin.bind(mixins, rv)
+
       # Try to call custom validation function
       return das.types.TypeBase.ValidateGlobally(rv)
 
@@ -68,16 +106,18 @@ class TypeValidator(object):
       return das.copy(self.default)
 
    def make(self, *args, **kwargs):
-      return self._validate(args[0])
+      return self.validate(args[0])
 
    def partial_make(self, args):
-      return self._validate(args)
+      return self.validate(args)
 
    def conform(self, args, fill=False):
       return self.validate(args)
 
    def copy(self):
-      return TypeValidator(default=self.default, description=self.description, editable=self.editable, hidden=self.hidden)
+      return TypeValidator(default=self.default, description=self.description,
+                           editable=self.editable, hidden=self.hidden,
+                           __properties__=self.get_properties())
 
    def __str__(self):
       return self.__repr__()
@@ -87,8 +127,11 @@ class Boolean(TypeValidator):
    TrueExp = re.compile(r"^(1|yes|on|true)$", re.IGNORECASE)
    FalseExp = re.compile(r"^(0|no|off|false)$", re.IGNORECASE)
 
-   def __init__(self, default=None, description=None, editable=True, hidden=False):
-      super(Boolean, self).__init__(default=(False if default is None else default), description=description, editable=editable, hidden=hidden)
+   def __init__(self, default=None, description=None, editable=True, hidden=False,
+                __properties__=None):
+      super(Boolean, self).__init__(default=(False if default is None else default),
+                                    description=description, editable=editable,
+                                    hidden=hidden, __properties__=__properties__)
 
    def _validate_self(self, value):
       if not isinstance(value, bool):
@@ -98,24 +141,23 @@ class Boolean(TypeValidator):
             elif self.FalseExp.match(value):
                return False
             else:
-               raise ValidationError("String as boolean must match either '%s' or '%s'" % (self.TrueExp.pattern[2:-2], self.FalseExp.pattern[2:-2]))
+               raise ValidationError("String as boolean must match either '%s' or '%s'" %
+                  (self.TrueExp.pattern[2:-2], self.FalseExp.pattern[2:-2]))
          else:
-            raise ValidationError("Expected a boolean or string value, got %s" % type(value).__name__)
+            raise ValidationError("Expected a boolean or string value, got %s" %
+               type(value).__name__)
       return value
 
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
 
+   # No need to override is_type_compatible here, a Boolean matches another Boolean only
+
    def value_to_string(self, v):
-      return "true" if self._validate(v) else "false"
+      return "true" if self.validate(v) else "false"
 
    def string_to_value(self, v):
-      if v == "true":
-         self._validate(True)
-      elif v == "false":
-         self._validate(False)
-
-      return self._validate(v)
+      return self.validate(v)
 
    def __repr__(self):
       s = "Boolean("
@@ -128,12 +170,12 @@ class Boolean(TypeValidator):
       return s + ")"
 
    def copy(self):
-      return Boolean(default=self.default, description=self.description, editable=self.editable, hidden=self.hidden)
+      return Boolean(default=self.default, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
 
 class Integer(TypeValidator):
-   def __init__(self, default=None, min=None, max=None, enum=None, description=None, editable=True, hidden=False):
-      super(Integer, self).__init__(default=(0 if default is None else default), description=description, editable=editable, hidden=hidden)
+   def __init__(self, default=None, min=None, max=None, enum=None, description=None, editable=True, hidden=False, __properties__=None):
+      super(Integer, self).__init__(default=(0 if default is None else default), description=description, editable=editable, hidden=hidden, __properties__=__properties__)
       self.min = min
       self.max = max
       self.enum = enum
@@ -173,11 +215,30 @@ class Integer(TypeValidator):
          self.enumvals = set(self.enum.values())
       return self
 
+   def is_type_compatible(self, st, key=None, index=None):
+      if not super(Integer, self).is_type_compatible(st, key=key, index=index):
+         return False
+
+      _st = st.real_type()
+
+      if self.enum is not None:
+         return (_st.enum is not None and _st.enum == self.enum)
+      elif _st.enum is not None:
+         return False
+
+      if self.min is not None and (_st.min is None or _st.min < self.min):
+         return False
+
+      if self.max is not None and (_st.max is None or _st.max > self.max):
+         return False
+
+      return True
+
    def value_to_string(self, v):
-      return str(self._validate(v))
+      return str(self.validate(v))
 
    def string_to_value(self, v):
-      return self._validate(int(v))
+      return self.validate(int(v))
 
    def __repr__(self):
       s = "Integer("
@@ -199,12 +260,12 @@ class Integer(TypeValidator):
       return s + ")"
 
    def copy(self):
-      return Integer(default=self.default, min=self.min, max=self.max, enum=self.enum, description=self.description, editable=self.editable, hidden=self.hidden)
+      return Integer(default=self.default, min=self.min, max=self.max, enum=self.enum, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
 
 class Real(TypeValidator):
-   def __init__(self, default=None, min=None, max=None, description=None, editable=True, hidden=False):
-      super(Real, self).__init__(default=(0.0 if default is None else default), description=description, editable=editable, hidden=hidden)
+   def __init__(self, default=None, min=None, max=None, description=None, editable=True, hidden=False, __properties__=None):
+      super(Real, self).__init__(default=(0.0 if default is None else default), description=description, editable=editable, hidden=hidden, __properties__=__properties__)
       self.min = min
       self.max = max
 
@@ -220,11 +281,25 @@ class Real(TypeValidator):
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
 
+   def is_type_compatible(self, st, key=None, index=None):
+      if not super(Real, self).is_type_compatible(st, key=key, index=index):
+         return False
+
+      _st = st.real_type()
+
+      if self.min is not None and (_st.min is None or _st.min < self.min):
+         return False
+
+      if self.max is not None and (_st.max is None or _st.max > self.max):
+         return False
+
+      return True
+
    def value_to_string(self, v):
-      return str(self._validate(v))
+      return str(self.validate(v))
 
    def string_to_value(self, v):
-      return self._validate(float(v))
+      return self.validate(float(v))
 
    def __repr__(self):
       s = "Real("
@@ -243,13 +318,12 @@ class Real(TypeValidator):
       return s + ")"
 
    def copy(self):
-      return Real(default=self.default, min=self.min, max=self.max, description=self.description, editable=self.editable, hidden=self.hidden)
-
+      return Real(default=self.default, min=self.min, max=self.max, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
 
 class String(TypeValidator):
-   def __init__(self, default=None, choices=None, matches=None, strict=True, description=None, editable=True, hidden=False):
-      super(String, self).__init__(default=("" if default is None else default), description=description, editable=editable, hidden=hidden)
+   def __init__(self, default=None, choices=None, matches=None, strict=True, description=None, editable=True, hidden=False, __properties__=None):
+      super(String, self).__init__(default=("" if default is None else default), description=description, editable=editable, hidden=hidden, __properties__=__properties__)
       self.choices = choices
       self.strict = strict
       self.matches = None
@@ -261,15 +335,21 @@ class String(TypeValidator):
          else:
             raise Exception("String schema type 'matches' option must be a string or a compiled regular expression")
 
+   def _expand_choices(self, asSet=False):
+      if self.choices is None:
+         return None
+      if callable(self.choices):
+         rv = map(lambda x: das.ascii_or_unicode(x), self.choices())
+      else:
+         rv = self.choices
+      return (set(rv) if asSet else rv)
+
    def _validate_self(self, value):
       if not isinstance(value, basestring):
          raise ValidationError("Expected a string value, got %s" % type(value).__name__)
       v = das.ascii_or_unicode(value)
       if self.choices is not None and self.strict:
-         if callable(self.choices):
-            choices = map(lambda x: das.ascii_or_unicode(x), self.choices())
-         else:
-            choices = self.choices
+         choices = self._expand_choices()
          if not v in choices:
             raise ValidationError("String value must be on of %s, got %s" % (repr(choices), repr(v)))
       if self.matches is not None and not self.matches.match(v):
@@ -288,11 +368,38 @@ class String(TypeValidator):
          self.matches = re.compile(das.decode(self.matches.pattern, encoding))
       return self
 
+   def is_type_compatible(self, st, key=None, index=None):
+      if not super(String, self).is_type_compatible(st, key=key, index=index):
+         return False
+
+      _st = st.real_type()
+
+      if self.choices is not None and self.strict:
+         if _st.choices is None or not _st.strict:
+            return False
+         else:
+            s0 = self._expand_choices(asSet=True)
+            s1 = _st._expand_choices(asSet=True)
+            return (len(s0.symmetric_difference(s1)) == 0)
+
+      if self.matches is not None:
+         if _st.matches is None:
+            if _st.choices and _st.strict:
+               allchoicesmatch = all([self.matches.match(x) is not None for x in _st._expand_choices()])
+               if not allchoicesmatch:
+                  return False
+            else:
+               return False
+         elif _st.matches.pattern != self.matches.pattern:
+            return False
+
+      return True
+
    def value_to_string(self, v):
-      return str(self._validate(v))
+      return str(self.validate(v))
 
    def string_to_value(self, v):
-      return self._validate(v)
+      return self.validate(v)
 
    def __repr__(self):
       s = "String("
@@ -323,12 +430,12 @@ class String(TypeValidator):
       return s + ")"
 
    def copy(self):
-      return String(default=self.default, choices=self.choices, matches=self.matches, strict=self.strict, description=self.description, editable=self.editable, hidden=self.hidden)
+      return String(default=self.default, choices=self.choices, matches=self.matches, strict=self.strict, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
 
 class Set(TypeValidator):
-   def __init__(self, type, default=None, description=None, editable=True, hidden=False):
-      super(Set, self).__init__(default=(set() if default is None else default), description=description, editable=editable, hidden=hidden)
+   def __init__(self, type, default=None, description=None, editable=True, hidden=False, __properties__=None):
+      super(Set, self).__init__(default=(set() if default is None else default), description=description, editable=editable, hidden=hidden, __properties__=__properties__)
       self.type = type
 
    def _validate_self(self, value):
@@ -358,8 +465,17 @@ class Set(TypeValidator):
       self.type = das.decode(self.type, encoding)
       return self
 
+   def is_type_compatible(self, st, key=None, index=None):
+      if index is not None:
+         return self.type.is_type_compatible(st)
+      else:
+         if not super(Set, self).is_type_compatible(st, key=key, index=index):
+            return False
+         else:
+            return self.type.is_type_compatible(st.real_type().type)
+
    def make(self, *args, **kwargs):
-      return self._validate(args)
+      return self.validate(args)
 
    def conform(self, args, fill=False):
       if not isinstance(args, (list, set, tuple)):
@@ -388,15 +504,21 @@ class Set(TypeValidator):
       return s + ")"
 
    def copy(self):
-      return Set(self.type.copy(), default=self.default, description=self.description, editable=self.editable, hidden=self.hidden)
+      return Set(self.type.copy(), default=self.default, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
 
 class Sequence(TypeValidator):
-   def __init__(self, type, default=None, size=None, min_size=None, max_size=None, description=None, editable=True, hidden=False):
-      super(Sequence, self).__init__(default=([] if default is None else default), description=description, editable=editable, hidden=hidden)
+   def __init__(self, type, default=None, size=None, min_size=None, max_size=None, description=None, editable=True, hidden=False, __properties__=None):
+      super(Sequence, self).__init__(default=([] if default is None else default), description=description, editable=editable, hidden=hidden, __properties__=__properties__)
       self.size = size
-      self.min_size = min_size
-      self.max_size = max_size
+      self.min_size = None
+      self.max_size = None
+      if size is None:
+         if min_size is not None and max_size is not None and min_size == max_size:
+            self.size = min_size
+         else:
+            self.min_size = min_size
+            self.max_size = max_size
       self.type = type
 
    def _validate_self(self, value):
@@ -434,8 +556,26 @@ class Sequence(TypeValidator):
       self.type = das.decode(self.type, encoding)
       return self
 
+   def is_type_compatible(self, st, key=None, index=None):
+      if index is not None:
+         return self.type.is_type_compatible(st)
+      else:
+         if not super(Sequence, self).is_type_compatible(st, key=key, index=index):
+            return False
+         _st = st.real_type()
+         if not self.type.is_type_compatible(_st.type):
+            return False
+         elif self.size is not None and (_st.size is None or _st.size != self.size):
+            return False
+         elif self.min_size is not None and (_st.min_size is None or _st.min_size < self.min_size):
+            return False
+         elif self.max_size is not None and (_st.max_size is None or _st.max_size > self.max_size):
+            return False
+         else:
+            return True
+
    def make(self, *args, **kwargs):
-      return self._validate(args)
+      return self.validate(args)
 
    def conform(self, args, fill=False):
       if not isinstance(args, (list, set, tuple)):
@@ -472,12 +612,12 @@ class Sequence(TypeValidator):
       return s + ")"
 
    def copy(self):
-      return Sequence(self.type.copy(), default=self.default, size=self.size, min_size=self.min_size, max_size=self.max_size, description=self.description, editable=self.editable, hidden=self.hidden)
+      return Sequence(self.type.copy(), default=self.default, size=self.size, min_size=self.min_size, max_size=self.max_size, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
 
 class Tuple(TypeValidator):
    def __init__(self, *args, **kwargs):
-      super(Tuple, self).__init__(default=kwargs.get("default", None), description=kwargs.get("description", None), editable=kwargs.get("editable", True), hidden=kwargs.get("hidden", False))
+      super(Tuple, self).__init__(default=kwargs.get("default", None), description=kwargs.get("description", None), editable=kwargs.get("editable", True), hidden=kwargs.get("hidden", False), __properties__=kwargs.get("__properties__", None))
       self.types = args
 
    def _validate_self(self, value):
@@ -509,13 +649,29 @@ class Tuple(TypeValidator):
       self.types = tuple(map(lambda x: das.decode(x, encoding), self.types))
       return self
 
+   def is_type_compatible(self, st, key=None, index=None):
+      if index is not None:
+         return self.types[index].is_type_compatible(st)
+      else:
+         if not super(Tuple, self).is_type_compatible(st, key=key, index=index):
+            return False
+         _st = st.real_type()
+         if len(_st.types) != len(self.types):
+            return False
+         else:
+            for i in xrange(len(self.types)):
+               if not self.types[i].is_type_compatible(_st.types[i]):
+                  return False
+            else:
+               return True
+
    def make_default(self):
       if not self.default_validated and self.default is None:
          self.default = tuple([t.make_default() for t in self.types])
       return super(Tuple, self).make_default()
 
    def make(self, *args, **kwargs):
-      return self._validate(args)
+      return self.validate(args)
 
    def conform(self, args, fill=False):
       if not isinstance(args, (list, set, tuple)):
@@ -563,14 +719,15 @@ class Tuple(TypeValidator):
       kwargs = {"default": self.default,
                 "description": self.description,
                 "editable": self.editable,
-                "hidden": self.hidden}
+                "hidden": self.hidden,
+                "__properties__": self.get_properties()}
       return Tuple(*args, **kwargs)
 
 
 class Struct(TypeValidator, dict):
    CompatibilityMode = False
 
-   def __init__(self, __description__=None, __editable__=True, __hidden__=False, __order__=None, **kwargs):
+   def __init__(self, __description__=None, __editable__=True, __hidden__=False, __order__=None, __extends__=None, __properties__=None, **kwargs):
       # MRO: TypeValidator, dict, object
       removedValues = {}
       for name in ("default", "description", "editable", "hidden"):
@@ -579,33 +736,113 @@ class Struct(TypeValidator, dict):
             if das.__verbose__:
                das.print_once("[das] '%s' treated as a standard field for Struct type. Use '__%s__' to set schema type's attribute" % (name, name))
             del(kwargs[name])
+      removedItems = removedValues.items()
 
-      super(Struct, self).__init__(default=None, description=__description__, editable=__editable__, hidden=__hidden__, **kwargs)
+      super(Struct, self).__init__(default=None, description=__description__, editable=__editable__, hidden=__hidden__, __properties__=__properties__, **kwargs)
 
       # Keep mapping of aliases
-      aliases = {}
-      for k, v in self.items():
+      self._aliases = {}
+      for k, v in (self.items() + removedItems):
          aliasname = Alias.Name(v)
          if aliasname is not None:
-            aliases[k] = aliasname
+            self._aliases[k] = aliasname
 
-      keys = [k for k, _ in self.items() if not k in aliases]
-      if __order__ is not None:
-         __order__ = filter(lambda x: x in keys, __order__)
-         for n in keys:
-            if not n in __order__:
-               __order__.append(n)
-      else:
-         __order__ = sorted(keys)
+      # Build fields ordering
+      self._fix_order(__order__, extraItems=removedItems)
 
-      self.__dict__["_aliases"] = aliases
-      self.__dict__["_order"] = __order__
+      # Track schema to extend
+      exttypes = ([] if not self.has_property("extensions") else self.get_property("extensions").keys())
+
+      tmp = []
+      if isinstance(__extends__, (list, tuple, set, dict)):
+         tmp = [x for x in __extends__]
+      elif __extends__:
+         tmp = [__extends__]
+      for exttype in tmp:
+         _exttype = str(exttype)
+         if not "." in _exttype:
+            _exttype = self.CurrentSchema + "." + _exttype
+         if not _exttype in exttypes:
+            exttypes.append(_exttype)
+
+      self.set_property("extensions", dict([(et, False) for et in exttypes]))
 
       # As some fields were removed from kwargs to avoid conflict with
-      #   TypeValidator class initializer, add them back
-
+      #   TypeValidator class initializer, add them back at last
+      # Adding them before may cause problems as __setitem__ is triggered
       for name, value in removedValues.iteritems():
          self[name] = value
+
+   def _fix_order(self, order, extraItems=None):
+      keys = [k for k, _ in (self.items() + (extraItems or [])) if not k in self._aliases]
+      if order is not None:
+         self._original_order = list(order)
+         self._order = filter(lambda x: x in keys, self._original_order)
+         for n in keys:
+            if not n in order:
+               self._order.append(n)
+      else:
+         self._original_order = None
+         self._order = sorted(keys)
+
+   def _extend(self, name):
+      st = das.get_schema_type(name)
+
+      # Check for Struct schema type
+      if not isinstance(st, Struct):
+         raise Exception("Cannot inherit from %s schema types %s ()" % (type(st).__name__, repr(name)))
+
+      # Check for conflicting fields but allow overrides
+      for k in st.ordered_keys():
+         if k in self:
+            t0 = st[k].real_type(parent=st)
+            t1 = self[k].real_type(parent=self)
+            override = True
+            if not t0.is_type_compatible(t1):
+               override = False
+            else:
+               if not st._is_optional(k) and self._is_optional(k):
+                  override = False
+            if not override:
+               raise Exception("Cannot inherit schema type %s (conflicting field %s)" % (repr(name), repr(k)))
+
+      # Check for conflicting aliases
+      aliases = self._aliases.copy()
+      for n, a in st._aliases.iteritems():
+         if n in self.ordered_keys():
+            raise Exception("Cannot inherit schema type %s (alias %s -> %s conflicting with field)" % (repr(name), repr(n), repr(a)))
+         if n in aliases:
+            if aliases[n] != a:
+               raise Exception("Cannot inherit schema type %s (conflicting alias %s -> %s / %s)" % (repr(name), repr(n), repr(a), aliases[n]))
+         aliases[n] = a
+      self._aliases = aliases
+
+      if st._original_order or self._original_order:
+         if st._original_order:
+            _original_order = st._original_order[:]
+            _tmp = (self._order[:] if not self._original_order else self._original_order[:])
+         else:
+            _original_order = self._original_order[:]
+            _tmp = (st._order[:] if not st._original_order else st._original_order[:])
+         for item in _tmp:
+            if not item in _original_order:
+               _original_order.append(item)
+         self._original_order = _original_order
+
+      # Merge fields
+      for k in st.keys():
+         # if we reach here and k is defined in self, it is a compatible override, keep it
+         if not k in self:
+            self[k] = st[k].copy()
+
+      # Register and apply extra mixins
+      mixins = das.get_registered_mixins(name)
+      if mixins:
+         das.register_mixins(*mixins, schema_type=self)
+
+      # Reset default value
+      self.default_validated = False
+      self.default = None
 
    def _validate_self(self, value):
       if not isinstance(value, (dict, das.types.Struct)):
@@ -613,7 +850,7 @@ class Struct(TypeValidator, dict):
       allfound = True
       aliasvalues = {}
       for k, v in self.iteritems():
-         aliasname = self.__dict__["_aliases"].get(k, None)
+         aliasname = self._aliases.get(k, None)
          if aliasname is not None and k in value:
             if aliasname in aliasvalues:
                if aliasvalues[aliasname] != value[k]:
@@ -622,7 +859,7 @@ class Struct(TypeValidator, dict):
                aliasvalues[aliasname] = value[k]
       for k, v in self.iteritems():
          # Don't check aliases
-         if k in self.__dict__["_aliases"]:
+         if k in self._aliases:
             continue
          if not k in value:
             if k in aliasvalues:
@@ -663,6 +900,7 @@ class Struct(TypeValidator, dict):
             return vv
       else:
          self._validate_self(value)
+         actualkeys = set([item for item in value])
          rv = das.types.Struct()
          # don't set schema type just yet
          for k, v in self.iteritems():
@@ -671,7 +909,7 @@ class Struct(TypeValidator, dict):
             aliasname = Alias.Name(v)
             if aliasname is not None:
                # Issue warning on deprecated field
-               if deprecated:
+               if deprecated and k in actualkeys:
                   message = "[das] Field %s is deprecated, use %s instead" % (repr(k), repr(aliasname))
                   das.print_once(message)
                continue
@@ -695,8 +933,83 @@ class Struct(TypeValidator, dict):
          self[k] = das.decode(self[k], encoding)
       return self
 
+   def _aliased_type(self, nameOrType):
+      if isinstance(nameOrType, basestring):
+         vt = self[nameOrType]
+      elif isinstance(nameOrType, TypeValidator):
+         vt = nameOrType
+      else:
+         raise Exception("Expected 'str' or 'TypeValidator' instance got '%s'" % type(nameOrType).__name__)
+      an = Alias.Name(vt)
+      return (vt if an is None else self[an])
+
+   def _is_alias(self, nameOrType):
+      if isinstance(nameOrType, basestring):
+         vt = self[nameOrType]
+      elif isinstance(nameOrType, TypeValidator):
+         vt = nameOrType
+      else:
+         raise Exception("Expected 'str' or 'TypeValidator' instance got '%s'" % type(nameOrType).__name__)
+      an = Alias.Name(vt)
+      return (an is not None)
+
+   def _is_optional(self, name):
+      return isinstance(self._aliased_type(name), Optional)
+
+   def is_type_compatible(self, st, key=None, index=None):
+      if key is not None:
+         vtype = self.get(key, None)
+         if vtype is None:
+            return False
+         else:
+            # st is supposedly the type of the key
+            return vtype.real_type(parent=self).is_type_compatible(st)
+      else:
+         if not super(Struct, self).is_type_compatible(st, key=key, index=index):
+            return False
+         _st = st.real_type()
+         for k, v in self.iteritems():
+            # don't add aliases to dictionary
+            _vt0 = v.real_type(parent=self)
+            if not k in _st:
+               # only error if k is not an optional field
+               if not self._is_optional(v):
+                  return False
+            else:
+               _vt1 = _st[k].real_type(parent=_st)
+               if not _vt0.is_type_compatible(_vt1):
+                  return False
+               # Non optional fields are not compatible with optional ones
+               if not self._is_optional(v) and _st._is_optional(_st[k]):
+                  return False
+         # check for any fields in _st not in self
+         for k, v in _st.iteritems():
+            if _st._is_alias(v):
+               continue
+            if not k in self:
+               # allow if it is optional? -> no
+               return False
+         return True
+
+   def load_extensions(self):
+      for et, ld in self._properties["extensions"].items():
+         if not ld:
+            self._extend(et)
+            self._properties["extensions"][et] = True
+
+   def has_extension(self, name):
+      return (name in self._properties["extensions"])
+
+   def extend(self, name):
+      if self._properties["extensions"].get(name, False):
+         return
+
+      self._extend(name)
+
+      self._properties["extensions"][name] = True
+
    def ordered_keys(self):
-      return self.__dict__["_order"]
+      return self._order
 
    def make_default(self):
       if not self.default_validated and self.default is None:
@@ -750,32 +1063,78 @@ class Struct(TypeValidator, dict):
          v = self[k]
          s += "%s%s=%s" % (sep, k, v)
          sep = ", "
+      if self._original_order:
+         s += "%s__order__=%s" % (sep, repr(self._original_order))
+      if self._properties["extensions"]:
+         s += "%s__extends__=%s" % (sep, repr(self._properties["extensions"].keys()))
       if self.description:
          s += "%s__description__=%s" % (sep, repr(self.description))
       return s + ")"
 
+   def _update_internals(self):
+      keys = [k for k, _ in self.items() if not k in self._aliases]
+      if self._original_order:
+         self._order = filter(lambda x: x in keys, self._original_order)
+         for n in keys:
+            if not n in self._original_order:
+               self._order.append(n)
+      else:
+         self._order = sorted(keys)
+
+      self.default_validated = False
+      self.default = None
+
+   def __setitem__(self, k, v):
+      super(Struct, self).__setitem__(k, v)
+      self._update_internals()
+
+   def __delitem__(self, k):
+      super(Struct, self).__delitem__(k)
+      self._update_internals()
+
+   def update(self, *args, **kwargs):
+      super(Struct, self).update(*args, **kwargs)
+      self._update_internals()
+
+   def pop(self, k, *args):
+      rv = super(Struct, self).pop(k, *args)
+      self._update_internals()
+      return rv
+
+   def popitem(self):
+      rv = super(Struct, self).popitem(self)
+      self._update_internals()
+      return rv
+
+   def clear(self):
+      super(Struct, self).clear()
+      self._update_internals()
+
    def copy(self):
+      # self.load_extensions()
       kwargs = {}
       for k, v in self.iteritems():
          kwargs[k] = v.copy()
       return Struct(__description__=self.description, __editable__=self.editable,
-                    __hidden__=self.hidden, __order__=self.__dict__["_order"], **kwargs)
+                    __hidden__=self.hidden, __order__=self._original_order,
+                    __properties__=self.get_properties(),
+                    **kwargs)
 
 
 class StaticDict(Struct):
-   def __init__(self, __description__=None, __editable__=True, __hidden__=False, __order__=None, **kwargs):
-      super(StaticDict, self).__init__(__description__=__description__, __editable__=__editable__, __hidden__=__hidden__, __order__=__order__, **kwargs)
+   def __init__(self, __description__=None, __editable__=True, __hidden__=False, __order__=None, __properties__=None, **kwargs):
+      super(StaticDict, self).__init__(__description__=__description__, __editable__=__editable__, __hidden__=__hidden__, __order__=__order__, __properties__=__properties__, **kwargs)
       if das.__verbose__:
          das.print_once("[das] Warning: Schema type 'StaticDict' is deprecated, use 'Struct' instead")
 
 
 class Dict(TypeValidator):
-   def __init__(self, ktype, vtype, __default__=None, __description__=None, __editable__=True, __hidden__=False, **kwargs):
+   def __init__(self, ktype, vtype, __default__=None, __description__=None, __editable__=True, __hidden__=False, __properties__=None, **kwargs):
       for name in ("default", "description", "editable", "hidden"):
          if name in kwargs:
             if das.__verbose__:
                das.print_once("[das] '%s' treated as a possible key name for Dict type overrides. Use '__%s__' to set schema type's attribute" % (name, name))
-      super(Dict, self).__init__(default=({} if __default__ is None else __default__), description=__description__, editable=__editable__, hidden=__hidden__)
+      super(Dict, self).__init__(default=({} if __default__ is None else __default__), description=__description__, editable=__editable__, hidden=__hidden__, __properties__=__properties__)
       self.ktype = ktype
       self.vtype = vtype
       self.vtypeOverrides = {}
@@ -817,8 +1176,29 @@ class Dict(TypeValidator):
       self.vtypeOverrides = vtypeOverrides
       return self
 
+   def is_type_compatible(self, st, key=None, index=None):
+      if key is not None:
+         return self.vtypeOverrides.get(str(key), self.vtype).is_type_compatible(st)
+      else:
+         if not super(Dict, self).is_type_compatible(st, key=key, index=index):
+            return False
+         _st = st.real_type()
+         if not self.ktype.is_type_compatible(_st.ktype):
+            return False
+         if not self.vtype.is_type_compatible(_st.vtype):
+            return False
+         for k, v in self.vtypeOverrides.iteritems():
+            if not v.is_type_compatible(_st.vtypeOverrides.get(k, _st.vtype)):
+               return False
+         for k, v in _st.vtypeOverrides.iteritems():
+            if k in self.vtypeOverrides:
+               continue
+            elif not self.vtype.is_type_compatible(v):
+               return False
+         return True
+
    def make(self, *args, **kwargs):
-      return self._validate(kwargs)
+      return self.validate(kwargs)
 
    def conform(self, args, fill=False):
       if not isinstance(args, (dict, das.types.Struct)):
@@ -858,24 +1238,25 @@ class Dict(TypeValidator):
       for k, v in self.vtypeOverrides.iteritems():
          kwargs[k] = v.copy()
       return Dict(self.ktype.copy(), self.vtype.copy(),
-                  __default__=self.default, __description__=self.description, __editable__=self.editable,
-                  __hidden__=self.hidden, **kwargs)
+                  __default__=self.default, __description__=self.description,
+                  __editable__=self.editable, __hidden__=self.hidden,
+                  __properties__=self.get_properties(), **kwargs)
 
 
 class DynamicDict(Dict):
-   def __init__(self, ktype, vtype, __default__=None, __description__=None, __editable__=True, __hidden__=False, **kwargs):
-      super(DynamicDict, self).__init__(ktype, vtype, __default__=__default__, __description__=__description__, __editable__=__editable__, __hidden__=__hidden__, **kwargs)
+   def __init__(self, ktype, vtype, __default__=None, __description__=None, __editable__=True, __hidden__=False, __properties__=None, **kwargs):
+      super(DynamicDict, self).__init__(ktype, vtype, __default__=__default__, __description__=__description__, __editable__=__editable__, __hidden__=__hidden__, __properties__=__properties__, **kwargs)
       if das.__verbose__:
          das.print_once("[das] Warning: Schema type 'DynamicDict' is deprecated, use 'Dict' instead")
 
 
 class Class(TypeValidator):
-   def __init__(self, klass, default=None, description=None, editable=True, hidden=False):
+   def __init__(self, klass, default=None, description=None, editable=True, hidden=False, __properties__=None):
       if not isinstance(klass, (str, unicode)):
          self.klass = self._validate_class(klass)
       else:
          self.klass = self._class(klass)
-      super(Class, self).__init__(default=(self.klass() if default is None else default), description=description, editable=editable, hidden=hidden)
+      super(Class, self).__init__(default=(self.klass() if default is None else default), description=description, editable=editable, hidden=hidden, __properties__=__properties__)
 
    def _validate_class(self, c):
       if not hasattr(c, "copy"):
@@ -907,7 +1288,14 @@ class Class(TypeValidator):
                newval.string_to_value(value)
                return newval
             except Exception as e:
-               raise ValidationError("Cannot instanciace class '%s' from string %s" % (self.klass.__name__, repr(value)))
+               raise ValidationError("Cannot instanciate class '%s' from string %s (%s)" % (self.klass.__name__, repr(value), e))
+         elif hasattr(self.klass, "any_to_value"):
+            try:
+               newval = self.klass()
+               newval.any_to_value(value)
+               return newval
+            except Exception as e:
+               raise ValidationError("Cannot instanciate class '%s' from value %s (%s)" % (self.klass.__name__, repr(value), e))
          else:
             raise ValidationError("Expected a %s value, got %s" % (self.klass.__name__, type(value).__name__))
       return value
@@ -916,6 +1304,12 @@ class Class(TypeValidator):
       return self._validate_self(value)
 
    # No _decode?
+
+   def is_type_compatible(self, st, key=None, index=None):
+      if not super(Class, self).is_type_compatible(st, key=key, index=index):
+         return False
+      else:
+         return issubclass(st.real_type().klass, self.klass)
 
    def __repr__(self):
       cmod = self.klass.__module__
@@ -930,12 +1324,12 @@ class Class(TypeValidator):
       return s
 
    def copy(self):
-      return Class(self.klass, default=self.default, description=self.description, editable=self.editable, hidden=self.hidden)
+      return Class(self.klass, default=self.default, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
 
 class Or(TypeValidator):
    def __init__(self, *types, **kwargs):
-      super(Or, self).__init__(default=kwargs.get("default", None), description=kwargs.get("description", None), editable=kwargs.get("editable", True), hidden=kwargs.get("hidden", False))
+      super(Or, self).__init__(default=kwargs.get("default", None), description=kwargs.get("description", None), editable=kwargs.get("editable", True), hidden=kwargs.get("hidden", False), __properties__=kwargs.get("__properties__", None))
       if len(types) < 2:
          raise Exception("Schema type 'Or' requires at least two types") 
       self.types = types
@@ -954,13 +1348,16 @@ class Or(TypeValidator):
          Struct.CompatibilityMode = True
          if rv is not None:
             return rv
+      emsgs = []
       for typ in self.types:
          try:
             return typ._validate_self(value)
          except ValidationError as e:
+            emsgs.append(str(e))
             continue
-      raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(value).__name__)
-      return None
+      emsg = "Value of type %s doesn't match any of the allowed types" % type(value).__name__
+      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
+      raise ValidationError(emsg)
 
    def _validate(self, value, key=None, index=None):
       if Struct.CompatibilityMode:
@@ -975,13 +1372,32 @@ class Or(TypeValidator):
          Struct.CompatibilityMode = True
          if rv is not None:
             return rv
+      emsgs = []
       for typ in self.types:
          try:
             return typ.validate(value, key=key, index=index)
          except ValidationError as e:
+            emsgs.append(str(e))
             continue
-      raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(value).__name__)
-      return None
+      emsg = "Value of type %s doesn't match any of the allowed types" % type(value).__name__
+      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
+      raise ValidationError(emsg)
+
+   def is_type_compatible(self, st, key=None, index=None):
+      _st = st.real_type()
+      if _st is None:
+         return False
+      else:
+         if isinstance(_st, Or):
+            for typ in _st.types:
+               if not self.is_type_compatible(typ):
+                  return False
+            return True
+         else:
+            for typ in self.types:
+               if typ.is_type_compatible(_st):
+                  return True
+            return False
 
    def value_to_string(self, v):
       for typ in self.types:
@@ -989,6 +1405,7 @@ class Or(TypeValidator):
             return typ.value_to_string(v)
          except:
             continue
+      return None
 
    def string_to_value(self, v):
       for typ in self.types:
@@ -996,6 +1413,7 @@ class Or(TypeValidator):
             return typ.string_to_value(v)
          except:
             continue
+      return None
 
    def _decode(self, encoding):
       super(Or, self)._decode(encoding)
@@ -1008,30 +1426,45 @@ class Or(TypeValidator):
       return super(Or, self).make_default()
 
    def make(self, *args, **kwargs):
-      return self.types[0].make(*args, **kwargs)
+      emsgs = []
+      for typ in self.types:
+         try:
+            return typ.make(*args, **kwargs)
+         except ValidationError as e:
+            emsgs.append(str(e))
+
+      emsg = "Cannot make any of the allowed types from arguments (args=%s, kwargs=%s)" % (repr(args), repr(kwargs))
+      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
+      raise ValidationError(emsg)
 
    def conform(self, args, fill=False):
+      emsgs = []
       for typ in self.types:
          try:
             return typ.conform(args, fill=fill)
-         except ValidationError, e:
-            continue
+         except ValidationError as e:
+            emsgs.append(str(e))
 
-      raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(args).__name__)
+      emsg = "Cannot conform to any of the allowed types (args=%s, fill=%s)" % (repr(args), repr(fill))
+      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
+      raise ValidationError(emsg)
 
    def partial_make(self, args):
+      emsgs = []
       for typ in self.types:
          try:
             return typ.partial_make(args)
-         except:
-            continue
+         except Exception as e:
+            emsgs.append(str(e))
 
-      raise ValidationError("Value of type %s doesn't match any of the allowed types" % type(args).__name__)
+      emsg = "Value of type %s doesn't match any of the allowed types" % type(args).__name__
+      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
+      raise ValidationError(emsg)
 
    def __repr__(self):
       s = "Or(%s" % ", ".join(map(str, self.types))
       if self.default is not None:
-         s += ", default=%s" % self.default
+         s += ", default=%s" % repr(self.default)
       if self.description:
          s += ", description=%s" % repr(self.description)
       return s + ")"
@@ -1041,13 +1474,14 @@ class Or(TypeValidator):
       kwargs = {"default": self.default,
                 "description": self.description,
                 "editable": self.editable,
-                "hidden": self.hidden}
+                "hidden": self.hidden,
+                "__properties__": self.get_properties()}
       return Or(*types, **kwargs)
 
 
 class Optional(TypeValidator):
-   def __init__(self, type, description=None, editable=True, hidden=False):
-      super(Optional, self).__init__(description=description, editable=editable, hidden=hidden)
+   def __init__(self, type, description=None, editable=True, hidden=False, __properties__=None):
+      super(Optional, self).__init__(description=description, editable=editable, hidden=hidden, __properties__=__properties__)
       self.type = type
 
    def _validate_self(self, value):
@@ -1060,6 +1494,12 @@ class Optional(TypeValidator):
       super(Optional, self)._decode(encoding)
       self.type = das.decode(self.type, encoding)
       return self
+
+   def real_type(self, parent=None):
+      return self.type.real_type(parent=parent)
+
+   def is_type_compatible(self, st, key=None, index=None):
+      return self.type.is_type_compatible(st, key=key, index=index)
 
    def make_default(self):
       return self.type.make_default()
@@ -1083,12 +1523,12 @@ class Optional(TypeValidator):
       return "Optional(type=%s)" % self.type
 
    def copy(self):
-      return Optional(self.type.copy(), description=self.description, editable=self.editable, hidden=self.hidden)
+      return Optional(self.type.copy(), description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
 
 class Deprecated(Optional):
-   def __init__(self, type, message="", description=None, editable=True, hidden=False):
-      super(Deprecated, self).__init__(type, description=description, editable=editable, hidden=hidden)
+   def __init__(self, type, message="", description=None, editable=True, hidden=False, __properties__=None):
+      super(Deprecated, self).__init__(type, description=description, editable=editable, hidden=hidden, __properties__=__properties__)
       self.message = message
 
    def _validate_self(self, value):
@@ -1108,6 +1548,8 @@ class Deprecated(Optional):
       self.message = das.decode(self.message, encoding)
       return self
 
+   # Do not override is_type_compatible, already re-defined in Optional
+
    def make_default(self):
       return None
 
@@ -1115,12 +1557,12 @@ class Deprecated(Optional):
       return "Deprecated(type=%s)" % self.type
 
    def copy(self):
-      return Deprecated(self.type.copy(), message=self.message, description=self.description, editable=self.editable, hidden=self.hidden)
+      return Deprecated(self.type.copy(), message=self.message, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
 
 class Empty(TypeValidator):
-   def __init__(self, description=None, editable=True, hidden=False):
-      super(Empty, self).__init__(description=description, editable=editable, hidden=hidden)
+   def __init__(self, description=None, editable=True, hidden=False, __properties__=None):
+      super(Empty, self).__init__(description=description, editable=editable, hidden=hidden, __properties__=__properties__)
 
    def _validate_self(self, value):
       if value is not None:
@@ -1130,25 +1572,25 @@ class Empty(TypeValidator):
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
 
+   # no need to override is_type_compatible, Empty only matches another Empty
+
    def make_default(self):
       return None
 
    def value_to_string(self, v):
-      self._validate(v)
-
+      self.validate(v)
       return ""
 
    def string_to_value(self, v):
       if v:
          raise ValidationError("The value is not empty")
-
-      return self._validate(None)
+      return self.validate(None)
 
    def __repr__(self):
       return "Empty()"
 
    def copy(self):
-      return Empty(description=self.description, editable=self.editable, hidden=self.hidden)
+      return Empty(description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
 
 class Alias(TypeValidator):
@@ -1160,13 +1602,15 @@ class Alias(TypeValidator):
    def Name(t):
       if isinstance(t, Alias):
          return t.name
-      elif isinstance(t, Deprecated) and isinstance(t.type, Alias):
+      # Can't this be optional too?
+      #elif isinstance(t, Deprecated) and isinstance(t.type, Alias):
+      elif isinstance(t, Optional) and isinstance(t.type, Alias):
          return t.type.name
       else:
          return None
 
-   def __init__(self, name, description=None, editable=True, hidden=False):
-      super(Alias, self).__init__(description=description, editable=editable, hidden=hidden)
+   def __init__(self, name, description=None, editable=True, hidden=False, __properties__=None):
+      super(Alias, self).__init__(description=description, editable=editable, hidden=hidden, __properties__=__properties__)
       self.name = name
 
    def _validate_self(self, value):
@@ -1175,6 +1619,19 @@ class Alias(TypeValidator):
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
 
+   def real_type(self, parent=None):
+      if parent is not None:
+         return parent[self.name].real_type(parent=parent)
+      else:
+         return super(Alias, self).real_type(parent=parent)
+
+   def is_type_compatible(self, st, key=None, index=None):
+      _st = st.real_type()
+      if not isinstance(_st, Alias):
+         return False
+      else:
+         return (self.name == _st.name)
+
    def make_default(self):
       return None
 
@@ -1182,14 +1639,12 @@ class Alias(TypeValidator):
       return "Alias(%s)" % repr(self.name)
 
    def copy(self):
-      return Alias(self.name, description=self.description, editable=self.editable, hidden=self.hidden)
+      return Alias(self.name, description=self.description, editable=self.editable, hidden=self.hidden, __properties__=self.get_properties())
 
 
 class SchemaType(TypeValidator):
-   CurrentSchema = ""
-
-   def __init__(self, name, default=None, description=None, editable=True, hidden=False):
-      super(SchemaType, self).__init__(default=default, description=description, editable=editable, hidden=hidden)
+   def __init__(self, name, default=None, description=None, editable=True, hidden=False, __properties__=None):
+      super(SchemaType, self).__init__(default=default, description=description, editable=editable, hidden=hidden, __properties__=__properties__)
       if not "." in name:
          self.name = self.CurrentSchema + "." + name
       else:
@@ -1202,6 +1657,12 @@ class SchemaType(TypeValidator):
    def _validate(self, value, key=None, index=None):
       st = das.get_schema_type(self.name)
       return st.validate(value, key=key, index=index)
+
+   def real_type(self, parent=None):
+      return das.get_schema_type(self.name).real_type(parent=parent)
+
+   def is_type_compatible(self, st, key=None, index=None):
+      return das.get_schema_type(self.name).is_type_compatible(st, key=key, index=index)
 
    def make_default(self):
       if not self.default_validated and self.default is None:
@@ -1228,4 +1689,4 @@ class SchemaType(TypeValidator):
       return s + ")"
 
    def copy(self):
-      return SchemaType(self.name, default=self.default, description=self.description, editable=self.editable)
+      return SchemaType(self.name, default=self.default, description=self.description, editable=self.editable, __properties__=self.get_properties())

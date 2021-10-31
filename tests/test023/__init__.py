@@ -2,18 +2,16 @@
 import os
 import unittest
 import das # pylint: disable=import-error
+import math
+
 
 class TestCase(unittest.TestCase):
-   TestDir = None
-   InputFile = None
-
    @classmethod
    def setUpClass(cls):
-      cls.TestDir = os.path.abspath(os.path.dirname(__file__))
-      cls.InputFile = cls.TestDir + "/in.data"
-      os.environ["DAS_SCHEMA_PATH"] = cls.TestDir
+      os.environ["DAS_SCHEMA_PATH"] = os.path.abspath(os.path.dirname(__file__))
 
    def setUp(self):
+      self.types = {}
       self.addCleanup(self.cleanUp)
 
    def tearDown(self):
@@ -27,6 +25,7 @@ class TestCase(unittest.TestCase):
       del(os.environ["DAS_SCHEMA_PATH"])
 
    # Test functions
-
-   def test1(self):
-      das.read(self.InputFile, strict_schema=False)
+   def testExtend(self):
+       v = das.make_default("xtend.ext")
+       v.creator = "Me"
+       v.description = "WTF?!"
