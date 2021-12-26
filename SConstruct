@@ -12,7 +12,7 @@ sys.path.insert(0, os.getcwd() + "/python")
 try:
    import das
    version = das.__version__
-except Exception, e:
+except Exception as e:
    print("Can't figure out DaS version (%s)" % e)
 
 prjs = [

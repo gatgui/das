@@ -51,14 +51,14 @@ if __name__ == "__main__":
 
    try:
       data = das.read(infile)
-   except Exception, e:
+   except Exception as e:
       sys.stderr.write("Failed to read file '%s' (%s)\n" % (e, infile))
       sys.exit(1)
 
    for key in keys:
       try:
          vals.append(das.cli.get(data, key))
-      except Exception, e:
+      except Exception as e:
          sys.stderr.write("Failed to get value for field '%s' (%s)\n" % (key, e))
          vals.append(None)
 

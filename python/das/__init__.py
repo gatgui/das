@@ -326,12 +326,12 @@ def ascii_or_unicode(s, encoding=None):
       try:
          s.decode("ascii")
          return s
-      except Exception, e:
+      except Exception as e:
          if encoding is None:
             raise Exception("Input string must be 'ascii' encoded (%s)" % e)
          try:
             return s.decode(encoding)
-         except Exception, e:
+         except Exception as e:
             raise Exception("Input string must be 'ascii' or '%s' encoded (%s)" % (encoding, e))
    elif isinstance(s, unicode):
       try:
@@ -346,7 +346,7 @@ def decode(d, encoding):
    if hasattr(d, "_decode") and callable(getattr(d, "_decode")):
       try:
          return d._decode(encoding)
-      except Exception, e:
+      except Exception as e:
          print_once("[das] '%s._decode' method call failed (%s)\n[das] Fallback to default decoding" % (d.__class__.__name__, e))
 
    if isinstance(d, basestring):
@@ -981,12 +981,12 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
    elif isinstance(d, str):
       try:
          d.decode("ascii")
-      except Exception, e:
+      except Exception as e:
          if not encoding:
             raise Exception("Non-ascii string value found but no encoding provided (%s)." % e)
          try:
             stream.write(repr(d.decode(encoding)))
-         except Exception, e:
+         except Exception as e:
             raise Exception("Non-ascii string value cannot be decoded to '%s' (%s)." % (encoding, e))
       else:
          # properly deal with multiline characters

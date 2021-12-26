@@ -78,14 +78,14 @@ if __name__ == "__main__":
          if data._get_schema_type() is None:
             print("Data has no schema type")
             data = None
-      except Exception, e:
+      except Exception as e:
          print("Not a valid das file: %s (%s)" % (file_path, e))
          data = None
 
    echo_only = False
    try:
       import Qt
-   except Exception, e:
+   except Exception as e:
       print("Failed to import 'Qt' (%s)" % e)
       echo_only = True
 
@@ -196,14 +196,14 @@ if __name__ == "__main__":
                   self.path = rv
                   self.actionSaveAs.setEnabled(not readonly)
                   self.actionSave.setEnabled(False)
-               except Exception, e:
+               except Exception as e:
                   QtWidgets.QMessageBox.critical(self, "Error", "Couldn't read file '%s'\n%s" % (rv, e), QtWidgets.QMessageBox.Close)
 
          def onSave(self):
             try:
                das.write(self.editWidget.getData(), self.path)
                self.editWidget.cleanData()
-            except Exception, e:
+            except Exception as e:
                QtWidgets.QMessageBox.critical(self, "Error", "Couldn't save data to '%s'\n%s" % (self.path, e), QtWidgets.QMessageBox.Close)
 
          def onSaveAs(self):

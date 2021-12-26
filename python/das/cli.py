@@ -45,7 +45,7 @@ def _generic_do(data, key, val=None, attrfunc=None, subscriptfunc=None):
       novalue = False
       try:
          value = _pyeval(val)
-      except Exception, e:
+      except Exception as e:
          raise Exception("Invalid value %s: %s\n" % (val, e))
 
    if not novalue and (attrfunc is None or subscriptfunc is None):

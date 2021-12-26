@@ -11,7 +11,7 @@ try:
    from Qt import QtGui # pylint: disable=import-error
    from Qt import QtWidgets # pylint: disable=import-error
    from Qt import QtCompat # pylint: disable=import-error
-except Exception, e:
+except Exception as e:
    print("Failed to import Qt (%s)" % e)
    NoUI = True
 
@@ -672,7 +672,7 @@ if not NoUI:
                val = float(txt)
             else:
                val = int(txt)
-         except Exception, e:
+         except Exception as e:
             invalid = True
             errmsg = str(e)
             # if text is not empty, reset field to real value
@@ -745,7 +745,7 @@ if not NoUI:
             newkey = das.copy(item.key)
             try:
                newkey = val
-            except Exception, e:
+            except Exception as e:
                rv.setProperty("invalidState", True)
                rv.setProperty("message", "Invalid key (%s)" % e)
             else:
@@ -754,7 +754,7 @@ if not NoUI:
                tmpval = item.parent.type.vtype.make_default()
                try:
                   tmpdict[newkey] = tmpval
-               except Exception, e:
+               except Exception as e:
                   rv.setProperty("invalidState", True)
                   rv.setProperty("message", "Invalid key (%s)" % e)
                else:
@@ -800,7 +800,7 @@ if not NoUI:
             def textChanged(txt):
                try:
                   int(txt)
-               except Exception, e:
+               except Exception as e:
                   rv.setProperty("invalidState", True)
                   rv.setProperty("message", str(e))
                   # if text is not empty, reset to original value
@@ -826,7 +826,7 @@ if not NoUI:
             def textChanged(txt):
                try:
                   float(txt)
-               except Exception, e:
+               except Exception as e:
                   rv.setProperty("invalidState", True)
                   rv.setProperty("message", str(e))
                   # if text is not empty, reset to original value
@@ -864,7 +864,7 @@ if not NoUI:
          def textChanged(txt):
             try:
                item.data.copy().string_to_value(txt)
-            except Exception, e:
+            except Exception as e:
                rv.setProperty("invalidState", True)
                rv.setProperty("message", str(e))
             else:
@@ -1478,7 +1478,7 @@ if not NoUI:
                newkey = das.copy(item.key)
                try:
                   newkey = value
-               except Exception, e:
+               except Exception as e:
                   self.setItemErrorMessage(item, str(e))
                   return False
                if newkey != item.key:
@@ -1490,7 +1490,7 @@ if not NoUI:
                      try:
                         item.parent.data[newkey] = item.data
                         del(item.parent.data[item.key])
-                     except Exception, e:
+                     except Exception as e:
                         self.setItemErrorMessage(item.parent, str(e))
                         return False
                      else:
@@ -1504,7 +1504,7 @@ if not NoUI:
             elif self._headers[index.column()] == "Value":
                try:
                   structureChanged = self._setRawData(index, value)
-               except Exception, e:
+               except Exception as e:
                   self.setItemErrorMessage(index.internalPointer(), str(e))
                   return False
 
@@ -1588,7 +1588,7 @@ if not NoUI:
                seq = seq[:srcitem.row] + seq[srcitem.row+1:] + [srcitem.data]
                try:
                   self._setRawData(tgtindex, seq)
-               except Exception, e:
+               except Exception as e:
                   self.setItemErrorMessage(tgtitem, str(e))
                   return False
                self.dataChanged.emit(self.index(0, 1, tgtindex), self.index(self.rowCount(tgtindex)-1, 1, tgtindex))
@@ -1622,7 +1622,7 @@ if not NoUI:
                seq.insert(idx, srcitem.data)
                try:
                   self._setRawData(pindex, seq)
-               except Exception, e:
+               except Exception as e:
                   self.setItemErrorMessage(pitem, str(e))
                   return False
                self.dataChanged.emit(tgtindex if (tgtitem.row < srcitem.row) else srcindex, self.index(self.rowCount(pindex)-1, 1, pindex))
@@ -2137,7 +2137,7 @@ if not NoUI:
             undoData = das.copy(self.model.getData())
             try:
                item.data[dlg.data] = (item.type.vtype.make_default() if value is None else value)
-            except Exception, e:
+            except Exception as e:
                self.model.setItemErrorMessage(item, "Failed to add key %s\n(%s)" % (dlg.data, e))
             else:
                self.model.pushUndo(undoData)
@@ -2164,7 +2164,7 @@ if not NoUI:
             undoData = das.copy(self.model.getData())
             try:
                item.data.add(dlg.data)
-            except Exception, e:
+            except Exception as e:
                self.model.setItemErrorMessage(item, "Failed to add value %s\n(%s)" % (dlg.data, e))
             else:
                self.model.pushUndo(undoData)

@@ -61,7 +61,7 @@ class Schema(object):
          try:
             modname = os.path.splitext(os.path.basename(self.path))[0]
             mod = imp.load_source("das.schema.%s" % modname, pmp)
-         except Exception, e:
+         except Exception as e:
             import traceback
             print("[das] Failed to load schema module '%s' (%s)" % (pmp, e))
             traceback.print_exc()

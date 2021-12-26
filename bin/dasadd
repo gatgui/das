@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
    try:
       data = das.read(infile)
-   except Exception, e:
+   except Exception as e:
       sys.stderr.write("Failed to read file '%s' (%s)\n" % (e, infile))
       sys.exit(1)
 
@@ -74,7 +74,7 @@ if __name__ == "__main__":
    for key, val in keyvals:
       try:
          das.cli.add(data, key, val)
-      except Exception, e:
+      except Exception as e:
          sys.stderr.write("Failed to add value to field '%s' (%s)\n" % (key, e))
          continue
 
@@ -85,7 +85,7 @@ if __name__ == "__main__":
             sys.exit(1)
          try:
             das.write(data, outfile)
-         except Exception, e:
+         except Exception as e:
             sys.stderr.write("Failed to write file '%s' (%s)\n" % (outfile, e))
             sys.exit(1)
       else:
