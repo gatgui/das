@@ -4,6 +4,11 @@ import os
 import sys
 import das
 
+IS_PYTHON_2 = sys.version_info.major == 2
+if not IS_PYTHON_2:
+   basestring = str
+   unicode = str
+
 if __name__ == "__main__":
    schema_type = None
    strict_schema = None
@@ -132,8 +137,9 @@ if __name__ == "__main__":
                      # Put sub types under another menu
                      act = schemaMenu.addAction(typeName.split(".")[-1])
                      act.triggered.connect(self._makeNewCallback(typeName))
-                  except:
+                  except Exception as e:
                      # Ignore this type
+                     # print("Ignore this type {} reason {}".format(typeName, e))
                      pass
                subMenu = None
                for typeName in das.list_schema_types(schemaName, masters_only=False):

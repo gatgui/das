@@ -2,6 +2,7 @@ import das
 import re
 import fnmatch
 import math
+import sys
 
 NoUI = False
 
@@ -15,6 +16,14 @@ except Exception as e:
    print("Failed to import Qt (%s)" % e)
    NoUI = True
 
+IS_PYTHON_2 = sys.version_info.major == 2
+if not IS_PYTHON_2:
+   basestring = str
+   unicode = str
+   long = int
+   int = int
+   xrange = range
+   range = range
 
 if not NoUI:
    def IsPySide2():
@@ -101,7 +110,7 @@ if not NoUI:
 
       def copy(self):
          rv = FilterSet(self.name, self.mode, self.invert)
-         rv.filters = map(lambda x: x.copy(), self.filters)
+         rv.filters = list(map(lambda x: x.copy(), self.filters))
          return rv
 
       def matches(self, fullname):
@@ -520,7 +529,7 @@ if not NoUI:
                self.uniformmapping = (len(self.type.vtypeOverrides) == 0)
                if self.exists():
                   i = 0
-                  dkeys = [x for x in self.data.iterkeys()]
+                  dkeys = [x for x in iter(self.data.keys())]
                   for k in sorted(dkeys):
                      if isinstance(k, basestring):
                         itemname = k
@@ -1036,7 +1045,7 @@ if not NoUI:
          if headers is None:
             self._headers = self.AllHeaders[:]
          else:
-            hdrs = filter(lambda x: x in self.AllHeaders, headers)
+            hdrs = list(filter(lambda x: x in self.AllHeaders, headers))
             if not "Name" in hdrs:
                hdrs.insert(0, "Name")
             if not "Value" in hdrs:
@@ -1395,7 +1404,7 @@ if not NoUI:
                      rv = item.data.value_to_string()
                   else:
                      if isinstance(item.type, das.schematypes.Integer) and item.type.enum is not None:
-                        for k, v in item.type.enum.iteritems():
+                        for k, v in iter(item.type.enum.items()):
                            if v == item.data:
                               rv = k
                               break
@@ -1418,7 +1427,8 @@ if not NoUI:
             rv = item.desc
 
          if role == QtCore.Qt.DisplayRole and self._headers[index.column()] == "Value":
-            rv = "    " + rv
+            print(rv)
+            rv = "    {}".format(rv)
 
          return rv
 
@@ -1810,7 +1820,7 @@ if not NoUI:
                         if item.mappingkeytype is not None:
                            vtypes = []
                            if isinstance(item.type.vtype, das.schematypes.Or):
-                              vtypes = filter(lambda x: not isinstance(x, das.schematypes.Deprecated), item.type.vtype.types)
+                              vtypes = list(filter(lambda x: not isinstance(x, das.schematypes.Deprecated), item.type.vtype.types))
                            if len(vtypes) > 1:
                               actionAddMenu = menu.addMenu("Add to '%s'..." % ifn)
                               for ot in vtypes:
@@ -1828,7 +1838,7 @@ if not NoUI:
                            if item.resizable:
                               vtypes = []
                               if isinstance(item.type.type, das.schematypes.Or):
-                                 vtypes = filter(lambda x: not isinstance(x, das.schematypes.Deprecated), item.type.type.types)
+                                 vtypes = list(filter(lambda x: not isinstance(x, das.schematypes.Deprecated), item.type.type.types))
                               if len(vtypes) > 1:
                                  actionAddMenu = menu.addMenu("Add to '%s'" % ifn)
                                  for ot in vtypes:
@@ -1845,7 +1855,7 @@ if not NoUI:
                         else:
                            vtypes = []
                            if isinstance(item.type.type, das.schematypes.Or):
-                              vtypes = filter(lambda x: not isinstance(x, das.schematypes.Deprecated), item.type.type.types)
+                              vtypes = list(filter(lambda x: not isinstance(x, das.schematypes.Deprecated), item.type.type.types))
                            if len(vtypes) > 1:
                               actionAddMenu = menu.addMenu("Add to '%s'..." % ifn)
                               for ot in vtypes:

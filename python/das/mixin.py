@@ -64,7 +64,7 @@ def is_class_method(klass, name):
       return (getattr(klass, name).__self__ is klass)
 
 def list_methods(klass):
-   return filter(lambda x: is_instance_method(klass, x) and x not in _IgnoreMethods, dir(klass))
+   return list(filter(lambda x: is_instance_method(klass, x) and x not in _IgnoreMethods, dir(klass)))
 
 
 def get_bound_mixins(instance):

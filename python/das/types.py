@@ -2,6 +2,14 @@ import sys
 import das
 import traceback
 
+IS_PYTHON_2 = sys.version_info.major == 2
+if not IS_PYTHON_2:
+   basestring = str
+   unicode = str
+   long = int
+   int = int
+   xrange = range
+   range = range
 
 class ReservedNameError(Exception):
    def __init__(self, name):
@@ -608,7 +616,7 @@ class Dict(TypeBase, dict):
                self[k] = self._adapt_value(v, key=k)
       elif len(args) > 1:
          raise Exception("update expected at most 1 arguments, got %d" % len(args))
-      for k, v in kwargs.iteritems():
+      for k, v in iter(kwargs.items()):
          k = self._adapt_key(k)
          if k in self:
             if not k in oldvals:
@@ -623,7 +631,7 @@ class Dict(TypeBase, dict):
          try:
             for k in remvals:
                super(Dict, self).__delitem__(k)
-            for k, v in oldvals.iteritems():
+            for k, v in iter(oldvals.items()):
                super(Dict, self).__setitem__(k, v)
          except Exception as e:
             print("das.types.Dict.update: Failed to recover dict data (%s)" % e)
@@ -680,7 +688,7 @@ class Dict(TypeBase, dict):
       return [x for x in self.itervalues()]
 
    def iteritems(self):
-      for k, v in super(Dict, self).iteritems():
+      for k, v in iter(super(Dict, self).items()):
          yield k, TypeBase.TransferGlobalValidator(self, v)
 
    def items(self):
@@ -824,7 +832,10 @@ class Struct(TypeBase):
 
    # Override of dict.has_key
    def _has_key(self, k):
-      return self._dict.has_key(self._get_alias(k))
+      if IS_PYTHON_2:
+         return self._dict.has_key(self._get_alias(k))
+      else:
+         return self._get_alias(k) in self._dict
 
    # Override of dict.pop
    def _pop(self, k, *args):
@@ -906,7 +917,7 @@ class Struct(TypeBase):
                   self._check_reserved(k)
                   self._dict[k] = self._adapt_value(v, key=k)
 
-         for k, v in kwargs.iteritems():
+         for k, v in iter(kwargs.items()):
             k = self._get_alias(k)
             self._check_reserved(k)
             self._dict[k] = self._adapt_value(v, key=k)
@@ -924,7 +935,7 @@ class Struct(TypeBase):
 
    def _get_alias(self, k):
       st = self._get_schema_type()
-      if st is not None and st.has_key(k):
+      if st is not None and k in st:
          aliasname = das.schematypes.Alias.Name(st[k])
          if aliasname is not None:
             # if isinstance(st[k], das.schematypes.Deprecated):
@@ -955,7 +966,7 @@ class Struct(TypeBase):
             self.__dict__[k2] = getattr(self._dict, k)
 
    def ordered_keys(self):
-      return filter(lambda x: x in self, self._get_schema_type().ordered_keys())
+      return list(filter(lambda x: x in self, self._get_schema_type().ordered_keys()))
 
    def _itervalues(self):
       for v in self._dict.itervalues():

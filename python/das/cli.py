@@ -1,4 +1,14 @@
 import re
+import sys
+
+IS_PYTHON_2 = sys.version_info.major == 2
+if not IS_PYTHON_2:
+   basestring = str
+   unicode = str
+   long = int
+   int = int
+   xrange = range
+   range = range
 
 _opening_chars = "([{"
 _closing_chars = ")]}"

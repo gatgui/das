@@ -1,4 +1,18 @@
 import das # pylint: disable=import-error
+import sys
+
+IS_PYTHON_2 = sys.version_info.major == 2
+if not IS_PYTHON_2:
+  # Python program to  illustrate sum of two numbers.
+  def reduce(function, iterable, initializer=None):
+      it = iter(iterable)
+      if initializer is None:
+          value = next(it)
+      else:
+          value = initializer
+      for element in it:
+          value = function(value, element)
+      return value
 
 CurrencyRates = {"yen": 110.30,
                  "euro": 0.81,

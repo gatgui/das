@@ -3,7 +3,16 @@ import re
 import sys
 import datetime
 
-__version__ = "0.13.1"
+IS_PYTHON_2 = sys.version_info.major == 2
+if not IS_PYTHON_2:
+   basestring = str
+   unicode = str
+   long = int
+   int = int
+   xrange = range
+   range = range
+
+__version__ = "0.14.0"
 __verbose__ = False
 try:
    __verbose__ = (int(os.environ.get("DAS_VERBOSE", "0")) != 0)
@@ -92,7 +101,7 @@ def define_inline_type(typ):
    if typ is None:
       return schematypes.Empty()
    elif isinstance(typ, one_of):
-      otypes = map(define_inline_type, typ.types)
+      otypes = list(map(define_inline_type, typ.types))
       return schematypes.Or(*otypes)
    elif isinstance(typ, dict):
       n = len(typ)
@@ -121,7 +130,7 @@ def define_inline_type(typ):
          raise Exception("'set' execpted to have length 1")
       return schematypes.Set(define_inline_type(typ.copy().pop()))
    elif isinstance(typ, tuple):
-      tpl = map(lambda x: define_inline_type(x), typ)
+      tpl = list(map(lambda x: define_inline_type(x), typ))
       return schematypes.Tuple(*tpl)
    # Other accepted values are only class
    if not type(typ) is type:
@@ -185,7 +194,7 @@ def register_mixins(*mixins, **kwargs):
          lst.append(mixin)
          tmp[st] = lst
 
-      for k, v in tmp.iteritems():
+      for k, v in iter(tmp.items()):
          mixins = SchemaTypesRegistry.instance.get_schema_type_property(k, "mixins")
          if mixins is None:
             mixins = []
@@ -299,7 +308,13 @@ def _read_file(path, skip_content=False):
    content = ""
    md = {}
    if os.path.isfile(path):
-      with open(path, "rb") as f:
+
+      file_mode = "r"
+      if IS_PYTHON_2:
+         file_mode = "rb"
+
+      with open(path, file_mode) as f:
+         print(path)
          for l in f.readlines():
             sl = l.strip()
             if sl.startswith("#"):
@@ -324,18 +339,23 @@ def read_meta(path):
 def ascii_or_unicode(s, encoding=None):
    if isinstance(s, str):
       try:
-         s.decode("ascii")
+         if IS_PYTHON_2:
+            return s.decode("ascii")
          return s
       except Exception as e:
          if encoding is None:
             raise Exception("Input string must be 'ascii' encoded (%s)" % e)
          try:
-            return s.decode(encoding)
+            if IS_PYTHON_2:
+               return s.decode(encoding)
+            return s
          except Exception as e:
             raise Exception("Input string must be 'ascii' or '%s' encoded (%s)" % (encoding, e))
    elif isinstance(s, unicode):
       try:
-         return s.encode("ascii")
+         if IS_PYTHON_2:
+            return s.encode("ascii")
+         return s
       except:
          return s
    else:
@@ -361,10 +381,10 @@ def decode(d, encoding):
          for idx, val in enumerate(d):
             d[idx] = decode(val, encoding)
       elif isinstance(d, dict):
-         for k, v in d.iteritems():
+         for k, v in iter(d.items()):
             d[k] = decode(v, encoding)
       elif isinstance(d, Struct):
-         for k, v in d._dict.iteritems():
+         for k, v in iter(d._dict.items()):
             d[k] = decode(v, encoding)
       return d
 
@@ -418,8 +438,8 @@ def read_string(s, schema_type=None, encoding=None, strict_schema=True, **funcs)
 #           2 backward compatible
 def is_version_compatible(reqver, curver):
    try:
-      cur = map(int, curver.split("."))
-      req = map(int, reqver.split("."))
+      cur = list(map(int, curver.split(".")))
+      req = list(map(int, reqver.split(".")))
       if req[0] != cur[0]:
          return -1
       elif req[1] > cur[1]:
@@ -837,7 +857,7 @@ def read_csv(csv_path, delimiter="\t", newline="\n"):
       return []
 
    with open(csv_path, "r") as f:
-      lines = map(lambda x: re_strip.sub("", x), f.readlines())
+      lines = list(map(lambda x: re_strip.sub("", x), f.readlines()))
 
    if len(lines) == 0:
       return []
@@ -876,14 +896,14 @@ def copy(d, deep=True):
    elif isinstance(d, dict):
       if deep:
          rv = d.__class__()
-         for k, v in d.iteritems():
+         for k, v in iter(d.items()):
             rv[k] = copy(v, deep=True)
       else:
          rv = d.copy()
    elif isinstance(d, Struct):
       if deep:
          rv = d.__class__()
-         for k, v in d._dict.iteritems():
+         for k, v in iter(d._dict.items()):
             rv[k] = copy(v, deep=True)
       else:
          rv = d._copy()
@@ -942,7 +962,7 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
       i = 0
       keys = _get_sorted_keys(d)
       for k in keys:
-         stream.write("%s%s%s: " % (tindent, indent, repr(k)))
+         stream.write("{}{}{}: ".format(tindent, indent, repr(k)))
          v = d[k]
          pprint(v, stream, indent=indent, depth=depth+1, inline=True, eof=False, encoding=encoding)
          i += 1
@@ -980,12 +1000,16 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
 
    elif isinstance(d, str):
       try:
-         d.decode("ascii")
+         if IS_PYTHON_2:
+            d.decode("ascii")
       except Exception as e:
          if not encoding:
             raise Exception("Non-ascii string value found but no encoding provided (%s)." % e)
          try:
-            stream.write(repr(d.decode(encoding)))
+            if IS_PYTHON_2:
+               stream.write(repr(d.decode(encoding)))
+            else:
+               stream.write(repr(d))
          except Exception as e:
             raise Exception("Non-ascii string value cannot be decoded to '%s' (%s)." % (encoding, e))
       else:
@@ -1165,7 +1189,7 @@ def _dump_csv_data(k, d, valuetype, headers, parent=None, prefix=None):
       if not d:
          return
 
-      ckeys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
+      ckeys = list(map(lambda x: eval(repr(x)), _get_sorted_keys(d)))
 
       for ck in ckeys:
          _dump_csv_data(k + "." + ck, d[ck], valuetype.get(ck), headers, parent=parent, prefix=prefix)
@@ -1174,7 +1198,7 @@ def _dump_csv_data(k, d, valuetype, headers, parent=None, prefix=None):
       if not d:
          return
 
-      ckeys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
+      ckeys = list(map(lambda x: eval(repr(x)), _get_sorted_keys(d)))
       key_header = _get_header(prefix + k + "{key}", headers)
 
       vk = k + "{value}"
@@ -1220,18 +1244,23 @@ def write(d, path, indent="  ", encoding=None):
    if encoding is None and schema_type:
       encoding = "utf8"
 
-   with open(path, "wb") as f:
+   file_mode= "w"
+   if IS_PYTHON_2:
+      file_mode = "wb"
+      
+   with open(path, file_mode) as f:
       if encoding is not None:
-         f.write("# encoding: %s\n" % encoding)
-      f.write("# version: %s\n" % __version__)
-      f.write("# author: %s\n" % os.environ["USER" if sys.platform != "win32" else "USERNAME"])
-      f.write("# date: %s\n" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
+         f.write("# encoding: {}\n".format(encoding))
+      f.write("# version: {}\n".format(__version__))
+      f.write("# author: {}\n" .format(os.environ["USER" if sys.platform != "win32" else "USERNAME"]))
+      f.write("# date: {}\n".format(datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")))
+      f.write("# python_version : {}\n".format(sys.version))
       if schema_type:
          st = get_schema_type_name(schema_type)
-         f.write("# schema_type: %s\n" % st)
+         f.write("# schema_type: {}\n".format(st))
          sn = get_schema(st)
          if sn and sn.version is not None:
-            f.write("# schema_version: %s\n" % sn.version)
+            f.write("# schema_version: {}\n".format(sn.version))
       pprint(d, stream=f, indent=indent, encoding=encoding)
 
 
@@ -1276,7 +1305,7 @@ def write_csv(data, path, alias=None, encoding=None, delimiter="\t", newline="\n
       schem_val = _CSVValue(type_value, header_schema)
       header_schema.add_data(schem_val)
 
-      keys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
+      keys = list(map(lambda x: eval(repr(x)), _get_sorted_keys(d)))
 
       for k in keys:
          _dump_csv_data(k, d[k], schema_type[k], headers, parent=schem_val, prefix=prefix)
@@ -1286,7 +1315,7 @@ def write_csv(data, path, alias=None, encoding=None, delimiter="\t", newline="\n
       row_counts = max(map(lambda x: x.row_count(), headers))
 
       column_counts = len(headers)
-      lines = map(lambda y: map(lambda x: "", range(column_counts)), range(row_counts))
+      lines = list(map(lambda y: map(lambda x: "", range(column_counts)), range(row_counts)))
 
       for header in headers:
          for hd in header.data():
@@ -1311,7 +1340,11 @@ def write_csv(data, path, alias=None, encoding=None, delimiter="\t", newline="\n
 
 
 def generate_empty_schema(path, name=None, version=None, author=None):
-   with open(path, "wb") as f:
+   file_mode = "w"
+   if IS_PYTHON_2:
+      file_mode = "wb"
+
+   with open(path, file_mode) as f:
       if not name:
          name = os.path.basename(path).split(".")[0]
       if not author:

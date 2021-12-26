@@ -6,6 +6,17 @@ import glob
 import copy
 import das
 
+IS_PYTHON_2 = sys.version_info.major == 2
+if not IS_PYTHON_2:
+   basestring = str
+   unicode = str
+   long = int
+   int = int
+   xrange = range
+   range = range
+
+   def cmp(a, b):
+      return (a > b) - (a < b) 
 
 class UnknownSchemaError(Exception):
    def __init__(self, name):
@@ -47,12 +58,12 @@ class Schema(object):
       dmv = md.get("das_minimum_version", None)
       if dmv is not None:
          try:
-            spl = map(int, dmv.split("."))
+            spl = list(map(int, dmv.split(".")))
             wmaj, wmin = spl[0], spl[1]
          except:
             raise Exception("'das_minimum_version' must follow MAJOR.MINOR format")
          else:
-            dmaj, dmin, _ = map(int, das.__version__.split("."))
+            dmaj, dmin, _ = list(map(int, das.__version__.split(".")))
             if wmaj != dmaj or wmin > dmin:
                raise das.VersionError("Library", current_version=das.__version__, required_version=dmv)
 
@@ -101,7 +112,7 @@ class Schema(object):
          das.schematypes.TypeValidator.CurrentSchema = self.name
          rv = das.read_string(content, encoding=md.get("encoding", None), **eval_locals)
          das.schematypes.TypeValidator.CurrentSchema = ""
-         for typename, validator in rv.iteritems():
+         for typename, validator in iter(rv.items()):
             k = "%s.%s" % (self.name, typename)
             if SchemaTypesRegistry.instance.has_schema_type(k):
                raise Exception("[das] Schema type '%s' already registered in another schema" % k)
@@ -110,7 +121,7 @@ class Schema(object):
 
          mt = md.get("master_types", None)
          if mt is not None:
-            mt = filter(lambda y: len(y) > 0, map(lambda x: x.strip(), mt.split(",")))
+            mt = list(filter(lambda y: len(y) > 0, map(lambda x: x.strip(), mt.split(","))))
             self.master_types = set(map(lambda x: "%s.%s" % (self.name, x), mt))
 
          return True
@@ -128,9 +139,13 @@ class Schema(object):
    def list_types(self, sort=True, masters_only=False):
       rv = self.types.keys()
       if masters_only and self.master_types is not None:
-         rv = filter(lambda x: x in self.master_types, rv)
+         rv = list(filter(lambda x: x in self.master_types, rv))
       if sort:
-         rv.sort()
+         if IS_PYTHON_2:
+            rv.sort()
+         else:
+            rv = list(rv)
+            rv.sort()
       return rv
 
    def is_master_type(self, name):
@@ -143,7 +158,7 @@ class Schema(object):
       return self.types.get(name, None)
 
    def get_type_name(self, typ):
-      for k, v in self.types.iteritems():
+      for k, v in iter(self.types.items()):
          if type(v) != type(typ):
             continue
          if v == typ:
@@ -182,14 +197,18 @@ class SchemaLocation(object):
                self.schemas[schema.name] = schema
 
    def unload_schemas(self):
-      for _, schema in self.schemas.iteritems():
+      for _, schema in iter(self.schemas.items()):
          schema.unload()
       self.schemas = {}
 
    def list_schemas(self, sort=True):
       rv = self.schemas.keys()
       if sort:
-         rv.sort()
+         if IS_PYTHON_2:
+            rv.sort()
+         else:
+            rv = list(rv)
+            rv.sort()
       return rv
 
    def has_schema(self, name):
@@ -200,23 +219,27 @@ class SchemaLocation(object):
 
    def list_schema_types(self, schema=None, sort=True, masters_only=False):
       rv = set()
-      for n, s in self.schemas.iteritems():
+      for n, s in iter(self.schemas.items()):
          if schema is not None and n != schema:
             continue
          rv = rv.union(s.list_types(sort=False, masters_only=masters_only))
       rv = list(rv)
       if sort:
-         rv.sort()
+         if IS_PYTHON_2:
+            rv.sort()
+         else:
+            rv = list(rv)
+            rv.sort()
       return rv
 
    def has_schema_type(self, name):
-      for _, schema in self.schemas.iteritems():
+      for _, schema in iter(self.schemas.items()):
          if schema.has_type(name):
             return True
       return False
 
    def get_schema_type(self, name):
-      for sname, schema in self.schemas.iteritems():
+      for sname, schema in iter(self.schemas.items()):
          if name.startswith(sname+"."):
             rv = schema.get_type(name)
             if rv is not None:
@@ -224,7 +247,7 @@ class SchemaLocation(object):
       return None
 
    def get_schema_type_name(self, typ):
-      for _, schema in self.schemas.iteritems():
+      for _, schema in iter(self.schemas.items()):
          rv = schema.get_type_name(typ)
          if rv:
             return rv
@@ -367,11 +390,11 @@ class SchemaTypesRegistry(object):
 
       # re register dynamically added schema types
       if len(self.dyntypes):
-         for k, v in self.dyntypes.iteritems():
+         for k, v in iter(self.dyntypes.items()):
             try:
                if not self._add_schema_type(k, v):
                   print("Failed to re register dynamically added type '%s' (already registered)" % k)
-            except Exception, e:
+            except Exception as e:
                print("Failed to re register dynamically added type '%s' (%s)" % (k, e))
 
       self._rebuild_cache()
@@ -380,7 +403,11 @@ class SchemaTypesRegistry(object):
       self.load_schemas()
       rv = [x.path for x in self.locations]
       if sort:
-         rv.sort()
+         if IS_PYTHON_2:
+            rv.sort()
+         else:
+            rv = list(rv)
+            rv.sort()
       return rv
 
    def _samepath(self, path0, path1):
@@ -402,7 +429,11 @@ class SchemaTypesRegistry(object):
       self.load_schemas()
       rv = self.cache["name_to_schema"].keys()
       if sort:
-         rv.sort()
+         if IS_PYTHON_2:
+            rv.sort()
+         else:
+            rv = list(rv)
+            rv.sort()
       return rv
 
    def list_schema_types(self, schema=None, sort=True, masters_only=False):
@@ -416,7 +447,11 @@ class SchemaTypesRegistry(object):
          else:
             rv = []
       if sort:
-         rv.sort()
+         if IS_PYTHON_2:
+            rv.sort()
+         else:
+            rv = list(rv)
+            rv.sort()
       return rv
 
    def has_schema(self, name):
