@@ -1427,7 +1427,6 @@ if not NoUI:
             rv = item.desc
 
          if role == QtCore.Qt.DisplayRole and self._headers[index.column()] == "Value":
-            print(rv)
             rv = "    {}".format(rv)
 
          return rv

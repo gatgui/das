@@ -309,12 +309,7 @@ def _read_file(path, skip_content=False):
    md = {}
    if os.path.isfile(path):
 
-      file_mode = "r"
-      if IS_PYTHON_2:
-         file_mode = "rb"
-
-      with open(path, file_mode) as f:
-         print(path)
+      with open(path, "rb") as f:
          for l in f.readlines():
             sl = l.strip()
             if sl.startswith("#"):
@@ -1254,7 +1249,7 @@ def write(d, path, indent="  ", encoding=None):
       f.write("# version: {}\n".format(__version__))
       f.write("# author: {}\n" .format(os.environ["USER" if sys.platform != "win32" else "USERNAME"]))
       f.write("# date: {}\n".format(datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")))
-      f.write("# python_version : {}\n".format(sys.version))
+      f.write("# python_version : {}.{}.{}\n".format(sys.version_info.major, sys.version_info.minor, sys.version_info.micro))
       if schema_type:
          st = get_schema_type_name(schema_type)
          f.write("# schema_type: {}\n".format(st))
