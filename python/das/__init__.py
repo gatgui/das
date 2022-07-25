@@ -93,9 +93,9 @@ def define_inline_type(typ):
    if typ is None:
       return schematypes.Empty()
    elif isinstance(typ, one_of):
+      otypes = map(define_inline_type, typ.types)
       # on python 3.x, map return as generator
       # need to convert it to list
-      otypes = map(define_inline_type, typ.types)
       if not six.PY2:
          otypes = list(otypes)
       return schematypes.Or(*otypes)
@@ -433,8 +433,13 @@ def read_string(s, schema_type=None, encoding=None, strict_schema=True, **funcs)
 #           2 backward compatible
 def is_version_compatible(reqver, curver):
    try:
-      cur = list(map(int, curver.split(".")))
-      req = list(map(int, reqver.split(".")))
+      cur = map(int, curver.split("."))
+      req = map(int, reqver.split("."))
+      # on python 3.x map return as generator
+      # convert to list
+      if not six.PY2:
+         cur = list(cur)
+         req = list(req)
       if req[0] != cur[0]:
          return -1
       elif req[1] > cur[1]:
@@ -852,7 +857,11 @@ def read_csv(csv_path, delimiter="\t", newline="\n"):
       return []
 
    with open(csv_path, "r") as f:
-      lines = list(map(lambda x: re_strip.sub("", x), f.readlines()))
+      lines = map(lambda x: re_strip.sub("", x), f.readlines())
+      # on python 3.x map return as generator
+      # convert to list
+      if not six.PY2:
+         lines = list(lines)
 
    if len(lines) == 0:
       return []
@@ -1184,7 +1193,11 @@ def _dump_csv_data(k, d, valuetype, headers, parent=None, prefix=None):
       if not d:
          return
 
-      ckeys = list(map(lambda x: eval(repr(x)), _get_sorted_keys(d)))
+      ckeys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
+      # on python 3.x map return as generator
+      # convert to list
+      if not six.PY2:
+         ckeys = list(ckeys)
 
       for ck in ckeys:
          _dump_csv_data(k + "." + ck, d[ck], valuetype.get(ck), headers, parent=parent, prefix=prefix)
@@ -1193,7 +1206,11 @@ def _dump_csv_data(k, d, valuetype, headers, parent=None, prefix=None):
       if not d:
          return
 
-      ckeys = list(map(lambda x: eval(repr(x)), _get_sorted_keys(d)))
+      ckeys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
+      # on python 3.x map return as generator
+      # convert to list
+      if not six.PY2:
+         ckeys = list(ckeys)
       key_header = _get_header(prefix + k + "{key}", headers)
 
       vk = k + "{value}"
@@ -1300,7 +1317,11 @@ def write_csv(data, path, alias=None, encoding=None, delimiter="\t", newline="\n
       schem_val = _CSVValue(type_value, header_schema)
       header_schema.add_data(schem_val)
 
-      keys = list(map(lambda x: eval(repr(x)), _get_sorted_keys(d)))
+      keys = map(lambda x: eval(repr(x)), _get_sorted_keys(d))
+      # on python 3.x map return as generator
+      # convert to list
+      if not six.PY2:
+         keys = list(keys)
 
       for k in keys:
          _dump_csv_data(k, d[k], schema_type[k], headers, parent=schem_val, prefix=prefix)
@@ -1310,7 +1331,11 @@ def write_csv(data, path, alias=None, encoding=None, delimiter="\t", newline="\n
       row_counts = max(map(lambda x: x.row_count(), headers))
 
       column_counts = len(headers)
-      lines = list(map(lambda y: map(lambda x: "", six.moves.xrange(column_counts)), six.moves.xrange(row_counts)))
+      lines = map(lambda y: map(lambda x: "", six.moves.xrange(column_counts)), six.moves.xrange(row_counts))
+      # on python 3.x map return as generator
+      # need to convert to list
+      if not six.PY2:
+         lines = list(lines)
 
       for header in headers:
          for hd in header.data():
