@@ -93,7 +93,11 @@ def define_inline_type(typ):
    if typ is None:
       return schematypes.Empty()
    elif isinstance(typ, one_of):
-      otypes = list(map(define_inline_type, typ.types))
+      # on python 3.x, map return as generator
+      # need to convert it to list
+      otypes = map(define_inline_type, typ.types)
+      if not six.PY2:
+         otypes = list(otypes)
       return schematypes.Or(*otypes)
    elif isinstance(typ, dict):
       n = len(typ)
@@ -122,7 +126,11 @@ def define_inline_type(typ):
          raise Exception("'set' execpted to have length 1")
       return schematypes.Set(define_inline_type(typ.copy().pop()))
    elif isinstance(typ, tuple):
-      tpl = list(map(lambda x: define_inline_type(x), typ))
+      # on python 3.x, map return as generator
+      # need to convert it to list
+      tpl = map(lambda x: define_inline_type(x), typ)
+      if not six.PY2:
+         tpl = list(tpl)
       return schematypes.Tuple(*tpl)
    # Other accepted values are only class
    if not type(typ) is type:
@@ -186,7 +194,7 @@ def register_mixins(*mixins, **kwargs):
          lst.append(mixin)
          tmp[st] = lst
 
-      for k, v in iter(tmp.items()):
+      for k, v in six.iteritems(tmp):
          mixins = SchemaTypesRegistry.instance.get_schema_type_property(k, "mixins")
          if mixins is None:
             mixins = []
@@ -368,10 +376,10 @@ def decode(d, encoding):
          for idx, val in enumerate(d):
             d[idx] = decode(val, encoding)
       elif isinstance(d, dict):
-         for k, v in iter(d.items()):
+         for k, v in six.iteritems(d):
             d[k] = decode(v, encoding)
       elif isinstance(d, Struct):
-         for k, v in iter(d._dict.items()):
+         for k, v in six.iteritems(d._dict):
             d[k] = decode(v, encoding)
       return d
 
@@ -883,14 +891,14 @@ def copy(d, deep=True):
    elif isinstance(d, dict):
       if deep:
          rv = d.__class__()
-         for k, v in iter(d.items()):
+         for k, v in six.iteritems(d):
             rv[k] = copy(v, deep=True)
       else:
          rv = d.copy()
    elif isinstance(d, Struct):
       if deep:
          rv = d.__class__()
-         for k, v in iter(d._dict.items()):
+         for k, v in six.iteritems(d._dict):
             rv[k] = copy(v, deep=True)
       else:
          rv = d._copy()
