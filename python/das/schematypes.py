@@ -2,15 +2,7 @@ import re
 import das
 import imp
 import sys
-
-IS_PYTHON_2 = sys.version_info.major == 2
-if not IS_PYTHON_2:
-   basestring = str
-   unicode = str
-   long = int
-   int = int
-   xrange = range
-   range = range
+import six
 
 class ValidationError(Exception):
    def __init__(self, msg):
@@ -138,7 +130,7 @@ class Boolean(TypeValidator):
 
    def _validate_self(self, value):
       if not isinstance(value, bool):
-         if isinstance(value, basestring):
+         if isinstance(value, six.string_types):
             if self.TrueExp.match(value):
                return True
             elif self.FalseExp.match(value):
@@ -185,23 +177,23 @@ class Integer(TypeValidator):
 
    def _validate_self(self, value):
       if self.enum is not None:
-         if isinstance(value, basestring):
+         if isinstance(value, six.string_types):
             v = das.ascii_or_unicode(value)
             if not v in self.enum:
                raise ValidationError("Expected a enumeration string in %s, got %s" % (self.enum.keys(), repr(value)))
             else:
                value = self.enum[v]
-         elif isinstance(value, (int, long)):
+         elif isinstance(value, six.integer_types):
             if not value in self.enumvals:
                raise ValidationError("Expected a enumeration value (string or integer) in %s, got %s" % (self.enum, value))
-      if not isinstance(value, (int, long)):
+      if not isinstance(value, six.integer_types):
          raise ValidationError("Expected an integer value, got %s" % type(value).__name__)
       if self.enum is None:
          if self.min is not None and value < self.min:
             raise ValidationError("Integer value out of range, %d < %d" % (value, self.min))
          if self.max is not None and value > self.max:
             raise ValidationError("Integer value out of range, %d > %d" % (value, self.max))
-      return long(value)
+      return six.integer_types[-1](value)
 
    def _validate(self, value, key=None, index=None):
       return self._validate_self(value)
@@ -271,7 +263,7 @@ class Real(TypeValidator):
       self.max = max
 
    def _validate_self(self, value):
-      if not isinstance(value, (int, long, float)):
+      if not isinstance(value, (six.integer_types, float)):
          raise ValidationError("Expected a real value, got %s" % type(value).__name__)
       if self.min is not None and value < self.min:
          raise ValidationError("Real value out of range, %d < %d" % (value, self.min))
@@ -329,7 +321,7 @@ class String(TypeValidator):
       self.strict = strict
       self.matches = None
       if choices is None and matches is not None:
-         if isinstance(matches, basestring):
+         if isinstance(matches, six.string_types):
             self.matches = re.compile(matches)
          elif isinstance(matches, re._pattern_type):
             self.matches = matches
@@ -346,7 +338,7 @@ class String(TypeValidator):
       return (set(rv) if asSet else rv)
 
    def _validate_self(self, value):
-      if not isinstance(value, basestring):
+      if not isinstance(value, six.string_types):
          raise ValidationError("Expected a string value, got %s" % type(value).__name__)
       v = das.ascii_or_unicode(value)
       if self.choices is not None and self.strict:
@@ -636,7 +628,7 @@ class Tuple(TypeValidator):
          self._validate_self(value)
          n = len(value)
          tmp = [None] * n
-         for i in xrange(n):
+         for i in six.moves.xrange(n):
             try:
                tmp[i] = self.types[i].validate(value[i])
             except ValidationError as e:
@@ -660,7 +652,7 @@ class Tuple(TypeValidator):
          if len(_st.types) != len(self.types):
             return False
          else:
-            for i in xrange(len(self.types)):
+            for i in six.moves.xrange(len(self.types)):
                if not self.types[i].is_type_compatible(_st.types[i]):
                   return False
             else:
@@ -743,7 +735,7 @@ class Struct(TypeValidator, dict):
 
       # Keep mapping of aliases
       self._aliases = {}
-      if IS_PYTHON_2:
+      if six.PY2:
           union_items = self.items() + removedItems
       else:
          union_items = self.items() | removedItems
@@ -779,7 +771,7 @@ class Struct(TypeValidator, dict):
          self[name] = value
 
    def _fix_order(self, order, extraItems=None):
-      if IS_PYTHON_2:
+      if six.PY2:
          union_items = (self.items() + (extraItems or []))
       else:
          union_items = (self.items() | (extraItems or []))
@@ -943,7 +935,7 @@ class Struct(TypeValidator, dict):
       return self
 
    def _aliased_type(self, nameOrType):
-      if isinstance(nameOrType, basestring):
+      if isinstance(nameOrType, six.string_types):
          vt = self[nameOrType]
       elif isinstance(nameOrType, TypeValidator):
          vt = nameOrType
@@ -953,7 +945,7 @@ class Struct(TypeValidator, dict):
       return (vt if an is None else self[an])
 
    def _is_alias(self, nameOrType):
-      if isinstance(nameOrType, basestring):
+      if isinstance(nameOrType, six.string_types):
          vt = self[nameOrType]
       elif isinstance(nameOrType, TypeValidator):
          vt = nameOrType
@@ -1261,7 +1253,7 @@ class DynamicDict(Dict):
 
 class Class(TypeValidator):
    def __init__(self, klass, default=None, description=None, editable=True, hidden=False, __properties__=None):
-      if not isinstance(klass, (str, unicode)):
+      if not isinstance(klass, (str, six.text_type)):
          self.klass = self._validate_class(klass)
       else:
          self.klass = self._class(klass)
@@ -1291,7 +1283,7 @@ class Class(TypeValidator):
 
    def _validate_self(self, value):
       if not isinstance(value, self.klass):
-         if isinstance(value, basestring) and hasattr(self.klass, "string_to_value"):
+         if isinstance(value, six.string_types) and hasattr(self.klass, "string_to_value"):
             try:
                newval = self.klass()
                newval.string_to_value(value)
@@ -1365,7 +1357,7 @@ class Or(TypeValidator):
             emsgs.append(str(e))
             continue
       emsg = "Value of type %s doesn't match any of the allowed types" % type(value).__name__
-      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
+      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in six.moves.xrange(len(emsgs))])
       raise ValidationError(emsg)
 
    def _validate(self, value, key=None, index=None):
@@ -1389,7 +1381,7 @@ class Or(TypeValidator):
             emsgs.append(str(e))
             continue
       emsg = "Value of type %s doesn't match any of the allowed types" % type(value).__name__
-      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
+      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in six.moves.xrange(len(emsgs))])
       raise ValidationError(emsg)
 
    def is_type_compatible(self, st, key=None, index=None):
@@ -1443,7 +1435,7 @@ class Or(TypeValidator):
             emsgs.append(str(e))
 
       emsg = "Cannot make any of the allowed types from arguments (args=%s, kwargs=%s)" % (repr(args), repr(kwargs))
-      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
+      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in six.moves.xrange(len(emsgs))])
       raise ValidationError(emsg)
 
    def conform(self, args, fill=False):
@@ -1455,7 +1447,7 @@ class Or(TypeValidator):
             emsgs.append(str(e))
 
       emsg = "Cannot conform to any of the allowed types (args=%s, fill=%s)" % (repr(args), repr(fill))
-      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
+      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in six.moves.xrange(len(emsgs))])
       raise ValidationError(emsg)
 
    def partial_make(self, args):
@@ -1467,7 +1459,7 @@ class Or(TypeValidator):
             emsgs.append(str(e))
 
       emsg = "Value of type %s doesn't match any of the allowed types" % type(args).__name__
-      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in xrange(len(emsgs))])
+      emsg += "".join(["\n  Type %d error: %s" % (x, emsgs[x]) for x in six.moves.xrange(len(emsgs))])
       raise ValidationError(emsg)
 
    def __repr__(self):

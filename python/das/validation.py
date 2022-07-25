@@ -5,16 +5,9 @@ import imp
 import glob
 import copy
 import das
+import six
 
-IS_PYTHON_2 = sys.version_info.major == 2
-if not IS_PYTHON_2:
-   basestring = str
-   unicode = str
-   long = int
-   int = int
-   xrange = range
-   range = range
-
+if not six.PY2:
    def cmp(a, b):
       return (a > b) - (a < b) 
 
@@ -139,13 +132,9 @@ class Schema(object):
    def list_types(self, sort=True, masters_only=False):
       rv = self.types.keys()
       if masters_only and self.master_types is not None:
-         rv = list(filter(lambda x: x in self.master_types, rv))
+         rv = [x for x in self.master_types if x in rv]
       if sort:
-         if IS_PYTHON_2:
-            rv.sort()
-         else:
-            rv = list(rv)
-            rv.sort()
+         rv.sort()
       return rv
 
    def is_master_type(self, name):
@@ -203,12 +192,12 @@ class SchemaLocation(object):
 
    def list_schemas(self, sort=True):
       rv = self.schemas.keys()
+      # in python 3.x dict.keys() no longer return as list
+      # so we need to convert it
+      if not six.PY2:
+         rv = list(rv)
       if sort:
-         if IS_PYTHON_2:
-            rv.sort()
-         else:
-            rv = list(rv)
-            rv.sort()
+         rv.sort()
       return rv
 
    def has_schema(self, name):
@@ -225,11 +214,7 @@ class SchemaLocation(object):
          rv = rv.union(s.list_types(sort=False, masters_only=masters_only))
       rv = list(rv)
       if sort:
-         if IS_PYTHON_2:
-            rv.sort()
-         else:
-            rv = list(rv)
-            rv.sort()
+         rv.sort()
       return rv
 
    def has_schema_type(self, name):
@@ -403,11 +388,7 @@ class SchemaTypesRegistry(object):
       self.load_schemas()
       rv = [x.path for x in self.locations]
       if sort:
-         if IS_PYTHON_2:
-            rv.sort()
-         else:
-            rv = list(rv)
-            rv.sort()
+         rv.sort()
       return rv
 
    def _samepath(self, path0, path1):
@@ -428,18 +409,18 @@ class SchemaTypesRegistry(object):
    def list_schemas(self, sort=True):
       self.load_schemas()
       rv = self.cache["name_to_schema"].keys()
+      if not six.PY2:
+         rv = list(rv)
       if sort:
-         if IS_PYTHON_2:
-            rv.sort()
-         else:
-            rv = list(rv)
-            rv.sort()
+         rv.sort()
       return rv
 
    def list_schema_types(self, schema=None, sort=True, masters_only=False):
       self.load_schemas()
       if schema is None:
          rv = self.cache["name_to_type"].keys()
+         if not six.PY2:
+            rv = list(rv)
       else:
          schema = self.cache["name_to_schema"].get(schema, None)
          if schema:
@@ -447,11 +428,7 @@ class SchemaTypesRegistry(object):
          else:
             rv = []
       if sort:
-         if IS_PYTHON_2:
-            rv.sort()
-         else:
-            rv = list(rv)
-            rv.sort()
+         rv.sort()
       return rv
 
    def has_schema(self, name):

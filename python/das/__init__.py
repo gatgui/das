@@ -2,15 +2,7 @@ import os
 import re
 import sys
 import datetime
-
-IS_PYTHON_2 = sys.version_info.major == 2
-if not IS_PYTHON_2:
-   basestring = str
-   unicode = str
-   long = int
-   int = int
-   xrange = range
-   range = range
+import six
 
 __version__ = "0.14.0"
 __verbose__ = False
@@ -62,7 +54,7 @@ def has_schema(name):
 
 
 def get_schema(name_or_type):
-   if not isinstance(name_or_type, basestring):
+   if not isinstance(name_or_type, six.string_types):
       name_or_type = get_schema_type_name(name_or_type)
    name = name_or_type.split(".")[0]
    return SchemaTypesRegistry.instance.get_schema(name)
@@ -109,7 +101,7 @@ def define_inline_type(typ):
          raise Exception("'dict' execpted to have length at least 1")
       stringkeys = True
       for k in typ.keys():
-         if not isinstance(k, basestring):
+         if not isinstance(k, six.string_types):
             stringkeys = False
             break
       if stringkeys:
@@ -135,9 +127,9 @@ def define_inline_type(typ):
    # Other accepted values are only class
    if not type(typ) is type:
       raise Exception("'%s' is not a type" % typ)
-   elif issubclass(typ, basestring):
+   elif issubclass(typ, six.string_types):
       return schematypes.String()
-   elif typ in (int, long):
+   elif typ in six.integer_types:
       return schematypes.Integer()
    elif typ in (float,):
       return schematypes.Real()
@@ -153,7 +145,7 @@ def register_mixins(*mixins, **kwargs):
       print("[das] Register mixins: %s%s" % (", ".join(map(lambda x: x.__module__ + "." + x.__name__, mixins)), "" if schema_type is None else " (%s)" % repr(schema_type)))
 
    if schema_type is not None:
-      if isinstance(schema_type, basestring):
+      if isinstance(schema_type, six.string_types):
          stn = schema_type
          try:
             schema_type = get_schema_type(schema_type)
@@ -268,7 +260,7 @@ def conform(value, schema_type, fill=False):
 
 
 def validate(d, schema_type):
-   if not isinstance(schema_type, (basestring, TypeValidator)):
+   if not isinstance(schema_type, (six.string_types, TypeValidator)):
       raise Exception("Expected a string or a das.schematypes.TypeValidator instance as second argument")
    if isinstance(schema_type, TypeValidator):
       return schema_type.validate(d)
@@ -277,7 +269,7 @@ def validate(d, schema_type):
 
 
 def check(d, schema_type):
-   if not isinstance(schema_type, (basestring, TypeValidator)):
+   if not isinstance(schema_type, (six.string_types, TypeValidator)):
       raise Exception("Expected a string or a das.schematypes.TypeValidator instance as second argument")
    try:
       if isinstance(schema_type, TypeValidator):
@@ -290,7 +282,7 @@ def check(d, schema_type):
 
 
 def is_compatible(d, schema_type):
-   if not isinstance(schema_type, (basestring, TypeValidator)):
+   if not isinstance(schema_type, (six.string_types, TypeValidator)):
       raise Exception("Expected a string or a das.schematypes.TypeValidator instance as second argument") 
    try:
       if isinstance(schema_type, TypeValidator):
@@ -334,21 +326,21 @@ def read_meta(path):
 def ascii_or_unicode(s, encoding=None):
    if isinstance(s, str):
       try:
-         if IS_PYTHON_2:
+         if six.PY2:
             return s.decode("ascii")
          return s
       except Exception as e:
          if encoding is None:
             raise Exception("Input string must be 'ascii' encoded (%s)" % e)
          try:
-            if IS_PYTHON_2:
+            if six.PY2:
                return s.decode(encoding)
             return s
          except Exception as e:
             raise Exception("Input string must be 'ascii' or '%s' encoded (%s)" % (encoding, e))
-   elif isinstance(s, unicode):
+   elif isinstance(s, six.text_type):
       try:
-         if IS_PYTHON_2:
+         if six.PY2:
             return s.encode("ascii")
          return s
       except:
@@ -364,7 +356,7 @@ def decode(d, encoding):
       except Exception as e:
          print_once("[das] '%s._decode' method call failed (%s)\n[das] Fallback to default decoding" % (d.__class__.__name__, e))
 
-   if isinstance(d, basestring):
+   if isinstance(d, six.string_types):
       return ascii_or_unicode(d, encoding=encoding)
    elif isinstance(d, tuple):
       return d.__class__([decode(x, encoding) for x in d])
@@ -386,7 +378,7 @@ def decode(d, encoding):
 
 def read_string(s, schema_type=None, encoding=None, strict_schema=True, **funcs):
    if schema_type is not None:
-      if isinstance(schema_type, basestring):
+      if isinstance(schema_type, six.string_types):
          schname = schema_type
          sch = get_schema_type(schema_type)
       elif isinstance(schema_type, TypeValidator):
@@ -724,7 +716,7 @@ def _read_csv(value, row, header, headers, schematype, data, csv):
    if re_a_index.search(header):
       int_res = re_int.match(value)
       if int_res:
-         for _ in range(int(int_res.group(1)) + 1 - len(parent)):
+         for _ in six.moves.xrange(int(int_res.group(1)) + 1 - len(parent)):
             parent.append(_Placeholder.make_place_holder(_get_actual_type(st.type), is_optional=is_optional))
 
       return
@@ -777,7 +769,7 @@ def read_csv_table(csv_table):
       mtn = hr.group(1)
       if mtn == "schematype":
          cur = None
-         for r in range(row_size):
+         for r in six.moves.xrange(row_size):
             tv = data_table[r][column]
 
             if tv:
@@ -812,7 +804,7 @@ def read_csv_table(csv_table):
       con_headers = {}
       header_map[k] = con_headers
 
-      for c in range(column, col_size):
+      for c in six.moves.xrange(column, col_size):
          if regex.search(headers[c]):
             con_headers[regex.sub("", headers[c])] = c
             cln_list.append(c)
@@ -829,7 +821,7 @@ def read_csv_table(csv_table):
       read_data = {}
       for c in column_map[typ]:
          header = regex.sub("", headers[c])
-         for r in range(row_start, row_end + 1):
+         for r in six.moves.xrange(row_start, row_end + 1):
             _read_csv(data_table[r][c], r, header, con_headers, schema_type, read_data, data_table)
 
       _Placeholder.finalize(read_data)
@@ -928,7 +920,7 @@ def _get_sorted_keys(d):
 
    for k in keys:
       # We assume string keys are 'ascii'
-      if isinstance(k, unicode):
+      if isinstance(k, six.text_type):
          try:
             k = k.encode("ascii")
          except:
@@ -995,13 +987,13 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
 
    elif isinstance(d, str):
       try:
-         if IS_PYTHON_2:
+         if six.PY2:
             d.decode("ascii")
       except Exception as e:
          if not encoding:
             raise Exception("Non-ascii string value found but no encoding provided (%s)." % e)
          try:
-            if IS_PYTHON_2:
+            if six.PY2:
                stream.write(repr(d.decode(encoding)))
             else:
                stream.write(repr(d))
@@ -1015,7 +1007,7 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
          nlines = len(lines)
          if nlines > 1:
             stream.write("'''")
-            for i in xrange(nlines):
+            for i in six.moves.xrange(nlines):
                stream.write(lines[i])
                if i + 1 < nlines:
                   stream.write("\n")
@@ -1024,7 +1016,7 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
             # stream.write("'%s'" % d)
             stream.write(repr(d))
 
-   elif isinstance(d, unicode):
+   elif isinstance(d, six.text_type):
       try:
          s = d.encode("ascii")
       except:
@@ -1035,7 +1027,7 @@ def pprint(d, stream=None, indent="  ", depth=0, inline=False, eof=True, encodin
          nlines = len(lines)
          if nlines > 1:
             stream.write("'''")
-            for i in xrange(nlines):
+            for i in six.moves.xrange(nlines):
                stream.write(lines[i])
                if i + 1 < nlines:
                   stream.write("\n")
@@ -1240,7 +1232,7 @@ def write(d, path, indent="  ", encoding=None):
       encoding = "utf8"
 
    file_mode= "w"
-   if IS_PYTHON_2:
+   if six.PY2:
       file_mode = "wb"
       
    with open(path, file_mode) as f:
@@ -1310,7 +1302,7 @@ def write_csv(data, path, alias=None, encoding=None, delimiter="\t", newline="\n
       row_counts = max(map(lambda x: x.row_count(), headers))
 
       column_counts = len(headers)
-      lines = list(map(lambda y: map(lambda x: "", range(column_counts)), range(row_counts)))
+      lines = list(map(lambda y: map(lambda x: "", six.moves.xrange(column_counts)), six.moves.xrange(row_counts)))
 
       for header in headers:
          for hd in header.data():
@@ -1324,7 +1316,7 @@ def write_csv(data, path, alias=None, encoding=None, delimiter="\t", newline="\n
             er = sr + (hd.count() if header.fill() else 1)
             c = header.column()
 
-            for r in range(sr, er):
+            for r in six.moves.xrange(sr, er):
                if lines[r][c] != "":
                   raise Exception("Invalid index. There is a data at [%s][%s] already" % (r, c))
                lines[r][c] = vv
@@ -1336,7 +1328,7 @@ def write_csv(data, path, alias=None, encoding=None, delimiter="\t", newline="\n
 
 def generate_empty_schema(path, name=None, version=None, author=None):
    file_mode = "w"
-   if IS_PYTHON_2:
+   if six.PY2:
       file_mode = "wb"
 
    with open(path, file_mode) as f:

@@ -1,14 +1,6 @@
 import re
 import sys
-
-IS_PYTHON_2 = sys.version_info.major == 2
-if not IS_PYTHON_2:
-   basestring = str
-   unicode = str
-   long = int
-   int = int
-   xrange = range
-   range = range
+import six
 
 _opening_chars = "([{"
 _closing_chars = ")]}"
@@ -63,7 +55,7 @@ def _generic_do(data, key, val=None, attrfunc=None, subscriptfunc=None):
 
    retval = None
 
-   for i in xrange(nparts):
+   for i in six.moves.xrange(nparts):
       part = parts[i]
       if not part:
          continue
@@ -93,7 +85,7 @@ def _generic_do(data, key, val=None, attrfunc=None, subscriptfunc=None):
          nsubscripts = len(subscripts)
 
          field = getattr(field, part)
-         for j in xrange(nsubscripts):
+         for j in six.moves.xrange(nsubscripts):
             subscript = subscripts[j]
             lastsubscript = (j + 1 == nsubscripts)
             if lastsubscript and subscriptfunc:

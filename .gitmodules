@@ -4,3 +4,6 @@
 [submodule "Qute"]
 	path = Qute
 	url = git://github.com/gatgui/Qt.py
+[submodule "six"]
+	path = six
+	url = git@github.com:benjaminp/six.git

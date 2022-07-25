@@ -3,11 +3,7 @@
 import os
 import sys
 import das
-
-IS_PYTHON_2 = sys.version_info.major == 2
-if not IS_PYTHON_2:
-   basestring = str
-   unicode = str
+import six
 
 if __name__ == "__main__":
    schema_type = None
@@ -193,7 +189,7 @@ if __name__ == "__main__":
             # PyQt4 and PySide behaves in a difference way
             #   PyQt4  : QFileDialog.getOpenFileName -> str        [file path]
             #   PySide : QFileDialog.getOpenFileName -> (str, str) [file path, filter]
-            if not isinstance(rv, basestring):
+            if not isinstance(rv, six.string_types):
                rv = rv[0]
             if rv and os.path.isfile(rv):
                try:
@@ -214,7 +210,7 @@ if __name__ == "__main__":
 
          def onSaveAs(self):
             rv = QtWidgets.QFileDialog.getSaveFileName(self, "Save File", "", "All Files (*.*)")
-            if not isinstance(rv, basestring):
+            if not isinstance(rv, six.string_types):
                rv = rv[0]
             if rv:
                self.path = rv

@@ -3,6 +3,7 @@ import re
 import fnmatch
 import math
 import sys
+import six
 
 NoUI = False
 
@@ -15,15 +16,6 @@ try:
 except Exception as e:
    print("Failed to import Qt (%s)" % e)
    NoUI = True
-
-IS_PYTHON_2 = sys.version_info.major == 2
-if not IS_PYTHON_2:
-   basestring = str
-   unicode = str
-   long = int
-   int = int
-   xrange = range
-   range = range
 
 if not NoUI:
    def IsPySide2():
@@ -129,7 +121,7 @@ if not NoUI:
          return ((not rv) if self.invert else rv)
 
       def add(self, flt, force=False):
-         for i in xrange(len(self.filters)):
+         for i in six.moves.xrange(len(self.filters)):
             if flt.name == self.filters[i].name:
                if force:
                   self.filters[i] = flt.copy()
@@ -155,9 +147,9 @@ if not NoUI:
          self.filters = []
 
       def remove(self, idxOrName):
-         if isinstance(idxOrName, basestring):
+         if isinstance(idxOrName, six.string_types):
             idx = -1
-            for i in xrange(len(self.filters)):
+            for i in six.moves.xrange(len(self.filters)):
                if idxOrName == self.filters[i].name:
                   idx = i
                   break
@@ -301,11 +293,11 @@ if not NoUI:
                self.typestr = "empty"
             elif isinstance(self.data, bool):
                self.typestr = "boolean"
-            elif isinstance(self.data, (int, long)):
+            elif isinstance(self.data, six.integer_types):
                self.typestr = "integer"
             elif isinstance(self.data, float):
                self.typestr = "real"
-            elif isinstance(self.data, basestring):
+            elif isinstance(self.data, six.string_types):
                self.typestr = "string"
             else:
                self.typestr = self.class_name(self.data.__class__)
@@ -336,7 +328,9 @@ if not NoUI:
                   values.append(("boolean", v))
             elif isinstance(t, das.schematypes.Integer):
                try:
-                  v = long(s)
+                  # in python 2.7 six.integer_types return as two tuples int and long
+                  # in python 3 return only one tuple
+                  v = six.integer_types[-1](s)
                   t._validate_self(v)
                   values.append(("integer", v))
                except:
@@ -457,7 +451,7 @@ if not NoUI:
                self.resizable = True
                self.orderable = True
                if self.exists():
-                  for i in xrange(len(self.data)):
+                  for i in six.moves.xrange(len(self.data)):
                      itemname = "[%d]" % i
                      itemdata = self.data[i]
                      newitem = ModelItem(itemname, row=i, parent=self)
@@ -469,7 +463,7 @@ if not NoUI:
                self.resizable = False
                self.orderable = True
                if self.exists():
-                  for i in xrange(len(self.data)):
+                  for i in six.moves.xrange(len(self.data)):
                      itemname = "(%d)" % i
                      itemdata = self.data[i]
                      newitem = ModelItem(itemname, row=i, parent=self)
@@ -531,7 +525,7 @@ if not NoUI:
                   i = 0
                   dkeys = [x for x in iter(self.data.keys())]
                   for k in sorted(dkeys):
-                     if isinstance(k, basestring):
+                     if isinstance(k, six.string_types):
                         itemname = k
                      elif hasattr(k, "value_to_string"):
                         itemname = k.value_to_string()
@@ -1001,7 +995,7 @@ if not NoUI:
             if item.type.min is not None and item.type.max is not None:
                data = widget.value()
             else:
-               data = long(widget.text())
+               data = six.integer_types[-1](widget.text())
          return model.setData(modelIndex, data, QtCore.Qt.EditRole)
 
       def setFltModelData(self, widget, model, modelIndex):
@@ -1243,7 +1237,7 @@ if not NoUI:
          while idx < cnt:
             curKey = curKey + ("." if curKey else "") + spl[idx]
             nr = self.rowCount(parentIndex)
-            for r in xrange(nr):
+            for r in six.moves.xrange(nr):
                index = self.index(r, 0, parentIndex)
                if index.isValid():
                   item = index.internalPointer()
@@ -2006,7 +2000,7 @@ if not NoUI:
                self.expandedState[k] = self.isExpanded(index)
 
          nr = self.model.rowCount(index)
-         for r in xrange(nr):
+         for r in six.moves.xrange(nr):
             self.resetExpandedState(index=self.model.index(r, 0, index))
 
          self.model.layoutChanged.emit()
@@ -2026,7 +2020,7 @@ if not NoUI:
                stateSet = True
 
          nr = self.model.rowCount(index)
-         for r in xrange(nr):
+         for r in six.moves.xrange(nr):
             if self.restoreExpandedState(index=self.model.index(r, 0, index)):
                stateSet = True
 
@@ -2223,7 +2217,7 @@ if not NoUI:
             curseq = parentIndex.internalPointer().data
             newseq = []
             remrows = set([index.row() for index in indices])
-            for row in xrange(len(curseq)):
+            for row in six.moves.xrange(len(curseq)):
                if not row in remrows:
                   newseq.append(curseq[row])
 

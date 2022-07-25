@@ -1,15 +1,7 @@
 import sys
 import das
 import traceback
-
-IS_PYTHON_2 = sys.version_info.major == 2
-if not IS_PYTHON_2:
-   basestring = str
-   unicode = str
-   long = int
-   int = int
-   xrange = range
-   range = range
+import six
 
 class ReservedNameError(Exception):
    def __init__(self, name):
@@ -832,10 +824,7 @@ class Struct(TypeBase):
 
    # Override of dict.has_key
    def _has_key(self, k):
-      if IS_PYTHON_2:
-         return self._dict.has_key(self._get_alias(k))
-      else:
-         return self._get_alias(k) in self._dict
+      return self._get_alias(k) in self._dict
 
    # Override of dict.pop
    def _pop(self, k, *args):
