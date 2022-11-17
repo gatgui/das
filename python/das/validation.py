@@ -134,6 +134,8 @@ class Schema(object):
       if masters_only and self.master_types is not None:
          rv = [x for x in self.master_types if x in rv]
       if sort:
+         if not six.PY2:
+            rv = list(rv)
          rv.sort()
       return rv
 

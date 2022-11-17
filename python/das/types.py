@@ -957,17 +957,26 @@ class Struct(TypeBase):
    def ordered_keys(self):
       return list(filter(lambda x: x in self, self._get_schema_type().ordered_keys()))
 
-   def _itervalues(self):
-      for v in self._dict.itervalues():
-         yield TypeBase.TransferGlobalValidator(self, v)
+   if six.PY2:
+      def _itervalues(self):
+         for v in self._dict.values():
+            yield TypeBase.TransferGlobalValidator(self, v)
 
-   def _values(self):
-      return [x for x in self.itervalues()]
+      def _iteritems(self):
+         for k, v in self._dict.items():
+            yield k, TypeBase.TransferGlobalValidator(self, v)
 
-   def _iteritems(self):
-      for k, v in self._dict.iteritems():
-         yield k, TypeBase.TransferGlobalValidator(self, v)
+      def _values(self):
+         return [x for x in self.itervalues()]
 
-   def _items(self):
-      return [x for x in self.iteritems()]
+      def _items(self):
+         return [x for x in self.iteritems()]
+   else:
+      def _values(self):
+         for v in self._dict.values():
+            yield TypeBase.TransferGlobalValidator(self, v)
+
+      def _items(self):
+         for k, v in self._dict.items():
+            yield k, TypeBase.TransferGlobalValidator(self, v)
 

@@ -319,6 +319,11 @@ def _read_file(path, skip_content=False):
                      md[m.group(1)] = m.group(2)
             else:
                reading_content = True
+               if not six.PY2:
+                  suffix_L = re.compile(r"^\s*([^:]+):\s*(.*)(L)")
+                  m = suffix_L.match(sl[1:])
+                  if m:
+                     l = re.sub(m.group(3), "", l)
                if skip_content:
                   break
                else:
